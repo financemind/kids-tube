@@ -1,24 +1,49 @@
 """Build videos.json from the official YouTube channel feeds.
 
 Usage: python3 kids-tube/tools/update_videos.py
-Only channels listed in CHANNELS are used. Shorts and videos that
-YouTube does not allow to be embedded are skipped.
+Only channels listed in CHANNELS are used. Shorts, live streams and
+videos that YouTube does not allow to be embedded are skipped.
 """
 import json
 import pathlib
+import re
 import urllib.error
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
+# Watch-time limit for shows the parents want watched less (minutes).
+# day: most per day; a day at or over it also hides the show the next day.
+# week: most in the last 7 days.
+LIMITED = {"day": 20, "week": 60}
+
 CHANNELS = [
-    # (key, title shown in the app, channel id)
-    ("sesame", "Sesame Street", "UCoookXUzPciGrEZEXmh4Jjg"),
-    ("blippi", "Blippi", "UC5PYHgAzJ1wLEidB58SK6Xw"),
-    ("numberblocks", "Numberblocks", "UCPlwvN0w4qFSP1FllALB92w"),
-    ("peppa", "Peppa Pig", "UCAOtE1V7Ots4DjM8JLlrYgg"),
-    ("bluey", "Bluey", "UCEC-8nMiuXYH2QUs0yYcHTQ"),
-    ("songs", "Super Simple Songs", "UCLsooMJoIpl_7ux2jvdPB-Q"),
+    # (key, title shown in the app, channel id, limit or None)
+    ("sesame", "Sesame Street", "UCoookXUzPciGrEZEXmh4Jjg", None),
+    ("blippi", "Blippi", "UC5PYHgAzJ1wLEidB58SK6Xw", None),
+    ("numberblocks", "Numberblocks", "UCPlwvN0w4qFSP1FllALB92w", None),
+    ("bluey", "Bluey", "UCEC-8nMiuXYH2QUs0yYcHTQ", None),
+    ("songs", "Super Simple Songs", "UCLsooMJoIpl_7ux2jvdPB-Q", None),
+    ("peppa", "Peppa Pig", "UCAOtE1V7Ots4DjM8JLlrYgg", LIMITED),
+    ("paw", "PAW Patrol", "UCSVSJ1OCSv5ClFgKFTHIDew", LIMITED),
 ]
+# Topics the child can pick. Videos come from searching YouTube for
+# "<show> <query>" and keeping only results from the channels above whose
+# title contains one of the words.
+TOPICS = [
+    # (key, Persian label, icon, search query, title words)
+    ("animals", "حیوانات", "🐾", "animals", ["animal", "zoo", "farm", "dog", "cat", "lion", "bird", "pet", "fish", "duck", "cow", "pig"]),
+    ("elephant", "فیل", "🐘", "elephant", ["elephant"]),
+    ("dino", "دایناسور", "🦖", "dinosaur", ["dinosaur", "dino", "t-rex", "t rex"]),
+    ("trucks", "ماشین‌ها", "🚒", "trucks cars", ["truck", "car ", "cars", "excavator", "digger", "bus", "fire engine", "tractor", "vehicle"]),
+    ("trains", "قطار", "🚂", "train", ["train"]),
+    ("numbers", "عددها", "🔢", "counting numbers", ["number", "count", "1 to", "123", "math"]),
+    ("abc", "حروف", "🔤", "ABC alphabet letters", ["abc", "alphabet", "letter", "phonics"]),
+    ("colors", "رنگ‌ها", "🎨", "colors", ["color", "colour", "rainbow"]),
+]
+PER_CHANNEL = 4
+PER_TOPIC = 16
+MAX_MINUTES = 60
 NS = {"a": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015"}
 OUT = pathlib.Path(__file__).resolve().parent.parent / "videos.json"
 
@@ -37,9 +62,67 @@ def embeddable(video_id):
         return False
 
 
+def is_live(video_id):
+    page = get(f"https://www.youtube.com/watch?v={video_id}").decode("utf-8", "replace")
+    return '"isLiveContent":true' in page
+
+
+def search(query):
+    """Videos from a YouTube search: (id, title, channel id, seconds or None if live)."""
+    url = "https://www.youtube.com/results?search_query=" + urllib.parse.quote_plus(query)
+    page = get(url).decode("utf-8", "replace")
+    m = re.search(r"var ytInitialData = (\{.*?\});</script>", page)
+    out = []
+
+    def walk(o):
+        if isinstance(o, dict):
+            v = o.get("videoRenderer")
+            if v:
+                runs = v.get("ownerText", {}).get("runs", [{}])
+                ch = runs[0].get("navigationEndpoint", {}).get("browseEndpoint", {}).get("browseId")
+                length = v.get("lengthText", {}).get("simpleText")
+                secs = None
+                if length:
+                    secs = 0
+                    for part in length.split(":"):
+                        secs = secs * 60 + int(part)
+                out.append((v["videoId"], v["title"]["runs"][0]["text"], ch, secs))
+            for x in o.values():
+                walk(x)
+        elif isinstance(o, list):
+            for x in o:
+                walk(x)
+
+    if m:
+        walk(json.loads(m.group(1)))
+    return out
+
+
+def build_topics():
+    topics = []
+    for key, label, icon, query, words in TOPICS:
+        videos, seen = [], set()
+        for show, title, cid, _ in CHANNELS:
+            taken = 0
+            for vid, vtitle, ch, secs in search(f"{title} {query}"):
+                low = vtitle.lower()
+                if (ch != cid or vid in seen or secs is None or secs < 60 or secs > MAX_MINUTES * 60
+                        or not any(w in low for w in words) or not embeddable(vid)):
+                    continue
+                seen.add(vid)
+                videos.append({"id": vid, "title": vtitle, "show": show})
+                taken += 1
+                if taken >= PER_CHANNEL:
+                    break
+        print(f"topic {key}: {len(videos)} videos")
+        if videos:
+            topics.append({"key": key, "title": label, "icon": icon, "videos": videos[:PER_TOPIC]})
+    return topics
+
+
 def main():
     categories = []
-    for key, title, cid in CHANNELS:
+    for key, title, cid, limit in CHANNELS:
         root = ET.fromstring(get(f"https://www.youtube.com/feeds/videos.xml?channel_id={cid}"))
         videos = []
         for e in root.findall("a:entry", NS):
@@ -47,13 +130,17 @@ def main():
             if "/shorts/" in link:
                 continue
             vid = e.find("yt:videoId", NS).text
-            if not embeddable(vid):
+            if not embeddable(vid) or is_live(vid):
                 continue
             videos.append({"id": vid, "title": e.find("a:title", NS).text})
         print(f"{title}: {len(videos)} videos")
         if videos:
-            categories.append({"key": key, "title": title, "channel": cid, "videos": videos})
-    OUT.write_text(json.dumps({"categories": categories}, ensure_ascii=False, indent=1) + "\n")
+            cat = {"key": key, "title": title, "channel": cid, "videos": videos}
+            if limit:
+                cat["limit"] = limit
+            categories.append(cat)
+    topics = build_topics()
+    OUT.write_text(json.dumps({"topics": topics, "categories": categories}, ensure_ascii=False, indent=1) + "\n")
     print(f"wrote {OUT}")
 
 

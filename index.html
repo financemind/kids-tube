@@ -48,6 +48,17 @@ button:focus-visible { outline: 4px solid var(--tomato); outline-offset: 3px; }
 }
 .show img { width: 132px; aspect-ratio: 16/9; object-fit: cover; border-radius: 14px; display: block; }
 .show span { font-family: var(--display); font-weight: 600; font-size: 17px; }
+.show .icon {
+  width: 132px; aspect-ratio: 16/9; border-radius: 14px; display: grid; place-items: center;
+  font-size: 46px; font-style: normal; background: var(--sky); line-height: 1;
+}
+.parents {
+  position: fixed; left: calc(10px + env(safe-area-inset-left, 0px)); bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  width: 40px; height: 40px; border-radius: 50%; opacity: .35; display: grid; place-items: center;
+  touch-action: none;
+}
+.parents svg { width: 20px; height: 20px; fill: var(--ink); }
+.parents.holding { opacity: 1; background: var(--sun); transition: background 2s; }
 .show[aria-pressed="true"] { background: var(--sun); transform: translateY(-3px); box-shadow: 0 7px 0 var(--shade); }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 18px; direction: ltr; }
@@ -97,9 +108,12 @@ button:focus-visible { outline: 4px solid var(--tomato); outline-offset: 3px; }
 <body>
 
 <main class="home" id="home">
+  <nav class="shows" id="topics" aria-label="Topics"></nav>
   <nav class="shows" id="shows" aria-label="Shows"></nav>
   <section class="grid" id="grid" aria-live="polite"></section>
 </main>
+
+<button class="parents" id="parentsBtn" aria-label="Parents: hold for 2 seconds"><svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 1 1 6 0v3z"/></svg></button>
 
 <section class="stage" id="stage" hidden>
   <div class="frame">
@@ -120,36 +134,90 @@ const ICON = {
   play: '<svg viewBox="0 0 24 24"><path d="M7 4v16l14-8z"/></svg>',
   pause: '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>',
   again: '<svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>',
+  home: '<svg viewBox="0 0 24 24"><path d="M12 3 2 12h3v8h5v-5h4v5h5v-8h3z"/></svg>',
 };
+const END_TRIM = 15; // seconds: stop before YouTube's end-screen video tiles appear
 const $ = (id) => document.getElementById(id);
 const thumb = (id, q = "hqdefault") => `https://i.ytimg.com/vi/${id}/${q}.jpg`;
 let data = { categories: [] }, current = null, player = null, apiReady = false, tick = null;
+let playingCat = null, playingId = null, locked = false, pending = null;
 
 function save(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 
+/* Watch time, per show per local day, in seconds. Stored on this device only. */
+let watch = {};
+try { watch = JSON.parse(load("watch") || "{}") || {}; } catch (e) { watch = {}; }
+function dayKey(offset = 0) {
+  const d = new Date(); d.setDate(d.getDate() - offset);
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+function secs(key, offset) { return (watch[dayKey(offset)] || {})[key] || 0; }
+/* vwatch: seconds per video per day, for the parents' page. Both stores keep 31 days. */
+let vwatch = {};
+try { vwatch = JSON.parse(load("vwatch") || "{}") || {}; } catch (e) { vwatch = {}; }
+function bump(store, key) {
+  const t = dayKey();
+  store[t] = store[t] || {};
+  store[t][key] = (store[t][key] || 0) + 1;
+  const keep = new Set(Array.from({ length: 31 }, (_, i) => dayKey(i)));
+  for (const k of Object.keys(store)) if (!keep.has(k)) delete store[k];
+}
+function addSecond(catKey, videoId) {
+  bump(watch, catKey); bump(vwatch, videoId);
+  save("watch", JSON.stringify(watch));
+  save("vwatch", JSON.stringify(vwatch));
+}
+function allowed(c) {
+  if (!c.limit) return true;
+  let week = 0;
+  for (let i = 0; i < 7; i++) week += secs(c.key, i);
+  return secs(c.key, 0) < c.limit.day * 60 && secs(c.key, 1) < c.limit.day * 60 && week < c.limit.week * 60;
+}
+const visible = () => data.categories.filter(allowed);
+const showOf = (key) => data.categories.find((c) => c.key === key);
+
+/* Tiles: topics first, then shows. A topic only offers videos whose show is allowed today. */
+function tiles() {
+  const topics = (data.topics || []).map((tp) => ({
+    id: "t:" + tp.key, title: tp.title, icon: tp.icon,
+    videos: tp.videos.filter((v) => { const c = showOf(v.show); return c && allowed(c); }),
+  })).filter((x) => x.videos.length);
+  const shows = visible().map((c) => ({ id: "s:" + c.key, title: c.title, videos: c.videos.map((v) => ({ ...v, show: c.key })) }));
+  return { topics, shows };
+}
+
 function renderShows() {
-  $("shows").innerHTML = "";
-  for (const c of data.categories) {
-    const b = document.createElement("button");
-    b.className = "show";
-    b.setAttribute("aria-pressed", String(c.key === current));
-    b.innerHTML = `<img alt="" src="${thumb(c.videos[0].id, "mqdefault")}"><span></span>`;
-    b.querySelector("span").textContent = c.title;
-    b.onclick = () => { current = c.key; save("show", c.key); renderShows(); renderGrid(); };
-    $("shows").appendChild(b);
+  const { topics, shows } = tiles();
+  const all = topics.concat(shows);
+  if (!all.some((x) => x.id === current)) current = all[0] && all[0].id;
+  for (const [nav, list] of [[$("topics"), topics], [$("shows"), shows]]) {
+    nav.innerHTML = "";
+    nav.hidden = !list.length;
+    for (const x of list) {
+      const b = document.createElement("button");
+      b.className = "show";
+      b.setAttribute("aria-pressed", String(x.id === current));
+      b.innerHTML = x.icon ? `<i class="icon" aria-hidden="true"></i><span></span>` : `<img alt="" src="${thumb(x.videos[0].id, "mqdefault")}"><span></span>`;
+      if (x.icon) b.querySelector(".icon").textContent = x.icon;
+      b.querySelector("span").textContent = x.title;
+      b.onclick = () => { current = x.id; save("show", x.id); renderShows(); renderGrid(); };
+      nav.appendChild(b);
+    }
   }
 }
 
 function renderGrid() {
-  const c = data.categories.find((x) => x.key === current) || data.categories[0];
+  const { topics, shows } = tiles();
+  const x = topics.concat(shows).find((t) => t.id === current);
   $("grid").innerHTML = "";
-  for (const v of c.videos) {
+  if (!x) return;
+  for (const v of x.videos) {
     const b = document.createElement("button");
     b.className = "video";
     b.innerHTML = `<img alt="" loading="lazy" src="${thumb(v.id)}"><span></span>`;
     b.querySelector("span").textContent = v.title;
-    b.onclick = () => openVideo(v);
+    b.onclick = () => openVideo(v, showOf(v.show));
     $("grid").appendChild(b);
   }
 }
@@ -160,14 +228,16 @@ function showCover(html, bg) {
   cv.innerHTML = html;
   cv.hidden = false;
 }
+function homeButton(id) { return `<button class="bigbtn" id="${id}" aria-label="Back to videos" style="background:var(--tomato)">${ICON.home}</button>`; }
 
-function openVideo(v) {
+function openVideo(v, c) {
+  playingCat = c; playingId = v.id; locked = false;
   $("home").hidden = true;
   $("stage").hidden = false;
   $("prog").style.width = "0";
   setPlayIcon(false);
   showCover(`<div class="msg">...</div>`, thumb(v.id));
-  if (!apiReady) { pending = v; return; }
+  if (!apiReady) { pending = [v, c]; return; }
   if (player) { player.loadVideoById(v.id); return; }
   player = new YT.Player("player", {
     host: "https://www.youtube-nocookie.com",
@@ -176,54 +246,84 @@ function openVideo(v) {
     events: { onReady: (e) => e.target.playVideo(), onStateChange: onState, onError: onErr },
   });
 }
-let pending = null;
-window.onYouTubeIframeAPIReady = () => { apiReady = true; if (pending) { const v = pending; pending = null; openVideo(v); } };
+window.onYouTubeIframeAPIReady = () => { apiReady = true; if (pending) { const [v, c] = pending; pending = null; openVideo(v, c); } };
 
 function setPlayIcon(playing) { $("playBtn").innerHTML = playing ? ICON.pause : ICON.play; }
+
+function pausedCover() {
+  showCover(`<button class="bigbtn" aria-label="Play">${ICON.play}</button>`, thumb(playingId));
+  $("cover").querySelector("button").onclick = () => player.playVideo();
+}
 
 function onState(e) {
   const S = YT.PlayerState;
   clearInterval(tick);
+  if (locked) { if (e.data === S.PLAYING) player.pauseVideo(); return; }
   if (e.data === S.PLAYING) {
     $("cover").hidden = true; setPlayIcon(true);
-    tick = setInterval(() => {
-      const d = player.getDuration();
-      if (d) $("prog").style.width = (100 * player.getCurrentTime() / d) + "%";
-    }, 500);
-  } else if (e.data === S.PAUSED || e.data === S.CUED) {
-    setPlayIcon(false);
-    showCover(`<button class="bigbtn" aria-label="Play">${ICON.play}</button>`, thumb(player.getVideoData().video_id));
-    $("cover").querySelector("button").onclick = () => player.playVideo();
-  } else if (e.data === S.ENDED) {
-    setPlayIcon(false);
-    $("prog").style.width = "100%";
-    // Cover the player completely so YouTube's end screen with other videos never shows.
-    showCover(`<div class="done"><div class="msg">تمام شد!</div>
-      <div style="display:flex;gap:22px"><button class="bigbtn" id="againBtn" aria-label="Watch again">${ICON.again}</button>
-      <button class="bigbtn" id="backBtn" aria-label="Back to videos" style="background:var(--tomato)"><svg viewBox="0 0 24 24"><path d="M12 3 2 12h3v8h5v-5h4v5h5v-8h3z"/></svg></button></div></div>`, null);
-    $("againBtn").onclick = () => { player.seekTo(0); player.playVideo(); };
-    $("backBtn").onclick = goHome;
+    tick = setInterval(onTick, 1000);
+    return;
   }
+  setPlayIcon(false);
+  if (e.data === S.ENDED) finish();
+  else if (e.data === S.PAUSED) pausedCover();
+  // Loading or buffering: keep YouTube's own overlays hidden behind the picture.
+  else showCover("", thumb(playingId));
+}
+
+function onTick() {
+  const d = player.getDuration(), t = player.getCurrentTime();
+  if (d) $("prog").style.width = Math.min(100, 100 * t / Math.max(1, d - END_TRIM)) + "%";
+  if (playingCat) {
+    addSecond(playingCat.key, playingId);
+    if (playingCat.limit && !allowed(playingCat)) return stopForToday();
+  }
+  if (d > END_TRIM * 3 && t >= d - END_TRIM) finish();
+}
+
+function finish() {
+  locked = true; clearInterval(tick);
+  player.pauseVideo();
+  setPlayIcon(false);
+  $("prog").style.width = "100%";
+  showCover(`<div class="done"><div class="msg">تمام شد!</div>
+    <div style="display:flex;gap:22px"><button class="bigbtn" id="againBtn" aria-label="Watch again">${ICON.again}</button>${homeButton("backBtn")}</div></div>`, null);
+  $("againBtn").onclick = () => {
+    if (playingCat && !allowed(playingCat)) return stopForToday();
+    locked = false; player.seekTo(0); player.playVideo();
+  };
+  $("backBtn").onclick = goHome;
+}
+
+function stopForToday() {
+  locked = true; clearInterval(tick);
+  player.pauseVideo();
+  setPlayIcon(false);
+  showCover(`<div class="done"><div class="msg">برای امروز بس است.</div>${homeButton("backBtn")}</div>`, null);
+  $("backBtn").onclick = goHome;
 }
 
 function onErr() {
-  showCover(`<div class="done"><div class="msg">این ویدیو باز نشد.</div>
-    <button class="bigbtn" id="backBtn" aria-label="Back to videos" style="background:var(--tomato)"><svg viewBox="0 0 24 24"><path d="M12 3 2 12h3v8h5v-5h4v5h5v-8h3z"/></svg></button></div>`, null);
+  locked = true;
+  showCover(`<div class="done"><div class="msg">این ویدیو باز نشد.</div>${homeButton("backBtn")}</div>`, null);
   $("backBtn").onclick = goHome;
 }
 
 function goHome() {
   clearInterval(tick);
+  locked = true;
   if (player) player.stopVideo();
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   $("stage").hidden = true;
   $("home").hidden = false;
+  renderShows(); renderGrid();
 }
 
 $("homeBtn").onclick = goHome;
 $("playBtn").onclick = () => {
-  if (!player) return;
-  player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo();
+  if (!player || locked) return;
+  if (player.getPlayerState() === YT.PlayerState.PLAYING) { pausedCover(); player.pauseVideo(); }
+  else player.playVideo();
 };
 $("shield").onclick = () => $("playBtn").click();
 $("fullBtn").onclick = () => {
@@ -232,11 +332,21 @@ $("fullBtn").onclick = () => {
   else if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
 };
 document.addEventListener("contextmenu", (e) => e.preventDefault());
+// Parents' page: hold the small lock for 2 seconds.
+{
+  const pb = $("parentsBtn"); let hold = null;
+  const start = (e) => { e.preventDefault(); pb.classList.add("holding"); hold = setTimeout(() => { location.href = "parents.html"; }, 2000); };
+  const stop = () => { pb.classList.remove("holding"); clearTimeout(hold); };
+  pb.addEventListener("pointerdown", start);
+  for (const ev of ["pointerup", "pointerleave", "pointercancel"]) pb.addEventListener(ev, stop);
+}
+// A new day can unlock a show: refresh the list when the app comes back to the screen.
+document.addEventListener("visibilitychange", () => { if (!document.hidden && !$("home").hidden) { renderShows(); renderGrid(); } });
 
 fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => {
   data = d;
   const saved = load("show");
-  current = data.categories.some((c) => c.key === saved) ? saved : data.categories[0].key;
+  current = saved;
   renderShows(); renderGrid();
 });
 </script>
