@@ -41,6 +41,15 @@ TOPICS = [
     ("abc", "حروف", "🔤", "ABC alphabet letters", ["abc", "alphabet", "letter", "phonics"]),
     ("colors", "رنگ‌ها", "🎨", "colors", ["color", "colour", "rainbow"]),
 ]
+# The app shows only these few main topics; each joins some topics above.
+# (key, Persian label, icon, topic keys)
+MAIN_TOPICS = [
+    ("animals", "حیوانات", "🐾", ["animals", "elephant", "dino"]),
+    ("vehicles", "ماشین و قطار", "🚒", ["trucks", "trains"]),
+    ("learn", "عدد و حرف", "🔢", ["numbers", "abc"]),
+    ("colors", "رنگ‌ها", "🎨", ["colors"]),
+]
+PER_MAIN_TOPIC = 8
 PER_CHANNEL = 4
 PER_TOPIC = 16
 MAX_MINUTES = 60
@@ -120,6 +129,41 @@ def build_topics():
     return topics
 
 
+def mix_shows(videos):
+    """Reorder so shows take turns: one from each show, then the next round."""
+    queues = {}
+    for v in videos:
+        queues.setdefault(v["show"], []).append(v)
+    out = []
+    while any(queues.values()):
+        for q in queues.values():
+            if q:
+                out.append(q.pop(0))
+    return out
+
+
+def group_topics(topics):
+    """Join topics into MAIN_TOPICS, taking videos from each part in turn."""
+    by_key = {t["key"]: t["videos"] for t in topics}
+    out = []
+    for key, label, icon, parts in MAIN_TOPICS:
+        lists = [mix_shows(by_key.get(p, [])) for p in parts]
+        videos, seen = [], set()
+        while len(videos) < PER_MAIN_TOPIC and any(lists):
+            for lst in lists:
+                while lst:
+                    v = lst.pop(0)
+                    if v["id"] not in seen:
+                        seen.add(v["id"])
+                        videos.append(v)
+                        break
+                if len(videos) >= PER_MAIN_TOPIC:
+                    break
+        if videos:
+            out.append({"key": key, "title": label, "icon": icon, "videos": videos})
+    return out
+
+
 def main():
     categories = []
     for key, title, cid, limit in CHANNELS:
@@ -139,7 +183,7 @@ def main():
             if limit:
                 cat["limit"] = limit
             categories.append(cat)
-    topics = build_topics()
+    topics = group_topics(build_topics())
     OUT.write_text(json.dumps({"topics": topics, "categories": categories}, ensure_ascii=False, indent=1) + "\n")
     print(f"wrote {OUT}")
 

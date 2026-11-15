@@ -109,7 +109,6 @@ button:focus-visible { outline: 4px solid var(--tomato); outline-offset: 3px; }
 
 <main class="home" id="home">
   <nav class="shows" id="topics" aria-label="Topics"></nav>
-  <nav class="shows" id="shows" aria-label="Shows"></nav>
   <section class="grid" id="grid" aria-live="polite"></section>
 </main>
 
@@ -174,26 +173,22 @@ function allowed(c) {
   for (let i = 0; i < 7; i++) week += secs(c.key, i);
   return secs(c.key, 0) < c.limit.day * 60 && secs(c.key, 1) < c.limit.day * 60 && week < c.limit.week * 60;
 }
-const visible = () => data.categories.filter(allowed);
 const showOf = (key) => data.categories.find((c) => c.key === key);
 
-/* Tiles: topics first, then shows. A topic only offers videos whose show is allowed today. */
+/* Tiles: only the main topics. A topic only offers videos whose show is allowed today. */
 function tiles() {
-  const topics = (data.topics || []).map((tp) => ({
+  return (data.topics || []).map((tp) => ({
     id: "t:" + tp.key, title: tp.title, icon: tp.icon,
     videos: tp.videos.filter((v) => { const c = showOf(v.show); return c && allowed(c); }),
   })).filter((x) => x.videos.length);
-  const shows = visible().map((c) => ({ id: "s:" + c.key, title: c.title, videos: c.videos.map((v) => ({ ...v, show: c.key })) }));
-  return { topics, shows };
 }
 
 function renderShows() {
-  const { topics, shows } = tiles();
-  const all = topics.concat(shows);
-  if (!all.some((x) => x.id === current)) current = all[0] && all[0].id;
-  for (const [nav, list] of [[$("topics"), topics], [$("shows"), shows]]) {
-    nav.innerHTML = "";
-    nav.hidden = !list.length;
+  const list = tiles();
+  if (!list.some((x) => x.id === current)) current = list[0] && list[0].id;
+  const nav = $("topics");
+  nav.innerHTML = "";
+  {
     for (const x of list) {
       const b = document.createElement("button");
       b.className = "show";
@@ -208,8 +203,7 @@ function renderShows() {
 }
 
 function renderGrid() {
-  const { topics, shows } = tiles();
-  const x = topics.concat(shows).find((t) => t.id === current);
+  const x = tiles().find((t) => t.id === current);
   $("grid").innerHTML = "";
   if (!x) return;
   for (const v of x.videos) {
