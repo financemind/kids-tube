@@ -41,11 +41,15 @@ TOPICS = [
     ("abc", "حروف", "🔤", "ABC alphabet letters", ["abc", "alphabet", "letter", "phonics"]),
     ("colors", "رنگ‌ها", "🎨", "colors", ["color", "colour", "rainbow"]),
 ]
-# The app shows one list a day. Shows with a limit (LIMITED) count as
-# "less wanted": their share of the daily list goes down week by week.
-# lessPerWeek[i] = how many of them in week i (from start); after the
-# last week: one every other day.
-DAILY = {"size": 6, "start": "2026-11-16", "lessPerWeek": [2, 1, 1]}
+# The app shows one list a day, chosen by score (see dailyList in index.html):
+# - a video watched videoRestMinutes or more yesterday is left out;
+# - every videoHalfMinutes of a video in the last 7 days halves its score,
+#   and every showHalfMinutes of its show halves it again (yesterday counts
+#   fully, 7 days ago counts 1/7);
+# - shows with a limit (LIMITED) also lose taperPerWeek each week from start;
+# - at most perShow videos per show (perLessShow for limited shows);
+# - after dailyMinutes of watching in a day, nothing more plays that day.
+DAILY = {"size": 6, "start": "2026-11-16", "dailyMinutes": 45, "perShow": 2, "perLessShow": 1, "videoRestMinutes": 10, "videoHalfMinutes": 10, "showHalfMinutes": 20, "taperPerWeek": 0.7}
 
 # Topics only feed the daily list's pool of videos; each joins some topics above.
 # (key, Persian label, icon, topic keys)
