@@ -134,8 +134,9 @@ function emptyRow(tbody, cols, text) {
 
 fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()).then((data) => {
   $("sToday").textContent = dur(sum(watch, null, 0, 0));
-  const cap = (data.daily && data.daily.dailyMinutes) || 60;
-  $("sTodayLabel").textContent = sum(watch, null, 0, 0) >= cap * 60 ? `امروز (به سقف ${fa(cap)} دقیقه رسید)` : `امروز (سقف ${fa(cap)} دقیقه)`;
+  const dly = data.daily || {}, turns = dly.turns || 2, tm = dly.turnMinutes || 30;
+  const usedTurns = Math.min(turns, Math.floor(sum(watch, null, 0, 0) / (tm * 60)));
+  $("sTodayLabel").textContent = `امروز (${fa(usedTurns)} از ${fa(turns)} نوبت ${fa(tm)} دقیقه‌ای تمام شده)`;
   $("sYest").textContent = dur(sum(watch, null, 1, 1));
   $("sWeek").textContent = dur(sum(watch, null, 0, 6));
 

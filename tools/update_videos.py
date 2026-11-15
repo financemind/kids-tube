@@ -48,8 +48,9 @@ TOPICS = [
 #   fully, 7 days ago counts 1/7);
 # - shows with a limit (LIMITED) also lose taperPerWeek each week from start;
 # - at most perShow videos per show (perLessShow for limited shows);
-# - after dailyMinutes of watching in a day, nothing more plays that day.
-DAILY = {"size": 6, "start": "2026-11-16", "dailyMinutes": 60, "perShow": 2, "perLessShow": 1, "videoRestMinutes": 10, "videoHalfMinutes": 10, "showHalfMinutes": 20, "taperPerWeek": 0.7}
+# - a day has `turns` turns of turnMinutes each; after a turn ends, the next
+#   opens only after breakMinutes; after the last turn, nothing until tomorrow.
+DAILY = {"size": 6, "start": "2026-11-16", "perShow": 2, "perLessShow": 1, "videoRestMinutes": 10, "videoHalfMinutes": 10, "showHalfMinutes": 20, "taperPerWeek": 0.7, "turns": 2, "turnMinutes": 30, "breakMinutes": 120}
 
 # Topics only feed the daily list's pool of videos; each joins some topics above.
 # (key, Persian label, icon, topic keys)

@@ -2,13 +2,15 @@
  "daily": {
   "size": 6,
   "start": "2026-11-16",
-  "dailyMinutes": 60,
   "perShow": 2,
   "perLessShow": 1,
   "videoRestMinutes": 10,
   "videoHalfMinutes": 10,
   "showHalfMinutes": 20,
-  "taperPerWeek": 0.7
+  "taperPerWeek": 0.7,
+  "turns": 2,
+  "turnMinutes": 30,
+  "breakMinutes": 120
  },
  "topics": [
   {

@@ -64,10 +64,12 @@ button:focus-visible { outline: 4px solid var(--tomato); outline-offset: 3px; }
   flex: 1; height: 38px; border-radius: 19px; background: var(--card); overflow: hidden; position: relative;
   box-shadow: inset 0 3px 0 var(--shade);
 }
+.tracks { flex: 1; display: flex; gap: 14px; }
+.track.waiting { opacity: .45; }
 .track i { display: block; height: 100%; width: 100%; background: var(--leaf); border-radius: 19px; transition: width .6s, background .6s; }
 .track i.low { background: var(--sun); }
 .track i.last { background: var(--tomato); }
-.track::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(var(--piece) - 4px), var(--card) calc(var(--piece) - 4px) var(--piece)); }
+.track::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(var(--piece) - 2px), var(--card) calc(var(--piece) - 2px) calc(var(--piece) + 2px), transparent calc(var(--piece) + 2px)); }
 .left-text { margin: -10px 0 0; text-align: center; font-size: 14px; opacity: .6; }
 .rest { display: grid; justify-items: center; gap: 12px; padding-block: 12vh; text-align: center; }
 .rest .moon { font-size: clamp(110px, 22vw, 180px); line-height: 1; }
@@ -105,14 +107,14 @@ button:focus-visible { outline: 4px solid var(--tomato); outline-offset: 3px; }
 <body>
 
 <main class="home" id="home">
-  <div class="budget" id="budget" role="img" aria-label="Time left today">
+  <div class="budget" id="budget" role="img" aria-label="Watching time left today">
     <span class="sun" aria-hidden="true">☀️</span>
-    <div class="track"><i id="left"></i></div>
+    <div class="tracks" id="tracks"></div>
     <span class="moon-s" aria-hidden="true">🌙</span>
   </div>
   <p class="left-text" id="leftText"></p>
   <section class="grid" id="grid" aria-live="polite"></section>
-  <section class="rest" id="rest" hidden><div class="moon" aria-hidden="true">🌙</div><p>برای امروز بس است. فردا دوباره.</p></section>
+  <section class="rest" id="rest" hidden><div class="moon" id="restIcon" aria-hidden="true">🌙</div><p id="restText">برای امروز بس است. فردا دوباره.</p></section>
 </main>
 
 <button class="parents" id="parentsBtn" aria-label="Parents: hold for 2 seconds"><svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 1 1 6 0v3z"/></svg></button>
@@ -204,7 +206,27 @@ function score(v) {
   return w;
 }
 function todaySeconds() { return Object.values(watch[dayKey()] || {}).reduce((a, b) => a + b, 0); }
-const doneForToday = () => todaySeconds() >= (cfg().dailyMinutes || 60) * 60;
+
+/* Turns: the day has a few short turns (cfg turns × turnMinutes) with a break
+   (breakMinutes) after each. Only playing time counts. */
+const turnSecs = () => (cfg().turnMinutes || 30) * 60;
+const turnCount = () => cfg().turns || 2;
+function turnEnds() { // when each finished turn ended today (ms timestamps)
+  try { return (JSON.parse(load("turnEnds") || "{}") || {})[dayKey()] || []; } catch (e) { return []; }
+}
+function timeState() {
+  const s = todaySeconds(), T = turnSecs(), n = turnCount();
+  const used = Math.min(n, Math.floor(s / T)); // turns fully used
+  if (used >= n) return { mode: "tomorrow", turn: n };
+  if (used > 0) {
+    const ends = turnEnds();
+    if (!ends[used - 1]) { ends[used - 1] = Date.now(); save("turnEnds", JSON.stringify({ [dayKey()]: ends })); }
+    const until = ends[used - 1] + (cfg().breakMinutes || 120) * 60000;
+    if (Date.now() < until) return { mode: "break", turn: used, until };
+  }
+  return { mode: "watch", turn: used, left: (used + 1) * T - s };
+}
+const canWatch = () => timeState().mode === "watch";
 
 function dailyList() {
   const seen = new Set(), pool = [];
@@ -228,21 +250,43 @@ function dailyList() {
   return list;
 }
 
+let lastMode = null;
 function renderBudget() {
-  const total = (cfg().dailyMinutes || 60) * 60, left = Math.max(0, total - todaySeconds());
-  const frac = left / total, bar = $("left");
-  bar.style.width = (100 * frac).toFixed(1) + "%";
-  bar.className = frac <= 1 / 6 ? "last" : frac <= 1 / 3 ? "low" : "";
-  $("budget").style.setProperty("--piece", (100 / Math.round(total / 600)).toFixed(3) + "%");
-  const m = Math.ceil(left / 60);
-  $("leftText").textContent = m ? `${m.toLocaleString("fa-IR")} دقیقه مانده` : "";
+  const st = timeState(), T = turnSecs(), n = turnCount(), box = $("tracks");
+  if (box.children.length !== n) {
+    box.innerHTML = "";
+    for (let i = 0; i < n; i++) box.insertAdjacentHTML("beforeend", '<div class="track"><i></i></div>');
+  }
+  [...box.children].forEach((tr, i) => {
+    const frac = i < st.turn ? 0 : i > st.turn ? 1 : st.mode === "watch" ? st.left / T : 1; // in a break the next turn waits, full
+    const bar = tr.firstChild;
+    bar.style.width = (100 * frac).toFixed(1) + "%";
+    bar.className = i === st.turn && frac <= 1 / 3 ? "last" : i === st.turn && frac <= 2 / 3 ? "low" : "";
+    tr.classList.toggle("waiting", i > st.turn || (st.mode === "break" && i === st.turn));
+    tr.style.setProperty("--piece", (100 / Math.max(1, Math.round(T / 600))).toFixed(3) + "%");
+  });
+  const fa = (x) => x.toLocaleString("fa-IR");
+  let text = "";
+  if (st.mode === "watch") text = `${fa(Math.ceil(st.left / 60))} دقیقه از نوبت ${st.turn === 0 ? "اول" : st.turn === 1 ? "دوم" : fa(st.turn + 1)} مانده`;
+  else if (st.mode === "break") {
+    const t = new Date(st.until);
+    text = `نوبت بعدی ساعت ${fa(t.getHours())}:${String(t.getMinutes()).padStart(2, "0").replace(/\d/g, (d) => fa(+d))} باز می‌شود`;
+  }
+  $("leftText").textContent = text;
+  return st;
 }
 
 function renderGrid() {
-  renderBudget();
+  const st = renderBudget();
+  lastMode = st.mode;
   $("grid").innerHTML = "";
-  $("rest").hidden = !doneForToday();
-  if (doneForToday()) return;
+  $("rest").hidden = st.mode === "watch";
+  if (st.mode !== "watch") {
+    // Break: go and play. Last turn used: see you tomorrow.
+    $("restIcon").textContent = st.mode === "break" ? "🛝" : "🌙";
+    $("restText").textContent = st.mode === "break" ? "وقت بازی! بعداً دوباره." : "برای امروز بس است. فردا دوباره.";
+    return;
+  }
   for (const v of dailyList()) {
     const b = document.createElement("button");
     b.className = "video";
@@ -307,7 +351,8 @@ function onTick() {
   const d = player.getDuration(), t = player.getCurrentTime();
   if (playingCat) {
     addSecond(playingCat.key, playingId);
-    if ((playingCat.limit && !allowed(playingCat)) || doneForToday()) return stopForToday();
+    if (!canWatch()) return stopForToday();
+    if (playingCat.limit && !allowed(playingCat)) return finish();
   }
   if (d > END_TRIM * 3 && t >= d - END_TRIM) finish();
 }
@@ -319,7 +364,8 @@ function finish() {
   showCover(`<div class="done"><div class="msg">تمام شد!</div>
     <div style="display:flex;gap:22px"><button class="bigbtn" id="againBtn" aria-label="Watch again">${ICON.again}</button>${homeButton("backBtn")}</div></div>`, null);
   $("againBtn").onclick = () => {
-    if ((playingCat && !allowed(playingCat)) || doneForToday()) return stopForToday();
+    if (!canWatch()) return stopForToday();
+    if (playingCat && !allowed(playingCat)) return goHome();
     locked = false; player.seekTo(0); player.playVideo();
   };
   $("backBtn").onclick = goHome;
@@ -329,7 +375,8 @@ function stopForToday() {
   locked = true; clearInterval(tick);
   player.pauseVideo();
   setPlayIcon(false);
-  showCover(`<div class="done"><div class="msg">برای امروز بس است.</div>${homeButton("backBtn")}</div>`, null);
+  const brk = timeState().mode === "break";
+  showCover(`<div class="done"><div class="msg" style="font-size:90px">${brk ? "🛝" : "🌙"}</div><div class="msg">${brk ? "وقت بازی! بعداً دوباره." : "برای امروز بس است."}</div>${homeButton("backBtn")}</div>`, null);
   $("backBtn").onclick = goHome;
 }
 
@@ -366,6 +413,8 @@ document.addEventListener("contextmenu", (e) => e.preventDefault());
 }
 // A new day can unlock a show: refresh the list when the app comes back to the screen.
 document.addEventListener("visibilitychange", () => { if (!document.hidden && !$("home").hidden) { renderGrid(); } });
+// While the home screen is open, notice when a break ends.
+setInterval(() => { if (!$("home").hidden && data.categories.length && timeState().mode !== lastMode) renderGrid(); }, 30000);
 
 fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => {
   data = d;
