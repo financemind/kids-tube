@@ -56,6 +56,19 @@ button:focus-visible { outline: 4px solid var(--tomato); outline-offset: 3px; }
 .video img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: var(--shade); }
 .video img { border-radius: 19px; }
 
+/* Time left today: a big bar that shrinks from the sun toward the moon.
+   White lines split it into 10-minute pieces the child can see go away. */
+.budget { display: flex; align-items: center; gap: 12px; direction: ltr; }
+.budget .sun, .budget .moon-s { font-size: 40px; line-height: 1; }
+.track {
+  flex: 1; height: 38px; border-radius: 19px; background: var(--card); overflow: hidden; position: relative;
+  box-shadow: inset 0 3px 0 var(--shade);
+}
+.track i { display: block; height: 100%; width: 100%; background: var(--leaf); border-radius: 19px; transition: width .6s, background .6s; }
+.track i.low { background: var(--sun); }
+.track i.last { background: var(--tomato); }
+.track::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(var(--piece) - 4px), var(--card) calc(var(--piece) - 4px) var(--piece)); }
+.left-text { margin: -10px 0 0; text-align: center; font-size: 14px; opacity: .6; }
 .rest { display: grid; justify-items: center; gap: 12px; padding-block: 12vh; text-align: center; }
 .rest .moon { font-size: clamp(110px, 22vw, 180px); line-height: 1; }
 .rest p { margin: 0; font-family: var(--body); font-weight: 700; font-size: 20px; opacity: .75; }
@@ -92,6 +105,12 @@ button:focus-visible { outline: 4px solid var(--tomato); outline-offset: 3px; }
 <body>
 
 <main class="home" id="home">
+  <div class="budget" id="budget" role="img" aria-label="Time left today">
+    <span class="sun" aria-hidden="true">☀️</span>
+    <div class="track"><i id="left"></i></div>
+    <span class="moon-s" aria-hidden="true">🌙</span>
+  </div>
+  <p class="left-text" id="leftText"></p>
   <section class="grid" id="grid" aria-live="polite"></section>
   <section class="rest" id="rest" hidden><div class="moon" aria-hidden="true">🌙</div><p>برای امروز بس است. فردا دوباره.</p></section>
 </main>
@@ -185,7 +204,7 @@ function score(v) {
   return w;
 }
 function todaySeconds() { return Object.values(watch[dayKey()] || {}).reduce((a, b) => a + b, 0); }
-const doneForToday = () => todaySeconds() >= (cfg().dailyMinutes || 45) * 60;
+const doneForToday = () => todaySeconds() >= (cfg().dailyMinutes || 60) * 60;
 
 function dailyList() {
   const seen = new Set(), pool = [];
@@ -209,7 +228,18 @@ function dailyList() {
   return list;
 }
 
+function renderBudget() {
+  const total = (cfg().dailyMinutes || 60) * 60, left = Math.max(0, total - todaySeconds());
+  const frac = left / total, bar = $("left");
+  bar.style.width = (100 * frac).toFixed(1) + "%";
+  bar.className = frac <= 1 / 6 ? "last" : frac <= 1 / 3 ? "low" : "";
+  $("budget").style.setProperty("--piece", (100 / Math.round(total / 600)).toFixed(3) + "%");
+  const m = Math.ceil(left / 60);
+  $("leftText").textContent = m ? `${m.toLocaleString("fa-IR")} دقیقه مانده` : "";
+}
+
 function renderGrid() {
+  renderBudget();
   $("grid").innerHTML = "";
   $("rest").hidden = !doneForToday();
   if (doneForToday()) return;
