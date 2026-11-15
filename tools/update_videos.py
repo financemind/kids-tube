@@ -41,7 +41,13 @@ TOPICS = [
     ("abc", "حروف", "🔤", "ABC alphabet letters", ["abc", "alphabet", "letter", "phonics"]),
     ("colors", "رنگ‌ها", "🎨", "colors", ["color", "colour", "rainbow"]),
 ]
-# The app shows only these few main topics; each joins some topics above.
+# The app shows one list a day. Shows with a limit (LIMITED) count as
+# "less wanted": their share of the daily list goes down week by week.
+# lessPerWeek[i] = how many of them in week i (from start); after the
+# last week: one every other day.
+DAILY = {"size": 6, "start": "2026-11-16", "lessPerWeek": [2, 1, 1]}
+
+# Topics only feed the daily list's pool of videos; each joins some topics above.
 # (key, Persian label, icon, topic keys)
 MAIN_TOPICS = [
     ("animals", "حیوانات", "🐘", ["animals", "elephant", "dino"]),
@@ -184,7 +190,7 @@ def main():
                 cat["limit"] = limit
             categories.append(cat)
     topics = group_topics(build_topics())
-    OUT.write_text(json.dumps({"topics": topics, "categories": categories}, ensure_ascii=False, indent=1) + "\n")
+    OUT.write_text(json.dumps({"daily": DAILY, "topics": topics, "categories": categories}, ensure_ascii=False, indent=1) + "\n")
     print(f"wrote {OUT}")
 
 

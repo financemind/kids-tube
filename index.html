@@ -39,20 +39,6 @@ button:focus-visible { outline: 4px solid var(--tomato); outline-offset: 3px; }
   padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right));
   display: grid; gap: 20px;
 }
-/* Topic tiles: four big pictures across (two on a phone). The small label is for parents. */
-.topics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; direction: ltr; }
-@media (max-width: 560px) { .topics { grid-template-columns: repeat(2, 1fr); } }
-.topic {
-  display: grid; justify-items: center; gap: 4px; padding: 10px 8px 8px; border-radius: 26px;
-  background: var(--card); box-shadow: 0 5px 0 var(--shade); border: 5px solid transparent; transition: transform .12s;
-}
-.topic .icon {
-  width: 100%; aspect-ratio: 4/3; border-radius: 18px; display: grid; place-items: center;
-  font-size: clamp(56px, 10vw, 104px); font-style: normal; line-height: 1; background: var(--tint);
-}
-.topic span { font-family: var(--display); font-weight: 600; font-size: 14px; opacity: .7; }
-.topic[aria-pressed="true"] { border-color: var(--sun); transform: translateY(-4px); box-shadow: 0 9px 0 var(--shade); }
-.topic:active { transform: scale(.96); }
 .parents {
   position: fixed; left: calc(10px + env(safe-area-inset-left, 0px)); bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   width: 40px; height: 40px; border-radius: 50%; opacity: .35; display: grid; place-items: center;
@@ -102,7 +88,6 @@ button:focus-visible { outline: 4px solid var(--tomato); outline-offset: 3px; }
 <body>
 
 <main class="home" id="home">
-  <nav class="topics" id="topics" aria-label="Topics"></nav>
   <section class="grid" id="grid" aria-live="polite"></section>
 </main>
 
@@ -127,11 +112,10 @@ const ICON = {
   again: '<svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>',
   home: '<svg viewBox="0 0 24 24"><path d="M12 3 2 12h3v8h5v-5h4v5h5v-8h3z"/></svg>',
 };
-const TINT = { animals: "#d9f2dc", vehicles: "#ffe0dc", learn: "#dde6ff", colors: "#fff1c9" };
 const END_TRIM = 15; // seconds: stop before YouTube's end-screen video tiles appear
 const $ = (id) => document.getElementById(id);
 const thumb = (id, q = "hqdefault") => `https://i.ytimg.com/vi/${id}/${q}.jpg`;
-let data = { categories: [] }, current = null, player = null, apiReady = false, tick = null;
+let data = { categories: [] }, player = null, apiReady = false, tick = null;
 let playingCat = null, playingId = null, locked = false, pending = null;
 
 function save(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
@@ -168,39 +152,49 @@ function allowed(c) {
 }
 const showOf = (key) => data.categories.find((c) => c.key === key);
 
-/* Tiles: only the main topics. A topic only offers videos whose show is allowed today. */
-function tiles() {
-  return (data.topics || []).map((tp) => ({
-    id: "t:" + tp.key, title: tp.title, icon: tp.icon,
-    videos: tp.videos.filter((v) => { const c = showOf(v.show); return c && allowed(c); }),
-  })).filter((x) => x.videos.length);
+/* One list a day, the same all day. Shows with a limit are "less wanted":
+   how many of them appear goes down week by week (data.daily). */
+function seeded(str) { // small deterministic random generator from a string
+  let h = 2166136261;
+  for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+  return () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 100000) / 100000; };
 }
-
-function renderShows() {
-  const list = tiles();
-  if (!list.some((x) => x.id === current)) current = list[0] && list[0].id;
-  const nav = $("topics");
-  nav.innerHTML = "";
-  {
-    for (const x of list) {
-      const b = document.createElement("button");
-      b.className = "topic";
-      b.setAttribute("aria-pressed", String(x.id === current));
-      b.style.setProperty("--tint", TINT[x.id.slice(2)] || "var(--sky)");
-      b.innerHTML = `<i class="icon" aria-hidden="true"></i><span></span>`;
-      b.querySelector(".icon").textContent = x.icon;
-      b.querySelector("span").textContent = x.title;
-      b.onclick = () => { current = x.id; save("show", x.id); renderShows(); renderGrid(); };
-      nav.appendChild(b);
-    }
+function shuffle(list, rnd) {
+  const a = list.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+function lessToday() {
+  const cfg = data.daily || {};
+  const start = new Date((cfg.start || "2026-11-16") + "T00:00:00");
+  const days = Math.max(0, Math.floor((new Date() - start) / 86400000));
+  const weeks = cfg.lessPerWeek || [];
+  const week = Math.floor(days / 7);
+  if (week < weeks.length) return weeks[week];
+  return days % 2 === 0 ? 1 : 0; // later: one every other day
+}
+function dailyList() {
+  const seen = new Set(), pool = [];
+  const add = (v, show) => { if (!seen.has(v.id)) { seen.add(v.id); pool.push({ ...v, show }); } };
+  for (const c of data.categories) for (const v of c.videos) add(v, c.key);
+  for (const tp of data.topics || []) for (const v of tp.videos) add(v, v.show);
+  const rnd = seeded(dayKey());
+  const size = (data.daily && data.daily.size) || 6;
+  const isLess = (v) => !!(showOf(v.show) || {}).limit;
+  const less = shuffle(pool.filter((v) => isLess(v) && allowed(showOf(v.show))), rnd).slice(0, lessToday());
+  // Good videos: shows take turns, so one show doesn't fill the list.
+  const byShow = {};
+  for (const v of shuffle(pool.filter((v) => !isLess(v)), rnd)) (byShow[v.show] = byShow[v.show] || []).push(v);
+  const queues = shuffle(Object.values(byShow), rnd), good = [];
+  while (good.length < size - less.length && queues.some((q) => q.length)) {
+    for (const q of queues) if (q.length && good.length < size - less.length) good.push(q.shift());
   }
+  return shuffle(good.concat(less), rnd);
 }
 
 function renderGrid() {
-  const x = tiles().find((t) => t.id === current);
   $("grid").innerHTML = "";
-  if (!x) return;
-  for (const v of x.videos) {
+  for (const v of dailyList()) {
     const b = document.createElement("button");
     b.className = "video";
     // Picture only: the child can't read. The title stays for screen readers.
@@ -302,7 +296,7 @@ function goHome() {
   if (player) player.stopVideo();
   $("stage").hidden = true;
   $("home").hidden = false;
-  renderShows(); renderGrid();
+  renderGrid();
 }
 
 $("homeBtn").onclick = goHome;
@@ -322,13 +316,11 @@ document.addEventListener("contextmenu", (e) => e.preventDefault());
   for (const ev of ["pointerup", "pointerleave", "pointercancel"]) pb.addEventListener(ev, stop);
 }
 // A new day can unlock a show: refresh the list when the app comes back to the screen.
-document.addEventListener("visibilitychange", () => { if (!document.hidden && !$("home").hidden) { renderShows(); renderGrid(); } });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && !$("home").hidden) { renderGrid(); } });
 
 fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => {
   data = d;
-  const saved = load("show");
-  current = saved;
-  renderShows(); renderGrid();
+  renderGrid();
 });
 </script>
 <script src="https://www.youtube.com/iframe_api"></script>

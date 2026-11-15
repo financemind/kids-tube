@@ -1,4 +1,13 @@
 {
+ "daily": {
+  "size": 6,
+  "start": "2026-11-16",
+  "lessPerWeek": [
+   2,
+   1,
+   1
+  ]
+ },
  "topics": [
   {
    "key": "animals",
