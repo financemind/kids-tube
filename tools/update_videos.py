@@ -44,7 +44,7 @@ TOPICS = [
 # The app shows only these few main topics; each joins some topics above.
 # (key, Persian label, icon, topic keys)
 MAIN_TOPICS = [
-    ("animals", "حیوانات", "🐾", ["animals", "elephant", "dino"]),
+    ("animals", "حیوانات", "🐘", ["animals", "elephant", "dino"]),
     ("vehicles", "ماشین و قطار", "🚒", ["trucks", "trains"]),
     ("learn", "عدد و حرف", "🔢", ["numbers", "abc"]),
     ("colors", "رنگ‌ها", "🎨", ["colors"]),

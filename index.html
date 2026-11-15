@@ -39,19 +39,20 @@ button:focus-visible { outline: 4px solid var(--tomato); outline-offset: 3px; }
   padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right));
   display: grid; gap: 20px;
 }
-.shows { display: flex; gap: 12px; overflow-x: auto; padding: 4px 2px 10px; scrollbar-width: none; direction: ltr; }
-.shows::-webkit-scrollbar { display: none; }
-.show {
-  flex: 0 0 auto; display: grid; justify-items: center; gap: 6px;
-  padding: 8px 8px 10px; border-radius: 22px; background: var(--card);
-  box-shadow: 0 4px 0 var(--shade); transition: transform .12s;
+/* Topic tiles: four big pictures across (two on a phone). The small label is for parents. */
+.topics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; direction: ltr; }
+@media (max-width: 560px) { .topics { grid-template-columns: repeat(2, 1fr); } }
+.topic {
+  display: grid; justify-items: center; gap: 4px; padding: 10px 8px 8px; border-radius: 26px;
+  background: var(--card); box-shadow: 0 5px 0 var(--shade); border: 5px solid transparent; transition: transform .12s;
 }
-.show img { width: 132px; aspect-ratio: 16/9; object-fit: cover; border-radius: 14px; display: block; }
-.show span { font-family: var(--display); font-weight: 600; font-size: 17px; }
-.show .icon {
-  width: 132px; aspect-ratio: 16/9; border-radius: 14px; display: grid; place-items: center;
-  font-size: 46px; font-style: normal; background: var(--sky); line-height: 1;
+.topic .icon {
+  width: 100%; aspect-ratio: 4/3; border-radius: 18px; display: grid; place-items: center;
+  font-size: clamp(56px, 10vw, 104px); font-style: normal; line-height: 1; background: var(--tint);
 }
+.topic span { font-family: var(--display); font-weight: 600; font-size: 14px; opacity: .7; }
+.topic[aria-pressed="true"] { border-color: var(--sun); transform: translateY(-4px); box-shadow: 0 9px 0 var(--shade); }
+.topic:active { transform: scale(.96); }
 .parents {
   position: fixed; left: calc(10px + env(safe-area-inset-left, 0px)); bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   width: 40px; height: 40px; border-radius: 50%; opacity: .35; display: grid; place-items: center;
@@ -59,19 +60,15 @@ button:focus-visible { outline: 4px solid var(--tomato); outline-offset: 3px; }
 }
 .parents svg { width: 20px; height: 20px; fill: var(--ink); }
 .parents.holding { opacity: 1; background: var(--sun); transition: background 2s; }
-.show[aria-pressed="true"] { background: var(--sun); transform: translateY(-3px); box-shadow: 0 7px 0 var(--shade); }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 18px; direction: ltr; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 20px; direction: ltr; }
 .video {
-  display: grid; text-align: left; background: var(--card); border-radius: 20px; overflow: hidden;
-  box-shadow: 0 5px 0 var(--shade); transition: transform .12s;
+  display: block; background: var(--card); border-radius: 24px; overflow: hidden; padding: 0;
+  box-shadow: 0 6px 0 var(--shade); border: 5px solid var(--card); transition: transform .12s;
 }
 .video:active { transform: scale(.97); }
 .video img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: var(--shade); }
-.video span {
-  font-family: var(--display); font-weight: 500; font-size: 15px; line-height: 1.3; margin: 10px 14px 12px;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
+.video img { border-radius: 19px; }
 
 /* Player screen */
 .stage { position: fixed; inset: 0; background: #0d1426; display: grid; grid-template-rows: 1fr auto; z-index: 5; }
@@ -108,7 +105,7 @@ button:focus-visible { outline: 4px solid var(--tomato); outline-offset: 3px; }
 <body>
 
 <main class="home" id="home">
-  <nav class="shows" id="topics" aria-label="Topics"></nav>
+  <nav class="topics" id="topics" aria-label="Topics"></nav>
   <section class="grid" id="grid" aria-live="polite"></section>
 </main>
 
@@ -135,6 +132,7 @@ const ICON = {
   again: '<svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>',
   home: '<svg viewBox="0 0 24 24"><path d="M12 3 2 12h3v8h5v-5h4v5h5v-8h3z"/></svg>',
 };
+const TINT = { animals: "#d9f2dc", vehicles: "#ffe0dc", learn: "#dde6ff", colors: "#fff1c9" };
 const END_TRIM = 15; // seconds: stop before YouTube's end-screen video tiles appear
 const $ = (id) => document.getElementById(id);
 const thumb = (id, q = "hqdefault") => `https://i.ytimg.com/vi/${id}/${q}.jpg`;
@@ -191,10 +189,11 @@ function renderShows() {
   {
     for (const x of list) {
       const b = document.createElement("button");
-      b.className = "show";
+      b.className = "topic";
       b.setAttribute("aria-pressed", String(x.id === current));
-      b.innerHTML = x.icon ? `<i class="icon" aria-hidden="true"></i><span></span>` : `<img alt="" src="${thumb(x.videos[0].id, "mqdefault")}"><span></span>`;
-      if (x.icon) b.querySelector(".icon").textContent = x.icon;
+      b.style.setProperty("--tint", TINT[x.id.slice(2)] || "var(--sky)");
+      b.innerHTML = `<i class="icon" aria-hidden="true"></i><span></span>`;
+      b.querySelector(".icon").textContent = x.icon;
       b.querySelector("span").textContent = x.title;
       b.onclick = () => { current = x.id; save("show", x.id); renderShows(); renderGrid(); };
       nav.appendChild(b);
@@ -209,8 +208,10 @@ function renderGrid() {
   for (const v of x.videos) {
     const b = document.createElement("button");
     b.className = "video";
-    b.innerHTML = `<img alt="" loading="lazy" src="${thumb(v.id)}"><span></span>`;
-    b.querySelector("span").textContent = v.title;
+    // Picture only: the child can't read. The title stays for screen readers.
+    b.setAttribute("aria-label", v.title);
+    b.innerHTML = `<img alt="" loading="lazy" src="${thumb(v.id, "hq720")}">`;
+    b.querySelector("img").onerror = function () { this.onerror = null; this.src = thumb(v.id); };
     b.onclick = () => openVideo(v, showOf(v.show));
     $("grid").appendChild(b);
   }
