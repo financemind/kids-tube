@@ -61,7 +61,14 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 /* TV and big landscape screens: every picture fits on one screen, no scrolling (sizes set in fitGrid). */
 .home.fit { max-width: none; padding-bottom: 16px; gap: 12px; }
 .home.fit .grid { gap: 14px; justify-content: center; }
+/* TV remote: each picture shows its number, so pressing that number on the remote opens it. */
+.video .num { position: absolute; top: 8px; left: 8px; min-width: 44px; height: 44px; padding: 0 8px; border-radius: 22px;
+  background: rgba(29, 43, 79, .82); color: #fff; font: 700 26px/44px var(--body); text-align: center; display: none; }
+.numbers .video .num { display: block; }
+.video .topic { position: absolute; top: 6px; right: 8px; font-size: 40px; line-height: 1; filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
+.video.picked { outline: 8px solid var(--sun); outline-offset: 4px; }
 .video {
+  position: relative;
   display: block; background: var(--card); border-radius: 24px; overflow: hidden; padding: 0;
   box-shadow: 0 6px 0 var(--shade); border: 5px solid var(--card); transition: transform .12s;
 }
@@ -372,6 +379,14 @@ function balance(v, got, left) {
   if (needCalm && t.calm >= 4) m *= 1 + 3 * needCalm / left;
   return m;
 }
+/* Topic of the day: one fun topic (dinosaurs, space, sea…) is picked for each
+   day, and topicPerDay of the day's videos come from it. Its icon shows on
+   those pictures, so the child can spot them without reading. */
+function topicOfDay() {
+  const ts = (data.topics || []).filter((t) => t.videos.length >= 8);
+  if (!ts.length) return null;
+  return ts[Math.floor(seeded("topic" + dayKey())() * ts.length)];
+}
 function dailyList() {
   const seen = new Set(), pool = [];
   const add = (v, show) => { if (!seen.has(v.id)) { seen.add(v.id); pool.push({ ...v, show }); } };
@@ -379,10 +394,14 @@ function dailyList() {
   for (const tp of data.topics || []) for (const v of tp.videos) add(v, v.show);
   const k = cfg(), size = k.size || 6, rnd = seeded(dayKey());
   let cands = pool.map((v) => ({ v, w: score(v) * fit(v) })).filter((x) => x.w > 0);
-  const perShow = {}, list = [], got = { exciting: 0, fantasy: 0, learn: 0, calm: 0 };
+  const perShow = {}, list = [], got = { exciting: 0, fantasy: 0, learn: 0, calm: 0, topic: 0 };
+  const today = topicOfDay(), inTopic = new Set(today ? today.videos.map((v) => v.id) : []);
   while (list.length < size && cands.length) {
     // Weighted draw: a higher score means a better chance; balance() keeps the day's mix.
+    const wantTopic = got.topic < (k.topicPerDay ?? 4);
     let ws = cands.map((x) => x.w * balance(x.v, got, size - list.length));
+    // Until the topic has its share, draw only from the topic's videos (when any fit).
+    if (wantTopic && cands.some((x, i) => ws[i] > 0 && inTopic.has(x.v.id))) ws = ws.map((w, i) => (inTopic.has(cands[i].v.id) ? w : 0));
     if (!ws.some((w) => w > 0)) ws = cands.map((x) => x.w); // nothing fits the mix: ignore it
     const total = ws.reduce((a, w) => a + w, 0);
     let r = rnd() * total, i = 0;
@@ -394,6 +413,7 @@ function dailyList() {
     if (t.real <= 2) got.fantasy++;
     if (t.learn >= 4) got.learn++;
     if (t.calm >= 4) got.calm++;
+    if (inTopic.has(v.id)) { got.topic++; v.topic = today.icon; }
     perShow[v.show] = (perShow[v.show] || 0) + 1;
     const cap = (s) => (showOf(s).limit ? (k.perLessShow || 1) : (k.perShow || 2));
     cands = cands.filter((x) => (perShow[x.v.show] || 0) < cap(x.v.show));
@@ -445,7 +465,7 @@ function renderGrid() {
     b.className = "video";
     // Picture only: the child can't read. The title stays for screen readers.
     b.setAttribute("aria-label", v.title);
-    b.innerHTML = `<img alt="" loading="lazy" src="${thumb(v.id, "hq720")}">`;
+    b.innerHTML = `<img alt="" loading="lazy" src="${thumb(v.id, "hq720")}"><span class="num" aria-hidden="true">${$("grid").children.length + 1}</span>${v.topic ? `<span class="topic" aria-hidden="true">${v.topic}</span>` : ""}`;
     b.querySelector("img").onerror = function () { this.onerror = null; this.src = thumb(v.id); };
     b.onclick = () => openVideo(v, showOf(v.show));
     $("grid").appendChild(b);
@@ -695,7 +715,33 @@ function moveFocus(dir) {
   }
   if (best) { best.focus(); best.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
 }
+/* Number keys on the remote open that picture: 1-9 at once; for 10-16 press
+   two numbers quickly (after "1" it waits a moment for a second number). */
+let numBuf = "", numTimer = null;
+function pickNumber(n) {
+  const tiles = $("grid").children, b = tiles[n - 1];
+  if (!b) return;
+  b.classList.add("picked"); b.focus();
+  setTimeout(() => { b.classList.remove("picked"); b.click(); }, 250);
+}
+function onDigit(d) {
+  const count = $("grid").children.length;
+  clearTimeout(numTimer);
+  numBuf += d;
+  const n = Number(numBuf);
+  if (numBuf.length >= 2 || n * 10 > count || n === 0) { // no two-number choice can start with this
+    numBuf = "";
+    if (n >= 1) pickNumber(n);
+    return;
+  }
+  numTimer = setTimeout(() => { numBuf = ""; pickNumber(n); }, 1200);
+}
+// Show the numbers on TV and big screens, or once any remote or keyboard key is used.
+if (matchMedia("(min-width: 900px) and (orientation: landscape)").matches) document.body.classList.add("numbers");
 document.addEventListener("keydown", (e) => {
+  const digit = /^[0-9]$/.test(e.key) ? e.key : e.keyCode >= 96 && e.keyCode <= 105 ? String(e.keyCode - 96) : null;
+  document.body.classList.add("numbers");
+  if (digit !== null && $("stage").hidden && !$("home").hidden) { e.preventDefault(); onDigit(digit); return; }
   if (e.key.startsWith("Arrow")) { e.preventDefault(); moveFocus(e.key); return; }
   const onStage = !$("stage").hidden;
   if (BACK_KEYS.has(e.key) || BACK_CODES.has(e.keyCode)) {

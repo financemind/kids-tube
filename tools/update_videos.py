@@ -114,20 +114,35 @@ SKIP_PLAYLIST = ["live", "#shorts", "shorts", "halloween", "christmas", "holiday
 MAX_PER_CHANNEL = 200   # videos per show at most (newest uploads first, then playlists)
 MIN_SECONDS = 60
 
-# Topics the child can pick. Videos come from searching YouTube for
-# "<show> <query>" and keeping only results from the channels above whose
-# title contains one of the words.
+# Fun topics. A video joins a topic when its title has one of the topic's
+# words as a whole word (plural too: "dog" matches "dogs", not "dogma"); a word
+# ending in * matches any word starting with it ("count*" matches "counting"). Each day one topic
+# is the "topic of the day" (see dailyList in index.html).
+# (key, Persian label, icon, title words)
 TOPICS = [
-    # (key, Persian label, icon, search query, title words)
-    ("animals", "حیوانات", "🐾", "animals", ["animal", "zoo", "farm", "dog", "cat", "lion", "bird", "pet", "fish", "duck", "cow", "pig"]),
-    ("elephant", "فیل", "🐘", "elephant", ["elephant"]),
-    ("dino", "دایناسور", "🦖", "dinosaur", ["dinosaur", "dino", "t-rex", "t rex"]),
-    ("trucks", "ماشین‌ها", "🚒", "trucks cars", ["truck", "car ", "cars", "excavator", "digger", "bus", "fire engine", "tractor", "vehicle"]),
-    ("trains", "قطار", "🚂", "train", ["train"]),
-    ("numbers", "عددها", "🔢", "counting numbers", ["number", "count", "1 to", "123", "math"]),
-    ("abc", "حروف", "🔤", "ABC alphabet letters", ["abc", "alphabet", "letter", "phonics"]),
-    ("colors", "رنگ‌ها", "🎨", "colors", ["color", "colour", "rainbow"]),
+    ("dino", "دایناسورها", "🦖", ["dinosaur", "dino", "t-rex", "t rex"]),
+    ("space", "فضا و ستاره‌ها", "🚀", ["space", "rocket", "moon", "planet", "astronaut", "star"]),
+    ("ocean", "دریا و ماهی‌ها", "🐳", ["ocean", "sea", "fish", "whale", "shark", "beach", "underwater", "mermaid", "octopus"]),
+    ("farm", "مزرعه", "🐄", ["farm", "cow", "pig", "sheep", "horse", "chicken", "goat", "duck"]),
+    ("wild", "جنگل و باغ‌وحش", "🦁", ["jungle", "lion", "tiger", "monkey", "zoo", "safari", "elephant", "giraffe", "bear"]),
+    ("bugs", "حشره‌ها", "🐛", ["bug", "insect", "butterfl*", "bee", "bees", "ant", "ants", "spider", "caterpillar", "ladybug"]),
+    ("pets", "سگ و گربه", "🐶", ["dog", "pupp*", "cat", "cats", "kitten", "pet", "bunny"]),
+    ("trucks", "کامیون و ماشین‌سازی", "🚜", ["truck", "fire engine", "fire truck", "excavator", "digger", "crane", "tractor", "garbage", "construct*"]),
+    ("travel", "قطار، هواپیما، کشتی", "🚂", ["train", "plane", "airplane", "aeroplane", "boat", "ship", "bus", "helicopter", "rocket"]),
+    ("music", "آهنگ و رقص", "🎵", ["song", "sing*", "danc*", "music", "nursery rhyme"]),
+    ("feelings", "احساس‌ها و دوستی", "💛", ["feel*", "sad", "happy", "angry", "scared", "emotion*", "friend", "share", "sharing", "kind", "sorry"]),
+    ("food", "خوراکی و آشپزی", "🍎", ["food", "cook*", "cake", "fruit", "vegetable*", "pizza", "snack", "bak*", "kitchen", "ice cream", "picnic"]),
+    ("weather", "باران و برف", "☔", ["rain", "snow", "wind", "weather", "storm", "puddle", "rainbow", "sunny"]),
+    ("numbers", "عدد و شکل", "🔢", ["number", "count*", "math", "shape", "123"]),
+    ("abc", "حروف و قصه", "🔤", ["abc", "alphabet", "letter", "phonics", "book", "read*"]),
+    ("art", "رنگ و نقاشی", "🎨", ["color", "colour", "paint*", "draw*", "art", "craft*"]),
+    ("bedtime", "شب و خواب", "🌙", ["bedtime", "sleep", "night", "goodnight", "lullaby", "dream*"]),
+    ("body", "بدن و سلامتی", "🦷", ["doctor", "dentist", "teeth", "tooth", "wash*", "bath", "potty", "healthy", "hospital"]),
+    ("family", "خانواده", "👨‍👩‍👦", ["mum", "mom", "mummy", "dad", "daddy", "family", "baby", "grandma", "granny", "nana", "grandpa", "brother", "sister"]),
+    ("outdoor", "پارک و طبیعت", "🌳", ["park", "garden", "tree", "nature", "forest", "outside", "camping", "playground", "flower"]),
+    ("party", "تولد و جشن", "🎉", ["birthday", "party", "celebrat*"]),
 ]
+
 # The app shows one list a day, chosen by score (see dailyList in index.html):
 # - a video watched videoRestMinutes or more yesterday is left out;
 # - every videoHalfMinutes of a video in the last 7 days halves its score,
@@ -141,19 +156,9 @@ TOPICS = [
 # balance: each day's list keeps at most maxExciting fast shows (calm <= 2) and
 # maxFantasy magical shows (real <= 2), and tries for at least minLearn
 # teaching shows (learn >= 4) and minCalm quiet shows (calm >= 4).
-DAILY = {"balance": {"maxExciting": 3, "maxFantasy": 5, "minLearn": 6, "minCalm": 6}, "size": 16, "start": "2026-11-16", "perShow": 4, "perLessShow": 1, "videoRestMinutes": 10, "videoHalfMinutes": 10, "showHalfMinutes": 20, "taperPerWeek": 0.7, "turns": 4, "turnMinutes": 15, "breakTimes": 4}
+# topicPerDay: how many of the day's videos come from the topic of the day.
+DAILY = {"topicPerDay": 4, "balance": {"maxExciting": 3, "maxFantasy": 5, "minLearn": 6, "minCalm": 6}, "size": 16, "start": "2026-11-16", "perShow": 4, "perLessShow": 1, "videoRestMinutes": 10, "videoHalfMinutes": 10, "showHalfMinutes": 20, "taperPerWeek": 0.7, "turns": 4, "turnMinutes": 15, "breakTimes": 4}
 
-# Topics only feed the daily list's pool of videos; each joins some topics above.
-# (key, Persian label, icon, topic keys)
-MAIN_TOPICS = [
-    ("animals", "حیوانات", "🐘", ["animals", "elephant", "dino"]),
-    ("vehicles", "ماشین و قطار", "🚒", ["trucks", "trains"]),
-    ("learn", "عدد و حرف", "🔢", ["numbers", "abc"]),
-    ("colors", "رنگ‌ها", "🎨", ["colors"]),
-]
-PER_MAIN_TOPIC = 8
-PER_CHANNEL = 4
-PER_TOPIC = 16
 MAX_MINUTES = 60
 NS = {"a": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015"}
 OUT = pathlib.Path(__file__).resolve().parent.parent / "videos.json"
@@ -186,89 +191,26 @@ def is_live(video_id):
     return '"isLiveContent":true' in page
 
 
-def search(query):
-    """Videos from a YouTube search: (id, title, channel id, seconds or None if live)."""
-    url = "https://www.youtube.com/results?search_query=" + urllib.parse.quote_plus(query)
-    page = get(url).decode("utf-8", "replace")
-    m = re.search(r"var ytInitialData = (\{.*?\});</script>", page)
+def topic_words(words):
+    return [re.compile(r"\b" + re.escape(w[:-1]) if w.endswith("*") else r"\b" + re.escape(w) + r"(s|es)?\b", re.I)
+            for w in words]
+
+
+# Show and character names are taken out of titles before matching, so
+# "Peppa Pig" is not a farm video and "Care Bears" is not a zoo video.
+NAME_RE = re.compile(r"peppa pig|george pig|daddy pig|mummy pig|sarah (&|and) duck|care ?bears?|little bear|berenstain bears?"
+                     r"|clifford the big red dog|daniel tiger|puffin rock|baby einstein|paw patrol|postman pat|mister rogers"
+                     r"|planet earth|bluey|bingo|super simple|numberblocks?|sesame street|magic school bus", re.I)
+
+
+def build_topics(categories):
+    """Sort every collected video into the TOPICS its title matches."""
     out = []
-
-    def walk(o):
-        if isinstance(o, dict):
-            v = o.get("videoRenderer")
-            if v:
-                runs = v.get("ownerText", {}).get("runs", [{}])
-                ch = runs[0].get("navigationEndpoint", {}).get("browseEndpoint", {}).get("browseId")
-                length = v.get("lengthText", {}).get("simpleText")
-                secs = None
-                if length:
-                    secs = 0
-                    for part in length.split(":"):
-                        secs = secs * 60 + int(part)
-                out.append((v["videoId"], v["title"]["runs"][0]["text"], ch, secs))
-            for x in o.values():
-                walk(x)
-        elif isinstance(o, list):
-            for x in o:
-                walk(x)
-
-    if m:
-        walk(json.loads(m.group(1)))
-    return out
-
-
-def build_topics():
-    topics = []
-    for key, label, icon, query, words in TOPICS:
-        videos, seen = [], set()
-        for show, title, cid, _ in CHANNELS:
-            taken = 0
-            for vid, vtitle, ch, secs in search(f"{title} {query}"):
-                low = vtitle.lower()
-                if (ch != cid or vid in seen or secs is None or secs < 60 or secs > MAX_MINUTES * 60
-                        or not any(w in low for w in words) or not embeddable(vid)):
-                    continue
-                seen.add(vid)
-                videos.append({"id": vid, "title": vtitle, "show": show})
-                taken += 1
-                if taken >= PER_CHANNEL:
-                    break
+    for key, label, icon, words in TOPICS:
+        pats = topic_words(words)
+        videos = [{"id": v["id"], "title": v["title"], "show": c["key"]}
+                  for c in categories for v in c["videos"] if any(p.search(NAME_RE.sub(" ", v["title"])) for p in pats)]
         print(f"topic {key}: {len(videos)} videos")
-        if videos:
-            topics.append({"key": key, "title": label, "icon": icon, "videos": videos[:PER_TOPIC]})
-    return topics
-
-
-def mix_shows(videos):
-    """Reorder so shows take turns: one from each show, then the next round."""
-    queues = {}
-    for v in videos:
-        queues.setdefault(v["show"], []).append(v)
-    out = []
-    while any(queues.values()):
-        for q in queues.values():
-            if q:
-                out.append(q.pop(0))
-    return out
-
-
-def group_topics(topics):
-    """Join topics into MAIN_TOPICS, taking videos from each part in turn."""
-    by_key = {t["key"]: t["videos"] for t in topics}
-    out = []
-    for key, label, icon, parts in MAIN_TOPICS:
-        lists = [mix_shows(by_key.get(p, [])) for p in parts]
-        videos, seen = [], set()
-        while len(videos) < PER_MAIN_TOPIC and any(lists):
-            for lst in lists:
-                while lst:
-                    v = lst.pop(0)
-                    if v["id"] not in seen:
-                        seen.add(v["id"])
-                        videos.append(v)
-                        break
-                if len(videos) >= PER_MAIN_TOPIC:
-                    break
         if videos:
             out.append({"key": key, "title": label, "icon": icon, "videos": videos})
     return out
@@ -371,7 +313,7 @@ def main():
             if limit:
                 cat["limit"] = limit
             categories.append(cat)
-    topics = group_topics(build_topics())
+    topics = build_topics(categories)
     OUT.write_text(json.dumps({"daily": DAILY, "topics": topics, "categories": categories}, ensure_ascii=False, indent=1) + "\n")
     print(f"wrote {OUT}")
 
