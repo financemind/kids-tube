@@ -108,6 +108,13 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .round { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 5px 0 rgba(0,0,0,.3); }
 .round svg { width: 36px; height: 36px; fill: #fff; }
 .home-btn { background: var(--tomato); }
+.rotate-btn { background: #8a5cf6; }
+.rotate-btn svg { transition: transform .3s; }
+/* Rotate button: turns the whole player a quarter turn, for watching lying on one side. */
+.stage.r90, .stage.r270 { inset: auto; top: 50%; left: 50%; width: 100vh; height: 100vw; width: 100dvh; height: 100dvw; }
+.stage.r90 { transform: translate(-50%, -50%) rotate(90deg); }
+.stage.r180 { transform: rotate(180deg); }
+.stage.r270 { transform: translate(-50%, -50%) rotate(270deg); }
 .play-btn { background: var(--leaf); }
 .msg { position: relative; color: #fff; font-family: var(--body); font-weight: 700; font-size: 22px; text-align: center; padding: 0 20px; }
 .done { display: grid; gap: 22px; justify-items: center; }
@@ -138,6 +145,7 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
   <div class="bar">
     <button class="round home-btn" id="homeBtn" aria-label="Back to videos"><svg viewBox="0 0 24 24"><path d="M12 3 2 12h3v8h5v-5h4v5h5v-8h3z"/></svg></button>
     <button class="round play-btn" id="playBtn" aria-label="Play or pause"></button>
+    <button class="round rotate-btn" id="rotateBtn" aria-label="Turn the picture"><svg viewBox="0 0 24 24"><path d="M12 4V1L7 5l5 4V6a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg></button>
   </div>
 </section>
 
@@ -449,6 +457,14 @@ $("playBtn").onclick = () => {
   else player.playVideo();
 };
 $("shield").onclick = () => $("playBtn").click();
+/* Each press turns the player a quarter turn clockwise; this device remembers it. */
+let turn = Number(load("rotate")) || 0;
+function applyTurn() {
+  $("stage").classList.remove("r90", "r180", "r270");
+  if (turn) $("stage").classList.add("r" + turn);
+}
+applyTurn();
+$("rotateBtn").onclick = () => { turn = (turn + 90) % 360; save("rotate", String(turn)); applyTurn(); };
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 
 /* TV remote and keyboard: arrows move between buttons, OK presses, Back goes home. */
