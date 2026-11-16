@@ -205,7 +205,10 @@ function load(k) { try { return localStorage.getItem(k); } catch (e) { return nu
 /* Watch time, per show per local day, in seconds. Each device keeps its own
    counts (mine) and the server returns the sum of all other devices (others),
    so every phone and tablet shares one day. watch/vwatch = mine + others. */
-const API = "https://ntv.financemind.com/api/sync";
+// A copy opened on this computer for testing (localhost) never talks to the real
+// server, so tests do not count toward Noyan's time or show in the report.
+const LOCAL_TEST = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname) || location.hostname.endsWith(".localhost");
+const API = LOCAL_TEST ? null : "https://ntv.financemind.com/api/sync";
 function parse(k) { try { return JSON.parse(load(k) || "{}") || {}; } catch (e) { return {}; } }
 const mine = { watch: parse("watch"), vwatch: parse("vwatch"), turnEnds: parse("turnEnds"), pos: parse("pos") };
 /* Action log: every open, play, pause, home, end, time-up… with the time, the
@@ -272,7 +275,7 @@ function wipe(ts, day) { // parents reset the time on the server: one day, or ev
   combine();
 }
 async function sync(again = true) {
-  if (syncing) return;
+  if (syncing || !API) return;
   syncing = true;
   let wiped = false;
   try {
@@ -798,7 +801,7 @@ function refreshHome() {
 document.addEventListener("visibilitychange", () => {
   logAction(document.hidden ? "hide" : "show");
   if (document.hidden) {
-    try { navigator.sendBeacon(API, new Blob([syncBody()], { type: "text/plain" })); } catch (e) {}
+    if (API) try { navigator.sendBeacon(API, new Blob([syncBody()], { type: "text/plain" })); } catch (e) {}
   } else if (!$("home").hidden) { renderGrid(); sync().then(refreshHome); }
 });
 // Every 30 seconds: share counts with the other devices and notice when a break ends.

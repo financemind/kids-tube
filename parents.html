@@ -158,7 +158,10 @@ button.danger:disabled { opacity: .6; cursor: default; }
 const $ = (id) => document.getElementById(id);
 function read(k) { try { return JSON.parse(localStorage.getItem(k) || "{}") || {}; } catch (e) { return {}; } }
 let watch = read("watch"), vwatch = read("vwatch");
-const API = "https://ntv.financemind.com/api/sync";
+// A copy opened on this computer for testing (localhost) never talks to the real
+// server, so tests do not count toward Noyan's time or show in the report.
+const LOCAL_TEST = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname) || location.hostname.endsWith(".localhost");
+const API = LOCAL_TEST ? null : "https://ntv.financemind.com/api/sync";
 function addStores(a, b) {
   const out = {};
   for (const s of [a, b]) for (const [day, vals] of Object.entries(s || {})) {
@@ -184,6 +187,7 @@ async function resetToday() {
   const btn = $("resetBtn");
   btn.disabled = true; btn.textContent = "صبر کنید…";
   try {
+    if (!API) throw new Error("local test copy");
     const r = await fetch(API.replace("/sync", "/reset"), { method: "POST", headers: { "Content-Type": "text/plain" },
       body: JSON.stringify({ day: dayKey(0) }) });
     if (!r.ok) throw new Error();
@@ -197,7 +201,7 @@ async function resetToday() {
 }
 async function getDevices(again = true) {
   const device = localStorage.getItem("device");
-  if (!device) return null;
+  if (!device || !API) return null;
   try {
     const resetSeen = Number(localStorage.getItem("resetSeen")) || 0;
     const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
@@ -256,6 +260,7 @@ async function savePlan(daily, turns, minutes) {
   const btn = $("planBtn");
   btn.disabled = true; $("planMsg").textContent = "صبر کنید…";
   try {
+    if (!API) throw new Error("local test copy");
     const r = await fetch(API.replace("/sync", "/plan"), { method: "POST", headers: { "Content-Type": "text/plain" },
       body: JSON.stringify({ day: dayKey(0), turns, minutes }) });
     if (!r.ok) throw new Error();
@@ -292,7 +297,8 @@ Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), 
       $("devices").appendChild(tr);
     }
   } else {
-    $("note").textContent = "به سرور وصل نشد. فعلاً فقط تماشای همین دستگاه دیده می‌شود.";
+    $("note").textContent = LOCAL_TEST ? "نسخهٔ آزمایشی روی همین کامپیوتر: به سرور وصل نمی‌شود و فقط تماشای همین‌جا دیده می‌شود."
+      : "به سرور وصل نشد. فعلاً فقط تماشای همین دستگاه دیده می‌شود.";
     emptyRow($("devices"), 4, "به سرور وصل نشد.");
   }
   $("sToday").textContent = dur(sum(watch, null, 0, 0));
