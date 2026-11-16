@@ -58,6 +58,9 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .parents.holding { opacity: 1; background: var(--sun); transition: background 2s; }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 20px; direction: ltr; }
+/* TV and big landscape screens: every picture fits on one screen, no scrolling (sizes set in fitGrid). */
+.home.fit { max-width: none; padding-bottom: 16px; gap: 12px; }
+.home.fit .grid { gap: 14px; justify-content: center; }
 .video {
   display: block; background: var(--card); border-radius: 24px; overflow: hidden; padding: 0;
   box-shadow: 0 6px 0 var(--shade); border: 5px solid var(--card); transition: transform .12s;
@@ -407,6 +410,7 @@ function renderGrid() {
     // Break: go and play. Last turn used: see you tomorrow.
     $("restIcon").textContent = st.mode === "break" ? "🛝" : "🌙";
     $("restText").textContent = st.mode === "break" ? "وقت بازی! بعداً دوباره." : "برای امروز بس است. فردا دوباره.";
+    fitGrid();
     return;
   }
   for (const v of dailyList()) {
@@ -419,7 +423,29 @@ function renderGrid() {
     b.onclick = () => openVideo(v, showOf(v.show));
     $("grid").appendChild(b);
   }
+  fitGrid();
 }
+
+/* On a big landscape screen (TV, laptop) pick the column count that gives the
+   largest pictures while all of them fit on the screen without scrolling. */
+function fitGrid() {
+  const home = $("home"), grid = $("grid"), n = grid.children.length;
+  const big = innerWidth >= 900 && innerWidth >= innerHeight;
+  home.classList.toggle("fit", big && n > 0);
+  if (!big || !n || home.hidden) { grid.style.gridTemplateColumns = ""; return; }
+  const gap = 14, frame = 10; // the white border around each picture
+  const W = grid.clientWidth, H = innerHeight - grid.getBoundingClientRect().top - 24;
+  let best = { w: 0, c: 1 };
+  for (let c = 1; c <= 8; c++) {
+    const rows = Math.ceil(n / c);
+    const byWidth = (W - gap * (c - 1)) / c;
+    const byHeight = ((H - gap * (rows - 1)) / rows - frame) * 16 / 9 + frame;
+    const w = Math.min(byWidth, byHeight);
+    if (w > best.w) best = { w, c };
+  }
+  grid.style.gridTemplateColumns = `repeat(${best.c}, ${Math.floor(best.w)}px)`;
+}
+addEventListener("resize", fitGrid);
 
 function showCover(html, bg) {
   const cv = $("cover");

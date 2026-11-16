@@ -1,8 +1,8 @@
 {
  "daily": {
-  "size": 9,
+  "size": 16,
   "start": "2026-11-16",
-  "perShow": 2,
+  "perShow": 4,
   "perLessShow": 1,
   "videoRestMinutes": 10,
   "videoHalfMinutes": 10,

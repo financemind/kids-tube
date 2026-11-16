@@ -51,7 +51,7 @@ TOPICS = [
 # - by default a day has `turns` turns of turnMinutes each (parents can change
 #   today's turns in the report); after a turn ends, the next opens only after
 #   breakTimes x the turn length; after the last turn, nothing until tomorrow.
-DAILY = {"size": 9, "start": "2026-11-16", "perShow": 2, "perLessShow": 1, "videoRestMinutes": 10, "videoHalfMinutes": 10, "showHalfMinutes": 20, "taperPerWeek": 0.7, "turns": 4, "turnMinutes": 15, "breakTimes": 4}
+DAILY = {"size": 16, "start": "2026-11-16", "perShow": 4, "perLessShow": 1, "videoRestMinutes": 10, "videoHalfMinutes": 10, "showHalfMinutes": 20, "taperPerWeek": 0.7, "turns": 4, "turnMinutes": 15, "breakTimes": 4}
 
 # Topics only feed the daily list's pool of videos; each joins some topics above.
 # (key, Persian label, icon, topic keys)
