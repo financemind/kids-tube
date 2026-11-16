@@ -357,21 +357,43 @@ function timeState() {
 }
 const canWatch = () => timeState().mode === "watch";
 
+/* Show scores (1-5, set in update_videos.py): real, learn, kind, calm, color, music, age. */
+const traitsOf = (v) => ({ real: 3, learn: 3, kind: 3, calm: 3, color: 3, music: 3, age: 3, ...((showOf(v.show) || {}).traits || {}) });
+// Shows made for his age and gentle shows come up more often.
+function fit(v) { const t = traitsOf(v); return (t.age / 5) * (0.6 + 0.4 * t.kind / 5); }
+// The day's mix (cfg balance): few fast or magical shows, enough teaching and quiet ones.
+function balance(v, got, left) {
+  const b = cfg().balance || {}, t = traitsOf(v);
+  if (t.calm <= 2 && got.exciting >= (b.maxExciting ?? 3)) return 0;
+  if (t.real <= 2 && got.fantasy >= (b.maxFantasy ?? 5)) return 0;
+  let m = 1;
+  const needLearn = Math.max(0, (b.minLearn ?? 6) - got.learn), needCalm = Math.max(0, (b.minCalm ?? 6) - got.calm);
+  if (needLearn && t.learn >= 4) m *= 1 + 3 * needLearn / left;
+  if (needCalm && t.calm >= 4) m *= 1 + 3 * needCalm / left;
+  return m;
+}
 function dailyList() {
   const seen = new Set(), pool = [];
   const add = (v, show) => { if (!seen.has(v.id)) { seen.add(v.id); pool.push({ ...v, show }); } };
   for (const c of data.categories) for (const v of c.videos) add(v, c.key);
   for (const tp of data.topics || []) for (const v of tp.videos) add(v, v.show);
   const k = cfg(), size = k.size || 6, rnd = seeded(dayKey());
-  let cands = pool.map((v) => ({ v, w: score(v) })).filter((x) => x.w > 0);
-  const perShow = {}, list = [];
+  let cands = pool.map((v) => ({ v, w: score(v) * fit(v) })).filter((x) => x.w > 0);
+  const perShow = {}, list = [], got = { exciting: 0, fantasy: 0, learn: 0, calm: 0 };
   while (list.length < size && cands.length) {
-    // Weighted draw: a higher score means a better chance.
-    const total = cands.reduce((a, x) => a + x.w, 0);
+    // Weighted draw: a higher score means a better chance; balance() keeps the day's mix.
+    let ws = cands.map((x) => x.w * balance(x.v, got, size - list.length));
+    if (!ws.some((w) => w > 0)) ws = cands.map((x) => x.w); // nothing fits the mix: ignore it
+    const total = ws.reduce((a, w) => a + w, 0);
     let r = rnd() * total, i = 0;
-    while (i < cands.length - 1 && (r -= cands[i].w) > 0) i++;
+    while (i < cands.length - 1 && (r -= ws[i]) > 0) i++;
     const { v } = cands.splice(i, 1)[0];
     list.push(v);
+    const t = traitsOf(v);
+    if (t.calm <= 2) got.exciting++;
+    if (t.real <= 2) got.fantasy++;
+    if (t.learn >= 4) got.learn++;
+    if (t.calm >= 4) got.calm++;
     perShow[v.show] = (perShow[v.show] || 0) + 1;
     const cap = (s) => (showOf(s).limit ? (k.perLessShow || 1) : (k.perShow || 2));
     cands = cands.filter((x) => (perShow[x.v.show] || 0) < cap(x.v.show));

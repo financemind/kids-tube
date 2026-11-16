@@ -1,5 +1,11 @@
 {
  "daily": {
+  "balance": {
+   "maxExciting": 3,
+   "maxFantasy": 5,
+   "minLearn": 6,
+   "minCalm": 6
+  },
   "size": 16,
   "start": "2026-11-16",
   "perShow": 4,
@@ -608,7 +614,16 @@
      "title": "ChuChu TV Classics - Phonics Song with Two Words | Nursery Rhymes and Kids Songs",
      "list": "ABC & 123 Songs with Sesame Street and ChuChu TV!"
     }
-   ]
+   ],
+   "traits": {
+    "real": 3,
+    "learn": 5,
+    "kind": 5,
+    "calm": 3,
+    "color": 4,
+    "music": 4,
+    "age": 5
+   }
   },
   {
    "key": "blippi",
@@ -1015,7 +1030,16 @@
      "title": "Tractor Videos for Children – Explore a Swather with Blippi",
      "list": "Blippi: Vehicle Adventures!"
     }
-   ]
+   ],
+   "traits": {
+    "real": 5,
+    "learn": 4,
+    "kind": 4,
+    "calm": 1,
+    "color": 5,
+    "music": 4,
+    "age": 5
+   }
   },
   {
    "key": "numberblocks",
@@ -1217,7 +1241,16 @@
      "title": "The Space Signal - Full Episode | Series 8 E30 | Numberblocks",
      "list": "Numberblocks - Season 8"
     }
-   ]
+   ],
+   "traits": {
+    "real": 1,
+    "learn": 5,
+    "kind": 4,
+    "calm": 3,
+    "color": 5,
+    "music": 3,
+    "age": 4
+   }
   },
   {
    "key": "bluey",
@@ -1624,7 +1657,16 @@
      "title": "Rad and Frisky's Wedding 💒 💍 | 30 MINUTES The Sign Moment AND More Bluey Fun! 💙 ✨ | Bluey",
      "list": "Bluey Family Fun"
     }
-   ]
+   ],
+   "traits": {
+    "real": 4,
+    "learn": 2,
+    "kind": 5,
+    "calm": 3,
+    "color": 3,
+    "music": 2,
+    "age": 4
+   }
   },
   {
    "key": "songs",
@@ -2031,7 +2073,16 @@
      "title": "There's A Hole In The Bottom Of The Sea | Kids Songs | Super Simple Songs",
      "list": "Bugs! 🐛 🐝 🦋 🐞"
     }
-   ]
+   ],
+   "traits": {
+    "real": 3,
+    "learn": 4,
+    "kind": 5,
+    "calm": 4,
+    "color": 4,
+    "music": 5,
+    "age": 5
+   }
   },
   {
    "key": "peppa",
@@ -2237,6 +2288,15 @@
    "limit": {
     "day": 20,
     "week": 60
+   },
+   "traits": {
+    "real": 4,
+    "learn": 2,
+    "kind": 3,
+    "calm": 4,
+    "color": 3,
+    "music": 1,
+    "age": 5
    }
   },
   {
@@ -2603,6 +2663,15 @@
    "limit": {
     "day": 20,
     "week": 60
+   },
+   "traits": {
+    "real": 2,
+    "learn": 1,
+    "kind": 4,
+    "calm": 1,
+    "color": 5,
+    "music": 2,
+    "age": 4
    }
   },
   {
@@ -3010,7 +3079,16 @@
      "title": "Pat and the Spooky Scarecrow! 😱🐦‍⬛ | Postman Pat | 1 Hour of Full Episodes",
      "list": "Postman Pat"
     }
-   ]
+   ],
+   "traits": {
+    "real": 4,
+    "learn": 2,
+    "kind": 5,
+    "calm": 5,
+    "color": 3,
+    "music": 2,
+    "age": 5
+   }
   },
   {
    "key": "babyeinstein",
@@ -3372,7 +3450,16 @@
      "title": "Let's Explore: Opposites with Flamingos! | Ocean Explorers Season 2 | Baby Einstein | Learning Show",
      "list": "🪸 Ocean Explorers Season 2"
     }
-   ]
+   ],
+   "traits": {
+    "real": 4,
+    "learn": 3,
+    "kind": 3,
+    "calm": 4,
+    "color": 5,
+    "music": 5,
+    "age": 2
+   }
   },
   {
    "key": "sarahduck",
@@ -3779,7 +3866,16 @@
      "title": "Origami, Basking Sharks and Boat Birthdays | MARATHON | Sarah and Duck",
      "list": "Compilations - Sarah & Duck"
     }
-   ]
+   ],
+   "traits": {
+    "real": 3,
+    "learn": 2,
+    "kind": 5,
+    "calm": 5,
+    "color": 3,
+    "music": 1,
+    "age": 5
+   }
   },
   {
    "key": "bing",
@@ -4186,7 +4282,16 @@
      "title": "Voosh! | Bing Full Episode | Bing English",
      "list": "Bing - All Episodes"
     }
-   ]
+   ],
+   "traits": {
+    "real": 5,
+    "learn": 3,
+    "kind": 5,
+    "calm": 5,
+    "color": 3,
+    "music": 1,
+    "age": 5
+   }
   },
   {
    "key": "danieltiger",
@@ -4593,7 +4698,16 @@
      "title": "Daniel Tiger 🐯🦷 First Visit to the Dentist 👩‍⚕️ How To Take Care of Your Teeth",
      "list": "Daniel Tiger 📚📖💡 Stories for You!"
     }
-   ]
+   ],
+   "traits": {
+    "real": 4,
+    "learn": 4,
+    "kind": 5,
+    "calm": 4,
+    "color": 4,
+    "music": 4,
+    "age": 5
+   }
   },
   {
    "key": "franklin",
@@ -4675,7 +4789,16 @@
      "title": "Franklin and Friends - Franklin And The Amazing Stupendous Circus Trick / Franklin’s Earth Day",
      "list": "تازه‌ها"
     }
-   ]
+   ],
+   "traits": {
+    "real": 4,
+    "learn": 3,
+    "kind": 5,
+    "calm": 5,
+    "color": 3,
+    "music": 1,
+    "age": 4
+   }
   },
   {
    "key": "littlebear",
@@ -4887,7 +5010,16 @@
      "title": "Little Bear | Family Bath Time / Winter Wonderland / Mitzi's Mess - Ep. 42",
      "list": "Little Bear"
     }
-   ]
+   ],
+   "traits": {
+    "real": 4,
+    "learn": 2,
+    "kind": 5,
+    "calm": 5,
+    "color": 2,
+    "music": 2,
+    "age": 5
+   }
   },
   {
    "key": "arthur",
@@ -5294,7 +5426,16 @@
      "title": "Athur's Eyes | Full Episode | ARTHUR",
      "list": "Arthur Season 1"
     }
-   ]
+   ],
+   "traits": {
+    "real": 5,
+    "learn": 3,
+    "kind": 4,
+    "calm": 4,
+    "color": 3,
+    "music": 1,
+    "age": 2
+   }
   },
   {
    "key": "carebears",
@@ -5701,7 +5842,16 @@
      "title": "Care Bears - Beastly Bungalow | Care Bears Episodes | Care Bears & Cousins",
      "list": "Care Bears and Cousins Compilations!"
     }
-   ]
+   ],
+   "traits": {
+    "real": 1,
+    "learn": 2,
+    "kind": 5,
+    "calm": 3,
+    "color": 5,
+    "music": 3,
+    "age": 4
+   }
   },
   {
    "key": "puffin",
@@ -5748,7 +5898,16 @@
      "title": "Fun On Puffin Rock ⛰️🎉 | Gentle Compilation",
      "list": "تازه‌ها"
     }
-   ]
+   ],
+   "traits": {
+    "real": 5,
+    "learn": 4,
+    "kind": 5,
+    "calm": 5,
+    "color": 3,
+    "music": 2,
+    "age": 5
+   }
   },
   {
    "key": "mrrogers",
@@ -5850,7 +6009,16 @@
      "title": "\"Won't You Be My Neighbor?\" Through the Decades | Mister Rogers’ Neighborhood",
      "list": "Songs & Music 🎵"
     }
-   ]
+   ],
+   "traits": {
+    "real": 5,
+    "learn": 4,
+    "kind": 5,
+    "calm": 5,
+    "color": 2,
+    "music": 4,
+    "age": 4
+   }
   },
   {
    "key": "clifford",
@@ -6257,7 +6425,16 @@
      "title": "Puppy Days 🐶🐰 - Oh Brother | Up, Up & Oops (HD - Full Episodes)",
      "list": "Puppy Days - Full Episodes"
     }
-   ]
+   ],
+   "traits": {
+    "real": 3,
+    "learn": 3,
+    "kind": 5,
+    "calm": 4,
+    "color": 4,
+    "music": 1,
+    "age": 5
+   }
   },
   {
    "key": "magicbus",
@@ -6589,7 +6766,16 @@
      "title": "Light and Color | Full Episodes | The Magic School Bus",
      "list": "🚌 Full Episodes 🦎 The Magic School Bus"
     }
-   ]
+   ],
+   "traits": {
+    "real": 1,
+    "learn": 5,
+    "kind": 4,
+    "calm": 2,
+    "color": 4,
+    "music": 2,
+    "age": 2
+   }
   },
   {
    "key": "berenstain",
@@ -6801,7 +6987,16 @@
      "title": "Berenstain Bears: Go Up And Down/ Big Bear, Small Bear - Ep.40",
      "list": "The Berenstain Bears"
     }
-   ]
+   ],
+   "traits": {
+    "real": 4,
+    "learn": 3,
+    "kind": 5,
+    "calm": 4,
+    "color": 3,
+    "music": 1,
+    "age": 4
+   }
   },
   {
    "key": "moomin",
@@ -7208,7 +7403,16 @@
      "title": "The Hot Spring I EP 47 I Moomin 90s #moomin #fullepisode",
      "list": "Moomin 90s 📺 Full Episodes in Order"
     }
-   ]
+   ],
+   "traits": {
+    "real": 2,
+    "learn": 1,
+    "kind": 4,
+    "calm": 4,
+    "color": 3,
+    "music": 2,
+    "age": 3
+   }
   }
  ]
 }

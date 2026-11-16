@@ -4,8 +4,10 @@ Usage: python3 kids-tube/tools/update_videos.py
 Only channels listed in CHANNELS are used. Shorts, live streams and
 videos that YouTube does not allow to be embedded are skipped.
 """
+import http.client
 import json
 import pathlib
+import time
 import re
 import urllib.error
 import urllib.parse
@@ -56,6 +58,40 @@ OFFICIAL = {
     "mrrogers": "@MisterRogersNeighborhood", "clifford": "@CliffordtheBigRedDogClassic",
     "magicbus": "@TheMagicSchoolBusOfficial", "berenstain": "@OfficialBerenstainBears", "moomin": "@MoominOfficial",
 }
+# Each show scored 1-5 by Claude (a judgment, not from a source), used to keep
+# every day's list balanced (see dailyList in index.html):
+#   real  - 5 = real world, 1 = full of impossible, magical events
+#   learn - 5 = clearly teaches (numbers, letters, science, feelings)
+#   kind  - 5 = gentle and kind, no fighting or mean jokes
+#   calm  - 5 = slow and quiet, 1 = fast, loud and exciting
+#   color - 5 = very bright and colourful
+#   music - 5 = mostly songs
+#   age   - 5 = made for 3-4 year olds, 1 = made for much older or younger
+TRAITS = {
+    "sesame":       {"real": 3, "learn": 5, "kind": 5, "calm": 3, "color": 4, "music": 4, "age": 5},
+    "blippi":       {"real": 5, "learn": 4, "kind": 4, "calm": 1, "color": 5, "music": 4, "age": 5},
+    "numberblocks": {"real": 1, "learn": 5, "kind": 4, "calm": 3, "color": 5, "music": 3, "age": 4},
+    "bluey":        {"real": 4, "learn": 2, "kind": 5, "calm": 3, "color": 3, "music": 2, "age": 4},
+    "songs":        {"real": 3, "learn": 4, "kind": 5, "calm": 4, "color": 4, "music": 5, "age": 5},
+    "peppa":        {"real": 4, "learn": 2, "kind": 3, "calm": 4, "color": 3, "music": 1, "age": 5},
+    "paw":          {"real": 2, "learn": 1, "kind": 4, "calm": 1, "color": 5, "music": 2, "age": 4},
+    "postman":      {"real": 4, "learn": 2, "kind": 5, "calm": 5, "color": 3, "music": 2, "age": 5},
+    "babyeinstein": {"real": 4, "learn": 3, "kind": 3, "calm": 4, "color": 5, "music": 5, "age": 2},
+    "sarahduck":    {"real": 3, "learn": 2, "kind": 5, "calm": 5, "color": 3, "music": 1, "age": 5},
+    "bing":         {"real": 5, "learn": 3, "kind": 5, "calm": 5, "color": 3, "music": 1, "age": 5},
+    "danieltiger":  {"real": 4, "learn": 4, "kind": 5, "calm": 4, "color": 4, "music": 4, "age": 5},
+    "franklin":     {"real": 4, "learn": 3, "kind": 5, "calm": 5, "color": 3, "music": 1, "age": 4},
+    "littlebear":   {"real": 4, "learn": 2, "kind": 5, "calm": 5, "color": 2, "music": 2, "age": 5},
+    "arthur":       {"real": 5, "learn": 3, "kind": 4, "calm": 4, "color": 3, "music": 1, "age": 2},
+    "carebears":    {"real": 1, "learn": 2, "kind": 5, "calm": 3, "color": 5, "music": 3, "age": 4},
+    "puffin":       {"real": 5, "learn": 4, "kind": 5, "calm": 5, "color": 3, "music": 2, "age": 5},
+    "mrrogers":     {"real": 5, "learn": 4, "kind": 5, "calm": 5, "color": 2, "music": 4, "age": 4},
+    "clifford":     {"real": 3, "learn": 3, "kind": 5, "calm": 4, "color": 4, "music": 1, "age": 5},
+    "magicbus":     {"real": 1, "learn": 5, "kind": 4, "calm": 2, "color": 4, "music": 2, "age": 2},
+    "berenstain":   {"real": 4, "learn": 3, "kind": 5, "calm": 4, "color": 3, "music": 1, "age": 4},
+    "moomin":       {"real": 2, "learn": 1, "kind": 4, "calm": 4, "color": 3, "music": 2, "age": 3},
+}
+
 # Official playlists to take videos from, besides each channel's 15 newest
 # uploads. A playlist is used when its title contains one of these words
 # (case does not matter) and none of SKIP_PLAYLIST.
@@ -75,7 +111,7 @@ PLAYLIST_WORDS = {
 # Channels not listed in PLAYLIST_WORDS use these.
 DEFAULT_PLAYLIST_WORDS = ["full episode", "episodes", "season", "compilation", "best of", "songs", "stories"]
 SKIP_PLAYLIST = ["live", "#shorts", "shorts", "halloween", "christmas", "holiday", "sponsored", "toys", "roblox", "movie"]
-MAX_PER_CHANNEL = 80   # videos per show at most (newest uploads first, then playlists)
+MAX_PER_CHANNEL = 200   # videos per show at most (newest uploads first, then playlists)
 MIN_SECONDS = 60
 
 # Topics the child can pick. Videos come from searching YouTube for
@@ -102,7 +138,10 @@ TOPICS = [
 # - by default a day has `turns` turns of turnMinutes each (parents can change
 #   today's turns in the report); after a turn ends, the next opens only after
 #   breakTimes x the turn length; after the last turn, nothing until tomorrow.
-DAILY = {"size": 16, "start": "2026-11-16", "perShow": 4, "perLessShow": 1, "videoRestMinutes": 10, "videoHalfMinutes": 10, "showHalfMinutes": 20, "taperPerWeek": 0.7, "turns": 4, "turnMinutes": 15, "breakTimes": 4}
+# balance: each day's list keeps at most maxExciting fast shows (calm <= 2) and
+# maxFantasy magical shows (real <= 2), and tries for at least minLearn
+# teaching shows (learn >= 4) and minCalm quiet shows (calm >= 4).
+DAILY = {"balance": {"maxExciting": 3, "maxFantasy": 5, "minLearn": 6, "minCalm": 6}, "size": 16, "start": "2026-11-16", "perShow": 4, "perLessShow": 1, "videoRestMinutes": 10, "videoHalfMinutes": 10, "showHalfMinutes": 20, "taperPerWeek": 0.7, "turns": 4, "turnMinutes": 15, "breakTimes": 4}
 
 # Topics only feed the daily list's pool of videos; each joins some topics above.
 # (key, Persian label, icon, topic keys)
@@ -120,17 +159,25 @@ NS = {"a": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/sche
 OUT = pathlib.Path(__file__).resolve().parent.parent / "videos.json"
 
 
-def get(url):
+def get(url, tries=4):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9"})
-    with urllib.request.urlopen(req, timeout=20) as r:
-        return r.read()
+    for n in range(tries):
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                return r.read()
+        except urllib.error.HTTPError:
+            raise  # a real answer from YouTube (e.g. 401 not embeddable): callers handle it
+        except (OSError, http.client.HTTPException):
+            if n == tries - 1:
+                raise
+            time.sleep(3 * (n + 1))  # YouTube dropped the connection: wait and try again
 
 
 def embeddable(video_id):
     try:
         get(f"https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={video_id}")
         return True
-    except urllib.error.HTTPError:
+    except (urllib.error.HTTPError, OSError, http.client.HTTPException):
         return False
 
 
@@ -268,7 +315,12 @@ def playlist_videos(key, cid):
             continue
         short = name.split("|")[0].strip()
         found = 0
-        for v in lockups(page_data(f"https://www.youtube.com/playlist?list={lv['contentId']}"), []):
+        try:
+            items = lockups(page_data(f"https://www.youtube.com/playlist?list={lv['contentId']}"), [])
+        except (OSError, http.client.HTTPException, ValueError) as err:
+            print(f"  playlist {short}: skipped ({err})")
+            continue
+        for v in items:
             if v.get("contentType") != "LOCKUP_CONTENT_TYPE_VIDEO":
                 continue
             dur = re.findall(r'"text": "(\d+:\d\d(?::\d\d)?)"', json.dumps(v))
@@ -315,7 +367,7 @@ def main():
             videos.append({"id": vid, "title": vtitle, "list": plist})
         print(f"{title}: {len(videos)} videos")
         if videos:
-            cat = {"key": key, "title": title, "channel": cid, "videos": videos}
+            cat = {"key": key, "title": title, "channel": cid, "traits": TRAITS[key], "videos": videos}
             if limit:
                 cat["limit"] = limit
             categories.append(cat)

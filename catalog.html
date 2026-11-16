@@ -42,6 +42,9 @@ th, td { padding: 7px 6px; border-bottom: 1px solid var(--line); text-align: rig
 th { color: var(--muted); font-weight: 500; font-size: 13px; }
 td.n { font-variant-numeric: tabular-nums; }
 .table { overflow-x: auto; }
+td.s { text-align: center; font-weight: 700; }
+td.s.hi { color: #2f9e63; }
+td.s.lo { color: var(--warn); }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
 .card { display: grid; gap: 6px; text-decoration: none; color: var(--ink); border-radius: 12px; }
 .card img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 12px; background: var(--line); display: block; }
@@ -70,6 +73,15 @@ h3 { font-size: 15px; margin: 6px 0 0; color: var(--muted); display: flex; gap: 
       <tbody id="topics"></tbody>
     </table></div>
     <div class="jump" id="jump"></div>
+  </section>
+
+  <section>
+    <h2>نمرهٔ هر برنامه (۱ تا ۵)</h2>
+    <p class="note">این نمره‌ها را Claude داده، نه یک پژوهش. هر روز فهرست طوری چیده می‌شود که برنامه‌های تند و خیالی کم باشند و برنامه‌های آموزشی و آرام به اندازهٔ کافی.</p>
+    <div class="table"><table>
+      <thead><tr><th>برنامه</th><th>واقعی</th><th>آموزشی</th><th>مهربان</th><th>آرام</th><th>رنگی</th><th>آهنگ</th><th>مناسب سن</th></tr></thead>
+      <tbody id="traits"></tbody>
+    </table></div>
   </section>
 
   <div id="sections" style="display:grid;gap:18px"></div>
@@ -126,6 +138,15 @@ fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()).then((data) =>
     a.href = `https://www.youtube.com/channel/${c.channel}`; a.target = "_blank"; a.rel = "noopener"; a.style.direction = "ltr"; a.style.unicodeBidi = "isolate"; link.append(a);
     tr.append(name, el("td", "n", fa(c.videos.length)), el("td", "n", fa(fromTopics.size)), el("td", "n", fa(ids.size)), link);
     $("shows").append(tr);
+  }
+  for (const c of data.categories) {
+    const t = c.traits || {}, tr = el("tr");
+    tr.append(el("td", "", c.title));
+    for (const k of ["real", "learn", "kind", "calm", "color", "music", "age"]) {
+      const v = t[k] || 0;
+      tr.append(el("td", "s" + (["color", "music"].includes(k) ? "" : v >= 4 ? " hi" : v <= 2 ? " lo" : ""), v ? fa(v) : "—"));
+    }
+    $("traits").append(tr);
   }
   for (const t of data.topics || []) {
     const shows = [...new Set(t.videos.map((v) => showTitle[v.show] || v.show))].join("، ");
