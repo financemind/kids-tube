@@ -42,14 +42,40 @@ def store(devices):
 
 
 def reset_at():
-    """Parents can wipe every device's counts: write a new ms timestamp to
-    RESET_FILE (and empty DATA_FILE). Devices that have not seen it yet are
-    told to clear their own copy, and their old numbers are not stored."""
+    """Last reset as (ms timestamp, day or None). Day None means everything.
+    Devices that have not seen it yet are told to clear their own copy, and
+    their old numbers are not stored. Set by POST /api/reset."""
     try:
         with open(RESET_FILE) as f:
-            return int(f.read().strip() or 0)
-    except (OSError, ValueError):
-        return 0
+            raw = f.read().strip()
+    except OSError:
+        return 0, None
+    try:
+        r = json.loads(raw or "0")
+    except ValueError:
+        return 0, None
+    if isinstance(r, dict):
+        return int(r.get("at") or 0), r.get("day")
+    return int(r), None
+
+
+def do_reset(day):
+    """Clear one day (or everything) on every device."""
+    at = int(time.time() * 1000)
+    with lock:
+        devices = load()
+        for d in devices.values():
+            for name in ("watch", "vwatch", "turnEnds"):
+                if day is None:
+                    d[name] = {}
+                else:
+                    d.get(name, {}).pop(day, None)
+        store(devices)
+        tmp = RESET_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump({"at": at, "day": day}, f)
+        os.replace(tmp, RESET_FILE)
+    return at
 
 
 def clean_counts(raw):
@@ -125,11 +151,18 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(404, {"error": "not found"})
 
     def do_POST(self):
-        if self.path != "/api/sync":
+        if self.path not in ("/api/sync", "/api/reset"):
             return self.reply(404, {"error": "not found"})
         size = int(self.headers.get("Content-Length") or 0)
         if size <= 0 or size > MAX_BODY:
             return self.reply(413, {"error": "bad size"})
+        if self.path == "/api/reset":  # parents' button: {"day": "2026-11-16"} clears that day
+            try:
+                day = json.loads(self.rfile.read(size)).get("day")
+                assert isinstance(day, str) and DAY.match(day)
+            except (ValueError, AssertionError, AttributeError):
+                return self.reply(400, {"error": "bad request"})
+            return self.reply(200, {"reset": do_reset(day), "resetDay": day})
         try:
             body = json.loads(self.rfile.read(size))
             device = body["device"]
@@ -141,10 +174,10 @@ class Handler(BaseHTTPRequestHandler):
         mine = {"watch": clean_counts(data.get("watch")), "vwatch": clean_counts(data.get("vwatch")),
                 "turnEnds": clean_ends(data.get("turnEnds")),
                 "label": label[:40] if isinstance(label, str) else "", "seen": int(time.time() * 1000)}
-        reset = reset_at()
+        reset, reset_day = reset_at()
         seen = body.get("resetSeen")
         if reset and (not isinstance(seen, (int, float)) or seen < reset):
-            return self.reply(200, {"reset": reset})  # clear first, then sync again
+            return self.reply(200, {"reset": reset, "resetDay": reset_day})  # clear first, then sync again
         with lock:
             devices = load()
             if device not in devices and len(devices) >= MAX_DEVICES:
@@ -157,6 +190,7 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 result = others(devices, device)
         result["reset"] = result_reset
+        result["resetDay"] = reset_day
         self.reply(200, result)
 
     def log_message(self, fmt, *args):

@@ -197,9 +197,12 @@ function combine() { watch = addStores(mine.watch, others.watch); vwatch = addSt
 combine();
 let syncing = false;
 let resetSeen = Number(load("resetSeen")) || 0;
-function wipe(ts) { // parents reset every device's time on the server
-  mine.watch = {}; mine.vwatch = {}; mine.turnEnds = {}; others = {};
-  for (const k of ["watch", "vwatch", "turnEnds", "others"]) save(k, "{}");
+function wipe(ts, day) { // parents reset the time on the server: one day, or everything if no day
+  for (const k of ["watch", "vwatch", "turnEnds"]) {
+    if (day) delete mine[k][day]; else mine[k] = {};
+    save(k, JSON.stringify(mine[k]));
+  }
+  others = {}; save("others", "{}");
   resetSeen = ts; save("resetSeen", String(ts));
   combine();
 }
@@ -211,7 +214,7 @@ async function sync(again = true) {
     const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain" }, body: syncBody() });
     if (r.ok) {
       const j = await r.json();
-      if (j.reset && j.reset > resetSeen) { wipe(j.reset); wiped = true; }
+      if (j.reset && j.reset > resetSeen) { wipe(j.reset, j.resetDay); wiped = true; }
       else { others = j; save("others", JSON.stringify(others)); combine(); }
     }
   } catch (e) { /* offline: keep the last reply */ } finally { syncing = false; }

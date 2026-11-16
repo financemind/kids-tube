@@ -57,6 +57,10 @@ th { color: var(--muted); font-weight: 500; font-size: 13px; white-space: nowrap
 td.n { font-variant-numeric: tabular-nums; white-space: nowrap; }
 td.t { direction: ltr; text-align: left; min-width: 180px; }
 .empty { color: var(--muted); }
+.reset { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.reset h2 { margin-bottom: 4px; }
+button.danger { font: inherit; font-weight: 700; color: #fff; background: var(--stop); border: 0; border-radius: 12px; padding: 10px 18px; cursor: pointer; }
+button.danger:disabled { opacity: .6; cursor: default; }
 @media (max-width: 520px) { .stat b { font-size: 21px; } }
 </style>
 </head>
@@ -74,6 +78,14 @@ td.t { direction: ltr; text-align: left; min-width: 180px; }
       <div class="stat"><b id="sYest"></b><span>دیروز</span></div>
       <div class="stat"><b id="sWeek"></b><span>۷ روز اخیر</span></div>
     </div>
+  </section>
+
+  <section class="reset">
+    <div>
+      <h2>وقت امروز</h2>
+      <p class="note">وقت امروز روی همهٔ دستگاه‌ها از اول شروع می‌شود. آمار روزهای قبل می‌ماند.</p>
+    </div>
+    <button id="resetBtn" class="danger" type="button">صفر کردن وقت امروز</button>
   </section>
 
   <section>
@@ -125,6 +137,33 @@ function addStores(a, b) {
   return out;
 }
 // Send this device's counts and get every device back (needs the app opened once on this device).
+function wipeLocal(ts, day) { // same as the app: one day, or everything if no day
+  for (const k of ["watch", "vwatch", "turnEnds"]) {
+    const v = read(k);
+    if (day) delete v[day];
+    localStorage.setItem(k, JSON.stringify(day ? v : {}));
+  }
+  localStorage.setItem("others", "{}");
+  localStorage.setItem("resetSeen", String(ts));
+  watch = read("watch"); vwatch = read("vwatch");
+}
+// The reset button: today's time starts again from zero on every device.
+async function resetToday() {
+  if (!confirm("وقت امروز روی همهٔ دستگاه‌ها صفر شود؟ نویان دوباره دو نوبت کامل می‌گیرد.")) return;
+  const btn = $("resetBtn");
+  btn.disabled = true; btn.textContent = "صبر کنید…";
+  try {
+    const r = await fetch(API.replace("/sync", "/reset"), { method: "POST", headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ day: dayKey(0) }) });
+    if (!r.ok) throw new Error();
+    const j = await r.json();
+    wipeLocal(j.reset, j.resetDay);
+    location.reload();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = "صفر کردن وقت امروز";
+    alert("به سرور وصل نشد. اینترنت را چک کنید و دوباره بزنید.");
+  }
+}
 async function getDevices(again = true) {
   const device = localStorage.getItem("device");
   if (!device) return null;
@@ -136,9 +175,7 @@ async function getDevices(again = true) {
     if (!r.ok) return null;
     const j = await r.json();
     if (j.reset && j.reset > resetSeen) { // time was reset: clear this device too, then ask again
-      for (const k of ["watch", "vwatch", "turnEnds", "others"]) localStorage.setItem(k, "{}");
-      localStorage.setItem("resetSeen", String(j.reset));
-      watch = {}; vwatch = {};
+      wipeLocal(j.reset, j.resetDay);
       return again ? getDevices(false) : null;
     }
     return j;
@@ -169,6 +206,7 @@ function emptyRow(tbody, cols, text) {
   const tr = document.createElement("tr"); const td = cell(text, "empty"); td.colSpan = cols; tr.appendChild(td); tbody.appendChild(tr);
 }
 
+$("resetBtn").onclick = resetToday;
 Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), getDevices()]).then(([data, all]) => {
   if (all && all.devices) {
     const list = Object.entries(all.devices);
