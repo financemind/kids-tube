@@ -105,6 +105,8 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .stage { position: fixed; inset: 0; background: #0d1426; display: grid; grid-template-rows: 1fr auto; z-index: 5; }
 .frame { position: relative; overflow: hidden; }
 .frame > div, .frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+/* The video itself also plays with softer colours. */
+.frame iframe, #player { filter: saturate(.5); }
 /* Shield: stops every tap from reaching YouTube (no titles, logos, or suggested videos can be opened). */
 .shield { position: absolute; inset: 0; z-index: 2; }
 .cover {
