@@ -56,6 +56,7 @@ th, td { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: rig
 th { color: var(--muted); font-weight: 500; font-size: 13px; white-space: nowrap; }
 td.n { font-variant-numeric: tabular-nums; white-space: nowrap; }
 td.t { direction: ltr; text-align: left; min-width: 180px; }
+tr.quiet td { color: var(--muted); font-size: 13px; }
 .empty { color: var(--muted); }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
 .chips button, button.go { font: inherit; font-weight: 700; border-radius: 12px; padding: 8px 14px; cursor: pointer; }
@@ -136,6 +137,15 @@ button.danger:disabled { opacity: .6; cursor: default; }
   </section>
 
   <section>
+    <h2>کارهای امروز</h2>
+    <p class="note">هر کاری که امروز در برنامه شد، تازه‌ترین بالا. «دیده» یعنی از وقتی آن ویدیو باز شد چقدر پخش شد؛ «جای فیلم» یعنی کجای ویدیو بود (دقیقه:ثانیه).</p>
+    <div class="table"><table>
+      <thead><tr><th>ساعت</th><th>کار</th><th>ویدیو</th><th>دیده</th><th>جای فیلم</th><th>دستگاه</th></tr></thead>
+      <tbody id="log"></tbody>
+    </table></div>
+  </section>
+
+  <section>
     <h2>هر ویدیو</h2>
     <div class="table"><table>
       <thead><tr><th>ویدیو</th><th>برنامه</th><th>امروز</th><th>۷ روز</th><th>۳۰ روز</th></tr></thead>
@@ -190,7 +200,8 @@ async function getDevices(again = true) {
   if (!device) return null;
   try {
     const resetSeen = Number(localStorage.getItem("resetSeen")) || 0;
-    const body = JSON.stringify({ device, all: true, label: localStorage.getItem("deviceLabel") || "", resetSeen,
+    const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+    const body = JSON.stringify({ device, all: true, label: localStorage.getItem("deviceLabel") || "", resetSeen, logSince: midnight.getTime(),
       data: { watch, vwatch, turnEnds: read("turnEnds") } });
     const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain" }, body });
     if (!r.ok) return null;
@@ -349,6 +360,25 @@ Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), 
     const v = info[id] || { title: "ویدیویی که دیگر در فهرست نیست", show: "—" };
     tr.append(cell(v.title, "t"), cell(v.show), cell(dur(a), "n"), cell(dur(b), "n"), cell(dur(c), "n"));
     $("videos").appendChild(tr);
+  }
+
+  // Today's actions, newest first.
+  const ACT = { app: "برنامه باز شد", show: "برگشت به برنامه", hide: "از برنامه بیرون رفت", open: "ویدیو را باز کرد",
+    play: "پخش", pause: "توقف", home: "برگشت به صفحهٔ اصلی", end: "ویدیو تمام شد", again: "دوباره از اول (بعد از پایان)",
+    restart: "دکمهٔ از اول", timeup: "وقت تمام شد ⏰", rotate: "چرخاندن تصویر", error: "ویدیو باز نشد" };
+  const clock = (ms) => new Date(ms).toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" });
+  const mmss = (sec) => `${fa(Math.floor(sec / 60))}:${fa(sec % 60).padStart(2, "۰")}`;
+  const events = ((all && all.log) || []).slice().reverse();
+  if (!events.length) emptyRow($("log"), 6, all ? "امروز هنوز کاری ثبت نشده." : "به سرور وصل نشد.");
+  for (const e of events) {
+    const tr = document.createElement("tr");
+    if (["app", "show", "hide", "rotate"].includes(e.a)) tr.className = "quiet";
+    let what = ACT[e.a] || e.a;
+    if (e.a === "open" && e.from) what += ` (ادامه از ${mmss(e.from)})`;
+    const v = e.v ? (info[e.v] || { title: "ویدیویی که دیگر در فهرست نیست" }).title : "";
+    tr.append(cell(clock(e.at), "n"), cell(what), cell(v, v ? "t" : ""), cell(e.w ? mmss(e.w) : "", "n"),
+      cell(e.t != null && e.v ? mmss(e.t) : "", "n"), cell(e.dl || ""));
+    $("log").appendChild(tr);
   }
 });
 </script>

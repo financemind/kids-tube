@@ -102,13 +102,14 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 }
 .bigbtn svg { width: 64px; height: 64px; fill: var(--ink); }
 .bar {
-  display: flex; justify-content: center; align-items: center; gap: 48px; direction: ltr;
+  display: flex; justify-content: center; align-items: center; gap: clamp(16px, 5vw, 48px); direction: ltr;
   padding: 12px max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
 }
 .round { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 5px 0 rgba(0,0,0,.3); }
 .round svg { width: 36px; height: 36px; fill: #fff; }
 .home-btn { background: var(--tomato); }
 .rotate-btn { background: #8a5cf6; }
+.restart-btn { background: #2fa7e0; }
 .rotate-btn svg { transition: transform .3s; }
 /* Rotate button: turns the whole player a quarter turn, for watching lying on one side. */
 .stage.r90, .stage.r270 { inset: auto; top: 50%; left: 50%; width: 100vh; height: 100vw; width: 100dvh; height: 100dvw; }
@@ -156,6 +157,7 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
   <div class="bar">
     <button class="round home-btn" id="homeBtn" aria-label="Back to videos"><svg viewBox="0 0 24 24"><path d="M12 3 2 12h3v8h5v-5h4v5h5v-8h3z"/></svg></button>
     <button class="round play-btn" id="playBtn" aria-label="Play or pause"></button>
+    <button class="round restart-btn" id="restartBtn" aria-label="Start from the beginning"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zm3.5 7L19 5v14z"/></svg></button>
     <button class="round rotate-btn" id="rotateBtn" aria-label="Turn the picture"><svg viewBox="0 0 24 24"><path d="M12 4V1L7 5l5 4V6a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg></button>
   </div>
 </section>
@@ -181,7 +183,23 @@ function load(k) { try { return localStorage.getItem(k); } catch (e) { return nu
    so every phone and tablet shares one day. watch/vwatch = mine + others. */
 const API = "https://ntv.financemind.com/api/sync";
 function parse(k) { try { return JSON.parse(load(k) || "{}") || {}; } catch (e) { return {}; } }
-const mine = { watch: parse("watch"), vwatch: parse("vwatch"), turnEnds: parse("turnEnds") };
+const mine = { watch: parse("watch"), vwatch: parse("vwatch"), turnEnds: parse("turnEnds"), pos: parse("pos") };
+/* Action log: every open, play, pause, home, end, time-up… with the time, the
+   video and how long it was watched. Kept here until the server has it. */
+let logQueue = [];
+try { logQueue = JSON.parse(load("log") || "[]") || []; } catch (e) { logQueue = []; }
+let sessionSecs = 0; // seconds watched since the video was opened
+function logAction(a, extra) {
+  const ev = { at: Date.now(), a };
+  if (playingId && !["app", "show", "hide"].includes(a)) {
+    ev.v = playingId; ev.s = playingCat && playingCat.key; ev.w = sessionSecs;
+    try { ev.t = Math.floor(player.getCurrentTime()) || 0; } catch (e) { /* player not ready yet */ }
+  }
+  Object.assign(ev, extra);
+  logQueue.push(ev);
+  if (logQueue.length > 2000) logQueue = logQueue.slice(-2000);
+  save("log", JSON.stringify(logQueue));
+}
 let others = parse("others"); // last server reply, so starting offline still counts other devices
 let device = load("device");
 if (!device) { device = Math.random().toString(36).slice(2, 10) + Date.now().toString(36); save("device", device); }
@@ -195,6 +213,18 @@ function deviceLabel() {
 }
 save("deviceLabel", deviceLabel());
 const syncBody = (extra) => JSON.stringify({ device, label: deviceLabel(), resetSeen, data: mine, ...extra });
+/* Where each video was left, newest wins across devices; start a little earlier. */
+function resumeAt(id) {
+  const a = (mine.pos || {})[id], b = ((others.pos || {})[id]);
+  const p = !a ? b : !b ? a : a.at >= b.at ? a : b;
+  return p && p.t > 5 ? p.t - 2 : 0;
+}
+function savePos(id, t) {
+  mine.pos[id] = { t: Math.floor(t), at: Date.now() };
+  const ids = Object.keys(mine.pos);
+  if (ids.length > 150) { ids.sort((x, y) => mine.pos[x].at - mine.pos[y].at); delete mine.pos[ids[0]]; }
+  save("pos", JSON.stringify(mine.pos));
+}
 let watch = {}, vwatch = {};
 function addStores(a, b) {
   const out = {};
@@ -209,7 +239,7 @@ combine();
 let syncing = false;
 let resetSeen = Number(load("resetSeen")) || 0;
 function wipe(ts, day) { // parents reset the time on the server: one day, or everything if no day
-  for (const k of ["watch", "vwatch", "turnEnds"]) {
+  for (const k of ["watch", "vwatch", "turnEnds"]) { // resume positions stay
     if (day) delete mine[k][day]; else mine[k] = {};
     save(k, JSON.stringify(mine[k]));
   }
@@ -222,11 +252,15 @@ async function sync(again = true) {
   syncing = true;
   let wiped = false;
   try {
-    const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain" }, body: syncBody() });
+    const sent = logQueue.length;
+    const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain" }, body: syncBody({ log: logQueue.slice(0, 500) }) });
     if (r.ok) {
       const j = await r.json();
       if (j.reset && j.reset > resetSeen) { wipe(j.reset, j.resetDay); wiped = true; }
-      else { others = j; save("others", JSON.stringify(others)); combine(); }
+      else {
+        others = j; save("others", JSON.stringify(others)); combine();
+        if (j.logged) { logQueue = logQueue.slice(Math.min(sent, j.logged)); save("log", JSON.stringify(logQueue)); }
+      }
     }
   } catch (e) { /* offline: keep the last reply */ } finally { syncing = false; }
   if (wiped && again) return sync(false);
@@ -396,17 +430,19 @@ function showCover(html, bg) {
 function homeButton(id) { return `<button class="bigbtn" id="${id}" aria-label="Back to videos" style="background:var(--tomato)">${ICON.home}</button>`; }
 
 function openVideo(v, c) {
-  playingCat = c; playingId = v.id; locked = false;
+  playingCat = c; playingId = v.id; locked = false; sessionSecs = 0;
+  const start = resumeAt(v.id);
+  logAction("open", { from: start, t: start });
   $("home").hidden = true;
   $("stage").hidden = false;
   setPlayIcon(false);
   showCover(`<div class="msg">...</div>`, thumb(v.id));
   if (!apiReady) { pending = [v, c]; return; }
-  if (player) { player.loadVideoById(v.id); return; }
+  if (player) { player.loadVideoById({ videoId: v.id, startSeconds: start }); return; }
   player = new YT.Player("player", {
     host: "https://www.youtube-nocookie.com",
     videoId: v.id,
-    playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1, disablekb: 1, fs: 0, iv_load_policy: 3, playsinline: 1, cc_load_policy: 0 },
+    playerVars: { start: Math.floor(start), autoplay: 1, controls: 0, rel: 0, modestbranding: 1, disablekb: 1, fs: 0, iv_load_policy: 3, playsinline: 1, cc_load_policy: 0 },
     events: { onReady: (e) => e.target.playVideo(), onStateChange: onState, onError: onErr },
   });
 }
@@ -416,7 +452,7 @@ function setPlayIcon(playing) { $("playBtn").innerHTML = playing ? ICON.pause : 
 
 function pausedCover() {
   showCover(`<button class="bigbtn" aria-label="Play">${ICON.play}</button>`, thumb(playingId));
-  $("cover").querySelector("button").onclick = () => player.playVideo();
+  $("cover").querySelector("button").onclick = () => { logAction("play"); player.playVideo(); };
 }
 
 function onState(e) {
@@ -438,7 +474,8 @@ function onState(e) {
 function onTick() {
   const d = player.getDuration(), t = player.getCurrentTime();
   if (playingCat) {
-    addSecond(playingCat.key, playingId);
+    addSecond(playingCat.key, playingId); sessionSecs++;
+    savePos(playingId, t);
     if (!canWatch()) return stopForToday();
     if (playingCat.limit && !allowed(playingCat)) return finish();
   }
@@ -446,6 +483,8 @@ function onTick() {
 }
 
 function finish() {
+  logAction("end");
+  savePos(playingId, 0); // next time it starts from the beginning
   locked = true; clearInterval(tick);
   player.pauseVideo();
   setPlayIcon(false);
@@ -454,12 +493,14 @@ function finish() {
   $("againBtn").onclick = () => {
     if (!canWatch()) return stopForToday();
     if (playingCat && !allowed(playingCat)) return goHome();
+    logAction("again"); sessionSecs = 0;
     locked = false; player.seekTo(0); player.playVideo();
   };
   $("backBtn").onclick = goHome;
 }
 
 function stopForToday() {
+  logAction("timeup");
   locked = true; clearInterval(tick);
   player.pauseVideo();
   setPlayIcon(false);
@@ -507,13 +548,15 @@ function timeUpSound() {
   [784, 988, 1175, 1568].forEach((f, i) => bell(a, f, t + 2.5 + i * 0.2, 1.2, 0.2)); // happy tune going up
 }
 
-function onErr() {
+function onErr(e) {
+  logAction("error", { code: e && e.data });
   locked = true;
   showCover(`<div class="done"><div class="msg">این ویدیو باز نشد.</div>${homeButton("backBtn")}</div>`, null);
   $("backBtn").onclick = goHome;
 }
 
 function goHome() {
+  if (!$("stage").hidden) logAction("home");
   clearInterval(tick);
   locked = true;
   if (player) player.stopVideo();
@@ -525,8 +568,15 @@ function goHome() {
 $("homeBtn").onclick = goHome;
 $("playBtn").onclick = () => {
   if (!player || locked) return;
-  if (player.getPlayerState() === YT.PlayerState.PLAYING) { pausedCover(); player.pauseVideo(); }
-  else player.playVideo();
+  if (player.getPlayerState() === YT.PlayerState.PLAYING) { logAction("pause"); pausedCover(); player.pauseVideo(); }
+  else { logAction("play"); player.playVideo(); }
+};
+// Start over: the same video from the very beginning.
+$("restartBtn").onclick = () => {
+  if (!player || locked) return;
+  logAction("restart");
+  savePos(playingId, 0);
+  player.seekTo(0, true); player.playVideo();
 };
 $("shield").onclick = () => $("playBtn").click();
 /* Each press turns the player a quarter turn clockwise; this device remembers it. */
@@ -536,7 +586,7 @@ function applyTurn() {
   if (turn) $("stage").classList.add("r" + turn);
 }
 applyTurn();
-$("rotateBtn").onclick = () => { turn = (turn + 90) % 360; save("rotate", String(turn)); applyTurn(); };
+$("rotateBtn").onclick = () => { turn = (turn + 90) % 360; save("rotate", String(turn)); applyTurn(); logAction("rotate", { deg: turn }); };
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 
 /* TV remote and keyboard: arrows move between buttons, OK presses, Back goes home. */
@@ -610,6 +660,7 @@ function refreshHome() {
   if (timeState().mode !== lastMode) renderGrid(); else renderBudget();
 }
 document.addEventListener("visibilitychange", () => {
+  logAction(document.hidden ? "hide" : "show");
   if (document.hidden) {
     try { navigator.sendBeacon(API, new Blob([syncBody()], { type: "text/plain" })); } catch (e) {}
   } else if (!$("home").hidden) { renderGrid(); sync().then(refreshHome); }
@@ -617,6 +668,7 @@ document.addEventListener("visibilitychange", () => {
 // Every 30 seconds: share counts with the other devices and notice when a break ends.
 setInterval(() => { sync().then(refreshHome); }, 30000);
 
+logAction("app");
 Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), sync()]).then(([d]) => {
   data = d;
   renderGrid();

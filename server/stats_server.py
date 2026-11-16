@@ -16,6 +16,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 DATA_FILE = os.environ.get("STATS_FILE", "/var/lib/kids-tube/stats.json")
 RESET_FILE = os.path.join(os.path.dirname(DATA_FILE), "reset")  # holds a ms timestamp; see reset_at()
 PLANS_FILE = os.path.join(os.path.dirname(DATA_FILE), "plans.json")  # {day: {"turns": n, "minutes": m}}
+LOG_DIR = os.path.join(os.path.dirname(DATA_FILE), "log")  # one JSON-lines file per UTC day
+ACTIONS = {"app", "show", "hide", "open", "play", "pause", "home", "end", "again", "restart", "timeup", "rotate", "error"}
 PORT = int(os.environ.get("STATS_PORT", "8080"))
 ORIGINS = {"https://ntv.financemind.com", "https://financemind.github.io", "http://localhost:8765"}
 MAX_BODY = 200_000
@@ -100,6 +102,53 @@ def save_plan(day, turns, minutes):
     return plans
 
 
+def clean_event(ev, device, label):
+    """One action from the app, e.g. {"at": ms, "a": "open", "v": id, "s": show, "t": 12, "w": 60}."""
+    if not isinstance(ev, dict) or ev.get("a") not in ACTIONS or not isinstance(ev.get("at"), (int, float)):
+        return None
+    out = {"at": int(ev["at"]), "a": ev["a"], "d": device, "dl": label}
+    for k in ("v", "s"):
+        if isinstance(ev.get(k), str) and KEY.match(ev[k]):
+            out[k] = ev[k]
+    for k in ("t", "w", "from", "deg", "code"):
+        if isinstance(ev.get(k), (int, float)) and 0 <= ev[k] <= 10 ** 7:
+            out[k] = int(ev[k])
+    return out
+
+
+def append_log(events, device, label):
+    os.makedirs(LOG_DIR, exist_ok=True)
+    by_day = {}
+    for ev in events:
+        e = clean_event(ev, device, label)
+        if e:
+            day = time.strftime("%Y-%m-%d", time.gmtime(e["at"] / 1000))
+            by_day.setdefault(day, []).append(json.dumps(e, ensure_ascii=False))
+    for day, lines in by_day.items():
+        with open(os.path.join(LOG_DIR, day + ".jsonl"), "a") as f:
+            f.write("\n".join(lines) + "\n")
+
+
+def read_log(since):
+    """Actions from `since` (ms) until now, oldest first, at most 3000."""
+    out = []
+    t = max(since / 1000, time.time() - 8 * 86400)
+    days = sorted({time.strftime("%Y-%m-%d", time.gmtime(t + i * 86400)) for i in range(int((time.time() - t) / 86400) + 2)})
+    for day in days:
+        try:
+            with open(os.path.join(LOG_DIR, day + ".jsonl")) as f:
+                for line in f:
+                    try:
+                        e = json.loads(line)
+                    except ValueError:
+                        continue
+                    if e.get("at", 0) >= since:
+                        out.append(e)
+        except OSError:
+            pass
+    return out[-3000:]
+
+
 def clean_counts(raw):
     """Keep only {day: {key: seconds}} with sane values; the last 31 days."""
     out = {}
@@ -113,6 +162,17 @@ def clean_counts(raw):
     return out
 
 
+def clean_pos(raw):
+    """Where each video was left: {id: {"t": seconds, "at": ms}}, newest 150."""
+    out = {}
+    if isinstance(raw, dict):
+        for k, v in raw.items():
+            if isinstance(k, str) and KEY.match(k) and isinstance(v, dict) \
+                    and isinstance(v.get("t"), (int, float)) and isinstance(v.get("at"), (int, float)):
+                out[k] = {"t": max(0, int(v["t"])), "at": int(v["at"])}
+    return dict(sorted(out.items(), key=lambda kv: kv[1]["at"])[-150:])
+
+
 def clean_ends(raw):
     out = {}
     if isinstance(raw, dict):
@@ -124,7 +184,7 @@ def clean_ends(raw):
 
 
 def others(devices, me):
-    total = {"watch": {}, "vwatch": {}, "turnEnds": {}}
+    total = {"watch": {}, "vwatch": {}, "turnEnds": {}, "pos": {}}
     for dev, d in devices.items():
         if dev == me:
             continue
@@ -133,6 +193,9 @@ def others(devices, me):
                 t = total[name].setdefault(day, {})
                 for k, v in vals.items():
                     t[k] = t.get(k, 0) + v
+        for vid, p in d.get("pos", {}).items():
+            if vid not in total["pos"] or p["at"] > total["pos"][vid]["at"]:
+                total["pos"][vid] = p  # the newest place wins
         for day, ends in d.get("turnEnds", {}).items():
             t = total["turnEnds"].setdefault(day, [])
             for i, v in enumerate(ends):
@@ -204,26 +267,33 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(400, {"error": "bad request"})
         label = body.get("label")
         mine = {"watch": clean_counts(data.get("watch")), "vwatch": clean_counts(data.get("vwatch")),
-                "turnEnds": clean_ends(data.get("turnEnds")),
+                "turnEnds": clean_ends(data.get("turnEnds")), "pos": clean_pos(data.get("pos")),
                 "label": label[:40] if isinstance(label, str) else "", "seen": int(time.time() * 1000)}
         reset, reset_day = reset_at()
         seen = body.get("resetSeen")
         if reset and (not isinstance(seen, (int, float)) or seen < reset):
             return self.reply(200, {"reset": reset, "resetDay": reset_day})  # clear first, then sync again
+        log = body.get("log") if isinstance(body.get("log"), list) else []
         with lock:
             devices = load()
             if device not in devices and len(devices) >= MAX_DEVICES:
                 return self.reply(403, {"error": "too many devices"})
+            if log:
+                append_log(log[:500], device, mine["label"])
             devices[device] = mine
             store(devices)
             result_reset = reset
             if body.get("all"):  # parents' report: every device, each on its own
                 result = {"me": device, "devices": devices}
+                since = body.get("logSince")
+                if isinstance(since, (int, float)):
+                    result["log"] = read_log(since)
             else:
                 result = others(devices, device)
         result["reset"] = result_reset
         result["resetDay"] = reset_day
         result["plans"] = load_plans()
+        result["logged"] = len(log[:500])
         self.reply(200, result)
 
     def log_message(self, fmt, *args):
