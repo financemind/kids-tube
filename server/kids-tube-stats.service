@@ -1,0 +1,16 @@
+[Unit]
+Description=Kids tube shared watch-time store
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/kids-tube/stats_server.py
+DynamicUser=yes
+StateDirectory=kids-tube
+Environment=STATS_FILE=/var/lib/kids-tube/stats.json
+Restart=always
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

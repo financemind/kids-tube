@@ -66,7 +66,7 @@ td.t { direction: ltr; text-align: left; min-width: 180px; }
     <h1>گزارش تماشای نویان</h1>
     <a class="back" href="./">برگشت</a>
   </header>
-  <p class="note">این گزارش فقط تماشای همین دستگاه را نشان می‌دهد. هر گوشی و تبلت گزارش خودش را دارد.</p>
+  <p class="note" id="note">در حال گرفتن آمار همهٔ دستگاه‌ها…</p>
 
   <section>
     <div class="stats">
@@ -74,6 +74,14 @@ td.t { direction: ltr; text-align: left; min-width: 180px; }
       <div class="stat"><b id="sYest"></b><span>دیروز</span></div>
       <div class="stat"><b id="sWeek"></b><span>۷ روز اخیر</span></div>
     </div>
+  </section>
+
+  <section>
+    <h2>هر دستگاه</h2>
+    <div class="table"><table>
+      <thead><tr><th>دستگاه</th><th>امروز</th><th>۷ روز</th><th>آخرین بار</th></tr></thead>
+      <tbody id="devices"></tbody>
+    </table></div>
   </section>
 
   <section>
@@ -106,7 +114,27 @@ td.t { direction: ltr; text-align: left; min-width: 180px; }
 <script>
 const $ = (id) => document.getElementById(id);
 function read(k) { try { return JSON.parse(localStorage.getItem(k) || "{}") || {}; } catch (e) { return {}; } }
-const watch = read("watch"), vwatch = read("vwatch");
+let watch = read("watch"), vwatch = read("vwatch");
+const API = "https://ntv.financemind.com/api/sync";
+function addStores(a, b) {
+  const out = {};
+  for (const s of [a, b]) for (const [day, vals] of Object.entries(s || {})) {
+    out[day] = out[day] || {};
+    for (const [k, v] of Object.entries(vals || {})) out[day][k] = (out[day][k] || 0) + v;
+  }
+  return out;
+}
+// Send this device's counts and get every device back (needs the app opened once on this device).
+async function getDevices() {
+  const device = localStorage.getItem("device");
+  if (!device) return null;
+  try {
+    const body = JSON.stringify({ device, all: true, label: localStorage.getItem("deviceLabel") || "",
+      data: { watch, vwatch, turnEnds: read("turnEnds") } });
+    const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain" }, body });
+    return r.ok ? await r.json() : null;
+  } catch (e) { return null; }
+}
 const fa = (n) => n.toLocaleString("fa-IR");
 function dayKey(offset = 0) {
   const d = new Date(); d.setDate(d.getDate() - offset);
@@ -132,7 +160,24 @@ function emptyRow(tbody, cols, text) {
   const tr = document.createElement("tr"); const td = cell(text, "empty"); td.colSpan = cols; tr.appendChild(td); tbody.appendChild(tr);
 }
 
-fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()).then((data) => {
+Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), getDevices()]).then(([data, all]) => {
+  if (all && all.devices) {
+    const list = Object.entries(all.devices);
+    watch = {}; vwatch = {};
+    for (const [, d] of list) { watch = addStores(watch, d.watch); vwatch = addStores(vwatch, d.vwatch); }
+    $("note").textContent = "این گزارش تماشای همهٔ دستگاه‌ها را با هم نشان می‌دهد.";
+    list.sort((a, b) => (b[1].seen || 0) - (a[1].seen || 0));
+    for (const [id, d] of list) {
+      const tr = document.createElement("tr");
+      const seen = d.seen ? new Date(d.seen).toLocaleString("fa-IR", { weekday: "long", hour: "2-digit", minute: "2-digit" }) : "—";
+      tr.append(cell((d.label || "دستگاه") + (id === all.me ? " (همین دستگاه)" : "")),
+        cell(dur(sum(d.watch || {}, null, 0, 0)), "n"), cell(dur(sum(d.watch || {}, null, 0, 6)), "n"), cell(seen));
+      $("devices").appendChild(tr);
+    }
+  } else {
+    $("note").textContent = "به سرور وصل نشد. فعلاً فقط تماشای همین دستگاه دیده می‌شود.";
+    emptyRow($("devices"), 4, "به سرور وصل نشد.");
+  }
   $("sToday").textContent = dur(sum(watch, null, 0, 0));
   const dly = data.daily || {}, turns = dly.turns || 2, tm = dly.turnMinutes || 30;
   const usedTurns = Math.min(turns, Math.floor(sum(watch, null, 0, 0) / (tm * 60)));

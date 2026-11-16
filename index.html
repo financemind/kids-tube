@@ -6,6 +6,14 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <title>تلویزیون نویان</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#dff1ff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="تلویزیون نویان">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Vazirmatn:wght@500;700&display=swap">
 <style>
@@ -31,7 +39,9 @@ body {
   -webkit-touch-callout: none;
 }
 button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
-button:focus-visible { outline: 4px solid var(--tomato); outline-offset: 3px; }
+button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
+/* TV remote: the picked picture grows and gets a thick yellow ring. */
+.video:focus-visible { outline: 8px solid var(--sun); outline-offset: 4px; transform: scale(1.04); transition: transform .15s; }
 
 .home {
   max-width: 1200px; margin: 0 auto;
@@ -147,17 +157,51 @@ let playingCat = null, playingId = null, locked = false, pending = null;
 function save(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 
-/* Watch time, per show per local day, in seconds. Stored on this device only. */
-let watch = {};
-try { watch = JSON.parse(load("watch") || "{}") || {}; } catch (e) { watch = {}; }
+/* Watch time, per show per local day, in seconds. Each device keeps its own
+   counts (mine) and the server returns the sum of all other devices (others),
+   so every phone and tablet shares one day. watch/vwatch = mine + others. */
+const API = "https://ntv.financemind.com/api/sync";
+function parse(k) { try { return JSON.parse(load(k) || "{}") || {}; } catch (e) { return {}; } }
+const mine = { watch: parse("watch"), vwatch: parse("vwatch"), turnEnds: parse("turnEnds") };
+let others = parse("others"); // last server reply, so starting offline still counts other devices
+let device = load("device");
+if (!device) { device = Math.random().toString(36).slice(2, 10) + Date.now().toString(36); save("device", device); }
+/* A plain name for this device, so the parents' report can tell them apart. */
+function deviceLabel() {
+  const ua = navigator.userAgent;
+  if (/SmartTV|SMART-TV|Tizen|Web0S|webOS|BRAVIA|HbbTV|NetCast|Android TV|GoogleTV|AFT[A-Z]|CrKey|Roku|Xbox|PlayStation/i.test(ua)) return "تلویزیون";
+  if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) || (/Android/.test(ua) && !/Mobile/.test(ua))) return "تبلت";
+  if (/iPhone|Mobi|Android/.test(ua)) return "گوشی";
+  return "لپ‌تاپ یا کامپیوتر";
+}
+save("deviceLabel", deviceLabel());
+const syncBody = (extra) => JSON.stringify({ device, label: deviceLabel(), data: mine, ...extra });
+let watch = {}, vwatch = {};
+function addStores(a, b) {
+  const out = {};
+  for (const s of [a, b]) for (const [day, vals] of Object.entries(s || {})) {
+    out[day] = out[day] || {};
+    for (const [k, v] of Object.entries(vals || {})) out[day][k] = (out[day][k] || 0) + v;
+  }
+  return out;
+}
+function combine() { watch = addStores(mine.watch, others.watch); vwatch = addStores(mine.vwatch, others.vwatch); }
+combine();
+let syncing = false;
+async function sync() {
+  if (syncing) return;
+  syncing = true;
+  try {
+    const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain" }, body: syncBody() });
+    if (r.ok) { others = await r.json(); save("others", JSON.stringify(others)); combine(); }
+  } catch (e) { /* offline: keep the last reply */ } finally { syncing = false; }
+}
 function dayKey(offset = 0) {
   const d = new Date(); d.setDate(d.getDate() - offset);
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 function secs(key, offset) { return (watch[dayKey(offset)] || {})[key] || 0; }
-/* vwatch: seconds per video per day, for the parents' page. Both stores keep 31 days. */
-let vwatch = {};
-try { vwatch = JSON.parse(load("vwatch") || "{}") || {}; } catch (e) { vwatch = {}; }
+/* vwatch: seconds per video per day, for the parents' page. All stores keep 31 days. */
 function bump(store, key) {
   const t = dayKey();
   store[t] = store[t] || {};
@@ -166,9 +210,10 @@ function bump(store, key) {
   for (const k of Object.keys(store)) if (!keep.has(k)) delete store[k];
 }
 function addSecond(catKey, videoId) {
+  bump(mine.watch, catKey); bump(mine.vwatch, videoId);
   bump(watch, catKey); bump(vwatch, videoId);
-  save("watch", JSON.stringify(watch));
-  save("vwatch", JSON.stringify(vwatch));
+  save("watch", JSON.stringify(mine.watch));
+  save("vwatch", JSON.stringify(mine.vwatch));
 }
 function allowed(c) {
   if (!c.limit) return true;
@@ -211,8 +256,10 @@ function todaySeconds() { return Object.values(watch[dayKey()] || {}).reduce((a,
    (breakMinutes) after each. Only playing time counts. */
 const turnSecs = () => (cfg().turnMinutes || 30) * 60;
 const turnCount = () => cfg().turns || 2;
-function turnEnds() { // when each finished turn ended today (ms timestamps)
-  try { return (JSON.parse(load("turnEnds") || "{}") || {})[dayKey()] || []; } catch (e) { return []; }
+function turnEnds() { // when each finished turn ended today (ms timestamps); the earliest device wins
+  const a = (mine.turnEnds || {})[dayKey()] || [], b = ((others.turnEnds || {})[dayKey()]) || [];
+  return Array.from({ length: Math.max(a.length, b.length) }, (_, i) =>
+    a[i] && b[i] ? Math.min(a[i], b[i]) : a[i] || b[i] || null);
 }
 function timeState() {
   const s = todaySeconds(), T = turnSecs(), n = turnCount();
@@ -220,7 +267,7 @@ function timeState() {
   if (used >= n) return { mode: "tomorrow", turn: n };
   if (used > 0) {
     const ends = turnEnds();
-    if (!ends[used - 1]) { ends[used - 1] = Date.now(); save("turnEnds", JSON.stringify({ [dayKey()]: ends })); }
+    if (!ends[used - 1]) { ends[used - 1] = Date.now(); mine.turnEnds = { [dayKey()]: ends }; save("turnEnds", JSON.stringify(mine.turnEnds)); sync(); }
     const until = ends[used - 1] + (cfg().breakMinutes || 120) * 60000;
     if (Date.now() < until) return { mode: "break", turn: used, until };
   }
@@ -403,6 +450,63 @@ $("playBtn").onclick = () => {
 };
 $("shield").onclick = () => $("playBtn").click();
 document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+/* TV remote and keyboard: arrows move between buttons, OK presses, Back goes home. */
+const BACK_KEYS = new Set(["Escape", "Backspace", "GoBack", "BrowserBack", "XF86Back"]);
+const BACK_CODES = new Set([10009, 461, 8, 27]); // Tizen, webOS, others
+function focusables() {
+  return [...document.querySelectorAll("button")].filter((b) => {
+    if (b.id === "parentsBtn" || b.disabled) return false; // the lock stays a touch-only thing
+    const r = b.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== "hidden";
+  });
+}
+function moveFocus(dir) {
+  const all = focusables();
+  if (!all.length) return;
+  const cur = document.activeElement;
+  if (!all.includes(cur)) return all[0].focus();
+  const a = cur.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+  let best = null, bestD = Infinity;
+  for (const b of all) {
+    if (b === cur) continue;
+    const r = b.getBoundingClientRect(), dx = r.left + r.width / 2 - ax, dy = r.top + r.height / 2 - ay;
+    const ok = dir === "ArrowLeft" ? dx < -4 : dir === "ArrowRight" ? dx > 4 : dir === "ArrowUp" ? dy < -4 : dy > 4;
+    if (!ok) continue;
+    const along = dir === "ArrowLeft" || dir === "ArrowRight" ? Math.abs(dx) : Math.abs(dy);
+    const across = dir === "ArrowLeft" || dir === "ArrowRight" ? Math.abs(dy) : Math.abs(dx);
+    const d = along + across * 2;
+    if (d < bestD) { bestD = d; best = b; }
+  }
+  if (best) { best.focus(); best.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+}
+document.addEventListener("keydown", (e) => {
+  if (e.key.startsWith("Arrow")) { e.preventDefault(); moveFocus(e.key); return; }
+  const onStage = !$("stage").hidden;
+  if (BACK_KEYS.has(e.key) || BACK_CODES.has(e.keyCode)) {
+    if (onStage) { e.preventDefault(); goHome(); }
+    return;
+  }
+  if (onStage && ["MediaPlayPause", "MediaPlay", "MediaPause", " "].includes(e.key)) { e.preventDefault(); $("playBtn").click(); return; }
+  if ((e.key === "Enter" || e.keyCode === 13) && !focusables().includes(document.activeElement)) {
+    e.preventDefault(); // OK with nothing picked: pick the first thing
+    if (onStage) $("playBtn").click(); else moveFocus("ArrowDown");
+  }
+});
+
+/* Fill the whole screen on the first touch or key press (browsers only allow it after one).
+   An installed app already opens full screen. */
+const installed = matchMedia("(display-mode: fullscreen), (display-mode: standalone)").matches || navigator.standalone;
+function goFull() {
+  const el = document.documentElement;
+  if (installed || document.fullscreenElement || document.webkitFullscreenElement) return;
+  try { (el.requestFullscreen || el.webkitRequestFullscreen || (() => {})).call(el); } catch (e) {}
+}
+document.addEventListener("pointerdown", (e) => { if (!e.target.closest("#parentsBtn")) goFull(); });
+document.addEventListener("keydown", goFull);
+
+/* Works offline after the first visit and can be installed like an app. */
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 // Parents' page: hold the small lock for 2 seconds.
 {
   const pb = $("parentsBtn"); let hold = null;
@@ -412,11 +516,20 @@ document.addEventListener("contextmenu", (e) => e.preventDefault());
   for (const ev of ["pointerup", "pointerleave", "pointercancel"]) pb.addEventListener(ev, stop);
 }
 // A new day can unlock a show: refresh the list when the app comes back to the screen.
-document.addEventListener("visibilitychange", () => { if (!document.hidden && !$("home").hidden) { renderGrid(); } });
-// While the home screen is open, notice when a break ends.
-setInterval(() => { if (!$("home").hidden && data.categories.length && timeState().mode !== lastMode) renderGrid(); }, 30000);
+// Leaving the app sends this device's counts; coming back fetches the other devices'.
+function refreshHome() {
+  if ($("home").hidden || !data.categories.length) return;
+  if (timeState().mode !== lastMode) renderGrid(); else renderBudget();
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    try { navigator.sendBeacon(API, new Blob([syncBody()], { type: "text/plain" })); } catch (e) {}
+  } else if (!$("home").hidden) { renderGrid(); sync().then(refreshHome); }
+});
+// Every 30 seconds: share counts with the other devices and notice when a break ends.
+setInterval(() => { sync().then(refreshHome); }, 30000);
 
-fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => {
+Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), sync()]).then(([d]) => {
   data = d;
   renderGrid();
 });

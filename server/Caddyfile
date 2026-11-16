@@ -1,0 +1,15 @@
+ntv.financemind.com {
+	encode gzip
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8080
+	}
+	handle {
+		root * /srv/kids-tube
+		header /manifest.webmanifest Content-Type "application/manifest+json"
+		header /videos.json Cache-Control "no-cache"
+		header /sw.js Cache-Control "no-cache"
+		header /*.html Cache-Control "no-cache"
+		header / Cache-Control "no-cache"
+		file_server
+	}
+}
