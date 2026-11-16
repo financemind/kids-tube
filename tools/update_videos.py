@@ -22,11 +22,19 @@ CHANNELS = [
     ("sesame", "Sesame Street", "UCoookXUzPciGrEZEXmh4Jjg", None),
     ("blippi", "Blippi", "UC5PYHgAzJ1wLEidB58SK6Xw", None),
     ("numberblocks", "Numberblocks", "UCPlwvN0w4qFSP1FllALB92w", None),
-    ("bluey", "Bluey", "UCEC-8nMiuXYH2QUs0yYcHTQ", None),
+    ("bluey", "Bluey", "UCVzLLZkDuFGAE2BGdBuBNBg", None),
     ("songs", "Super Simple Songs", "UCLsooMJoIpl_7ux2jvdPB-Q", None),
     ("peppa", "Peppa Pig", "UCAOtE1V7Ots4DjM8JLlrYgg", LIMITED),
     ("paw", "PAW Patrol", "UCSVSJ1OCSv5ClFgKFTHIDew", LIMITED),
 ]
+# The official handle of each channel. Before building, every channel id is
+# checked against it, so a look-alike channel (anyone can name a channel
+# "Bluey") can never slip in again.
+OFFICIAL = {
+    "sesame": "@SesameStreet", "blippi": "@Blippi", "numberblocks": "@Numberblocks",
+    "bluey": "@BlueyOfficialChannel", "songs": "@SuperSimpleSongs",
+    "peppa": "@PeppaPigOfficial", "paw": "@PAWPatrolOfficial",
+}
 # Topics the child can pick. Videos come from searching YouTube for
 # "<show> <query>" and keeping only results from the channels above whose
 # title contains one of the words.
@@ -176,7 +184,18 @@ def group_topics(topics):
     return out
 
 
+def check_channels():
+    for key, title, cid, _ in CHANNELS:
+        html = get(f"https://www.youtube.com/channel/{cid}").decode("utf-8", "replace")
+        m = re.search(r'"canonicalBaseUrl":"/(@[^"]+)"', html)
+        handle = m.group(1) if m else None
+        if handle != OFFICIAL.get(key):
+            raise SystemExit(f"{title}: channel {cid} is {handle}, not the official {OFFICIAL.get(key)}. Stopped.")
+        print(f"{title}: official channel {handle}")
+
+
 def main():
+    check_channels()
     categories = []
     for key, title, cid, limit in CHANNELS:
         root = ET.fromstring(get(f"https://www.youtube.com/feeds/videos.xml?channel_id={cid}"))
