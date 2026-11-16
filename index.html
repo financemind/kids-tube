@@ -65,6 +65,10 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .video .num { position: absolute; top: 8px; left: 8px; min-width: 44px; height: 44px; padding: 0 8px; border-radius: 22px;
   background: rgba(29, 43, 79, .82); color: #fff; font: 700 26px/44px var(--body); text-align: center; display: none; }
 .numbers .video .num { display: block; }
+/* Topic of the day, in a corner: its picture (the same one as on its videos) and its name for the parents. */
+.today-topic { justify-self: start; margin: 0; display: inline-flex; align-items: center; gap: 8px; background: var(--card);
+  border-radius: 99px; padding: 4px 16px 4px 10px; box-shadow: 0 4px 0 var(--shade); font: 700 17px/1.4 var(--body); }
+.today-topic b { font-size: 32px; line-height: 1; }
 .video .topic { position: absolute; top: 6px; right: 8px; font-size: 40px; line-height: 1; filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
 .video.picked { outline: 8px solid var(--sun); outline-offset: 4px; }
 .video {
@@ -75,6 +79,8 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .video:active { transform: scale(.97); }
 .video img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: var(--shade); }
 .video img { border-radius: 19px; }
+/* Pictures are shown with weak colours, so the brightest thumbnail does not win the child's choice. */
+.video img { filter: saturate(.35); }
 
 /* Time left today: a big bar that shrinks from the sun toward the moon.
    White lines split it into 10-minute pieces the child can see go away. */
@@ -157,6 +163,7 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
     <span class="moon-s" aria-hidden="true">🌙</span>
   </div>
   <p class="left-text" id="leftText"></p>
+  <p class="today-topic" id="todayTopic" hidden></p>
   <section class="grid" id="grid" aria-live="polite"></section>
   <section class="rest" id="rest" hidden><div class="moon" id="restIcon" aria-hidden="true">🌙</div><p id="restText">برای امروز بس است. فردا دوباره.</p></section>
 </main>
@@ -457,9 +464,13 @@ function renderGrid() {
     // Break: go and play. Last turn used: see you tomorrow.
     $("restIcon").textContent = st.mode === "break" ? "🛝" : "🌙";
     $("restText").textContent = st.mode === "break" ? "وقت بازی! بعداً دوباره." : "برای امروز بس است. فردا دوباره.";
+    $("todayTopic").hidden = true;
     fitGrid();
     return;
   }
+  const tod = topicOfDay();
+  $("todayTopic").hidden = !tod;
+  if (tod) $("todayTopic").innerHTML = `<b aria-hidden="true">${tod.icon}</b>موضوع امروز: ${tod.title}`;
   for (const v of dailyList()) {
     const b = document.createElement("button");
     b.className = "video";
