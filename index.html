@@ -82,7 +82,7 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .track::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(var(--piece) - 2px), var(--card) calc(var(--piece) - 2px) calc(var(--piece) + 2px), transparent calc(var(--piece) + 2px)); }
 .left-text { margin: -10px 0 0; text-align: center; font-size: 14px; opacity: .6; }
 .rest { display: grid; justify-items: center; gap: 12px; padding-block: 12vh; text-align: center; }
-.rest .moon { font-size: clamp(110px, 22vw, 180px); line-height: 1; }
+.rest .moon { font-size: clamp(110px, 22vw, 180px); line-height: 1; animation: bob 2.4s ease-in-out infinite; }
 .rest p { margin: 0; font-family: var(--body); font-weight: 700; font-size: 20px; opacity: .75; }
 
 /* Player screen */
@@ -118,7 +118,18 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .play-btn { background: var(--leaf); }
 .msg { position: relative; color: #fff; font-family: var(--body); font-weight: 700; font-size: 22px; text-align: center; padding: 0 20px; }
 .done { display: grid; gap: 22px; justify-items: center; }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+/* Time is up: an alarm clock rings, then the slide (break) or moon (day over) pops in. */
+.ring { position: relative; font-size: clamp(120px, 26vmin, 200px); line-height: 1; transform-origin: 50% 30%; animation: ring .12s ease-in-out infinite alternate; }
+.ring::before, .ring::after { content: ""; position: absolute; top: 18%; width: 22%; height: 40%; border: 6px solid #fff; border-radius: 50%; opacity: .8; animation: waves .5s ease-out infinite; }
+.ring::before { left: -24%; border-color: transparent transparent transparent #fff; }
+.ring::after { right: -24%; border-color: transparent #fff transparent transparent; }
+@keyframes ring { from { transform: rotate(-16deg); } to { transform: rotate(16deg); } }
+@keyframes waves { from { opacity: .9; transform: scale(.8); } to { opacity: 0; transform: scale(1.3); } }
+.pop { font-size: clamp(110px, 24vmin, 180px); line-height: 1; animation: pop .7s cubic-bezier(.3, 1.6, .5, 1) both, bob 2.4s ease-in-out .7s infinite; }
+@keyframes pop { from { transform: scale(0) rotate(-30deg); } to { transform: scale(1); } }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+.done .msg.small { font-size: 18px; opacity: .8; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } .ring, .ring::before, .ring::after, .pop, .rest .moon { animation: none !important; } }
 </style>
 </head>
 <body>
@@ -453,8 +464,47 @@ function stopForToday() {
   player.pauseVideo();
   setPlayIcon(false);
   const brk = timeState().mode === "break";
-  showCover(`<div class="done"><div class="msg" style="font-size:90px">${brk ? "🛝" : "🌙"}</div><div class="msg">${brk ? "وقت بازی! بعداً دوباره." : "برای امروز بس است."}</div>${homeButton("backBtn")}</div>`, null);
-  $("backBtn").onclick = goHome;
+  // A child can't read: first an alarm clock rings with a soft bell, then the
+  // slide (go and play) or the moon (see you tomorrow) pops in with a little tune.
+  showCover(`<div class="done"><div class="ring" aria-label="Time is up">⏰</div></div>`, null);
+  timeUpSound();
+  setTimeout(() => {
+    if ($("stage").hidden) return;
+    showCover(`<div class="done"><div class="pop">${brk ? "🛝" : "🌙"}</div><div class="msg small">${brk ? "وقت بازی! بعداً دوباره." : "برای امروز بس است. فردا دوباره."}</div>${homeButton("backBtn")}</div>`, null);
+    $("backBtn").onclick = goHome;
+  }, 2600);
+}
+
+/* Sounds are made in the browser (no files): a soft alarm-clock trill, then a
+   happy music-box tune. Browsers allow sound only after a first touch or key,
+   which the child has already given by starting the video. */
+let audio = null;
+function audioCtx() {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === "suspended") audio.resume();
+  } catch (e) { audio = null; }
+  return audio;
+}
+document.addEventListener("pointerdown", audioCtx);
+document.addEventListener("keydown", audioCtx);
+function bell(a, freq, at, len, vol) {
+  for (const [mult, v] of [[1, vol], [2.76, vol * 0.25]]) { // a bell has a bright overtone
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = "sine"; o.frequency.value = freq * mult;
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(v, at + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+    o.connect(g); g.connect(a.destination);
+    o.start(at); o.stop(at + len + 0.05);
+  }
+}
+function timeUpSound() {
+  const a = audioCtx();
+  if (!a) return;
+  const t = a.currentTime + 0.05;
+  for (let r = 0; r < 3; r++) for (let i = 0; i < 8; i++) bell(a, i % 2 ? 1760 : 1480, t + r * 0.75 + i * 0.07, 0.18, 0.12); // ring-ring-ring
+  [784, 988, 1175, 1568].forEach((f, i) => bell(a, f, t + 2.5 + i * 0.2, 1.2, 0.2)); // happy tune going up
 }
 
 function onErr() {
