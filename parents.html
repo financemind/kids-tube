@@ -57,6 +57,14 @@ th { color: var(--muted); font-weight: 500; font-size: 13px; white-space: nowrap
 td.n { font-variant-numeric: tabular-nums; white-space: nowrap; }
 td.t { direction: ltr; text-align: left; min-width: 180px; }
 .empty { color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.chips button, button.go { font: inherit; font-weight: 700; border-radius: 12px; padding: 8px 14px; cursor: pointer; }
+.chips button { background: var(--bg); color: var(--ink); border: 2px solid var(--line); }
+.chips button.on { border-color: var(--bar); color: var(--bar); }
+button.go { background: var(--bar); color: #fff; border: 0; }
+button.go:disabled { opacity: .6; cursor: default; }
+.plan-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.plan-row select { font: inherit; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
 .reset { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .reset h2 { margin-bottom: 4px; }
 button.danger { font: inherit; font-weight: 700; color: #fff; background: var(--stop); border: 0; border-radius: 12px; padding: 10px 18px; cursor: pointer; }
@@ -78,6 +86,19 @@ button.danger:disabled { opacity: .6; cursor: default; }
       <div class="stat"><b id="sYest"></b><span>دیروز</span></div>
       <div class="stat"><b id="sWeek"></b><span>۷ روز اخیر</span></div>
     </div>
+  </section>
+
+  <section>
+    <h2>نوبت‌های امروز</h2>
+    <p class="note" id="planNow"></p>
+    <div class="chips" id="presets"></div>
+    <div class="plan-row">
+      <label><select id="planTurns"></select> نوبت</label>
+      <span>×</span>
+      <label><select id="planMinutes"></select> دقیقه</label>
+      <button id="planBtn" class="go" type="button">برای امروز ذخیره کن</button>
+    </div>
+    <p class="note" id="planMsg"></p>
   </section>
 
   <section class="reset">
@@ -207,6 +228,44 @@ function emptyRow(tbody, cols, text) {
 }
 
 $("resetBtn").onclick = resetToday;
+
+/* Today's turns: quick picks or any count × minutes. Saved on the server for every device. */
+const PRESETS = [[2, 30], [3, 30], [4, 15], [6, 15]];
+function planText(p) { return `${fa(p.turns)} نوبت ${fa(p.minutes)} دقیقه‌ای`; }
+function showPlan(daily, plans) {
+  const def = { turns: daily.turns || 4, minutes: daily.turnMinutes || 15 };
+  const today = (plans || {})[dayKey(0)];
+  const p = today || def;
+  const brk = p.minutes * (daily.breakTimes || 4);
+  $("planNow").textContent = `امروز: ${planText(p)}${today ? "" : " (پیش‌فرض)"} · بین نوبت‌ها ${dur(brk * 60)} استراحت. پیش‌فرض هر روز: ${planText(def)}.`;
+  $("planTurns").value = p.turns; $("planMinutes").value = p.minutes;
+  [...$("presets").children].forEach((b) => b.classList.toggle("on", +b.dataset.t === p.turns && +b.dataset.m === p.minutes));
+}
+async function savePlan(daily, turns, minutes) {
+  const btn = $("planBtn");
+  btn.disabled = true; $("planMsg").textContent = "صبر کنید…";
+  try {
+    const r = await fetch(API.replace("/sync", "/plan"), { method: "POST", headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ day: dayKey(0), turns, minutes }) });
+    if (!r.ok) throw new Error();
+    showPlan(daily, (await r.json()).plans);
+    $("planMsg").textContent = "ذخیره شد. دستگاه‌ها تا یک دقیقهٔ دیگر عوض می‌شوند.";
+  } catch (e) {
+    $("planMsg").textContent = "به سرور وصل نشد. اینترنت را چک کنید و دوباره بزنید.";
+  } finally { btn.disabled = false; }
+}
+function setupPlan(daily, plans) {
+  for (let n = 1; n <= 8; n++) $("planTurns").insertAdjacentHTML("beforeend", `<option value="${n}">${fa(n)}</option>`);
+  for (const m of [10, 15, 20, 30, 45, 60]) $("planMinutes").insertAdjacentHTML("beforeend", `<option value="${m}">${fa(m)}</option>`);
+  for (const [t, m] of PRESETS) {
+    const b = document.createElement("button");
+    b.type = "button"; b.dataset.t = t; b.dataset.m = m; b.textContent = planText({ turns: t, minutes: m });
+    b.onclick = () => savePlan(daily, t, m);
+    $("presets").appendChild(b);
+  }
+  $("planBtn").onclick = () => savePlan(daily, +$("planTurns").value, +$("planMinutes").value);
+  showPlan(daily, plans);
+}
 Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), getDevices()]).then(([data, all]) => {
   if (all && all.devices) {
     const list = Object.entries(all.devices);
@@ -226,7 +285,10 @@ Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), 
     emptyRow($("devices"), 4, "به سرور وصل نشد.");
   }
   $("sToday").textContent = dur(sum(watch, null, 0, 0));
-  const dly = data.daily || {}, turns = dly.turns || 2, tm = dly.turnMinutes || 30;
+  const dly = data.daily || {};
+  setupPlan(dly, all && all.plans);
+  const todayPlan = ((all && all.plans) || {})[dayKey(0)] || { turns: dly.turns || 4, minutes: dly.turnMinutes || 15 };
+  const turns = todayPlan.turns, tm = todayPlan.minutes;
   const usedTurns = Math.min(turns, Math.floor(sum(watch, null, 0, 0) / (tm * 60)));
   $("sTodayLabel").textContent = `امروز (${fa(usedTurns)} از ${fa(turns)} نوبت ${fa(tm)} دقیقه‌ای تمام شده)`;
   $("sYest").textContent = dur(sum(watch, null, 1, 1));

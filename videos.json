@@ -8,9 +8,9 @@
   "videoHalfMinutes": 10,
   "showHalfMinutes": 20,
   "taperPerWeek": 0.7,
-  "turns": 2,
-  "turnMinutes": 30,
-  "breakMinutes": 120
+  "turns": 4,
+  "turnMinutes": 15,
+  "breakTimes": 4
  },
  "topics": [
   {

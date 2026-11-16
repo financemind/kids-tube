@@ -15,6 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DATA_FILE = os.environ.get("STATS_FILE", "/var/lib/kids-tube/stats.json")
 RESET_FILE = os.path.join(os.path.dirname(DATA_FILE), "reset")  # holds a ms timestamp; see reset_at()
+PLANS_FILE = os.path.join(os.path.dirname(DATA_FILE), "plans.json")  # {day: {"turns": n, "minutes": m}}
 PORT = int(os.environ.get("STATS_PORT", "8080"))
 ORIGINS = {"https://ntv.financemind.com", "https://financemind.github.io", "http://localhost:8765"}
 MAX_BODY = 200_000
@@ -76,6 +77,27 @@ def do_reset(day):
             json.dump({"at": at, "day": day}, f)
         os.replace(tmp, RESET_FILE)
     return at
+
+
+def load_plans():
+    try:
+        with open(PLANS_FILE) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def save_plan(day, turns, minutes):
+    """Parents pick today's turns, e.g. 4 x 15 minutes. Keeps the last 7 days."""
+    with lock:
+        plans = load_plans()
+        plans[day] = {"turns": turns, "minutes": minutes}
+        plans = {d: plans[d] for d in sorted(plans, reverse=True)[:7]}
+        tmp = PLANS_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(plans, f)
+        os.replace(tmp, PLANS_FILE)
+    return plans
 
 
 def clean_counts(raw):
@@ -151,11 +173,21 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(404, {"error": "not found"})
 
     def do_POST(self):
-        if self.path not in ("/api/sync", "/api/reset"):
+        if self.path not in ("/api/sync", "/api/reset", "/api/plan"):
             return self.reply(404, {"error": "not found"})
         size = int(self.headers.get("Content-Length") or 0)
         if size <= 0 or size > MAX_BODY:
             return self.reply(413, {"error": "bad size"})
+        if self.path == "/api/plan":  # {"day": "2026-11-16", "turns": 4, "minutes": 15}
+            try:
+                b = json.loads(self.rfile.read(size))
+                day, turns, minutes = b["day"], b["turns"], b["minutes"]
+                assert isinstance(day, str) and DAY.match(day)
+                assert isinstance(turns, int) and 1 <= turns <= 8
+                assert isinstance(minutes, int) and 5 <= minutes <= 60
+            except (ValueError, KeyError, AssertionError, TypeError):
+                return self.reply(400, {"error": "bad request"})
+            return self.reply(200, {"plans": save_plan(day, turns, minutes)})
         if self.path == "/api/reset":  # parents' button: {"day": "2026-11-16"} clears that day
             try:
                 day = json.loads(self.rfile.read(size)).get("day")
@@ -191,6 +223,7 @@ class Handler(BaseHTTPRequestHandler):
                 result = others(devices, device)
         result["reset"] = result_reset
         result["resetDay"] = reset_day
+        result["plans"] = load_plans()
         self.reply(200, result)
 
     def log_message(self, fmt, *args):

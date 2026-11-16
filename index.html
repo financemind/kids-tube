@@ -276,10 +276,15 @@ function score(v) {
 }
 function todaySeconds() { return Object.values(watch[dayKey()] || {}).reduce((a, b) => a + b, 0); }
 
-/* Turns: the day has a few short turns (cfg turns × turnMinutes) with a break
-   (breakMinutes) after each. Only playing time counts. */
-const turnSecs = () => (cfg().turnMinutes || 30) * 60;
-const turnCount = () => cfg().turns || 2;
+/* Turns: the day has a few short turns with a break after each (breakTimes ×
+   the turn length). Parents can set today's turns in the report (server
+   plans); otherwise the default in videos.json. Only playing time counts. */
+function plan() {
+  const p = (others.plans || {})[dayKey()];
+  return p || { turns: cfg().turns || 4, minutes: cfg().turnMinutes || 15 };
+}
+const turnSecs = () => plan().minutes * 60;
+const turnCount = () => plan().turns;
 function turnEnds() { // when each finished turn ended today (ms timestamps); the earliest device wins
   const a = (mine.turnEnds || {})[dayKey()] || [], b = ((others.turnEnds || {})[dayKey()]) || [];
   return Array.from({ length: Math.max(a.length, b.length) }, (_, i) =>
@@ -292,7 +297,7 @@ function timeState() {
   if (used > 0) {
     const ends = turnEnds();
     if (!ends[used - 1]) { ends[used - 1] = Date.now(); mine.turnEnds = { [dayKey()]: ends }; save("turnEnds", JSON.stringify(mine.turnEnds)); sync(); }
-    const until = ends[used - 1] + (cfg().breakMinutes || 120) * 60000;
+    const until = ends[used - 1] + plan().minutes * (cfg().breakTimes || 4) * 60000;
     if (Date.now() < until) return { mode: "break", turn: used, until };
   }
   return { mode: "watch", turn: used, left: (used + 1) * T - s };
@@ -338,7 +343,8 @@ function renderBudget() {
   });
   const fa = (x) => x.toLocaleString("fa-IR");
   let text = "";
-  if (st.mode === "watch") text = `${fa(Math.ceil(st.left / 60))} دقیقه از نوبت ${st.turn === 0 ? "اول" : st.turn === 1 ? "دوم" : fa(st.turn + 1)} مانده`;
+  const nth = ["اول", "دوم", "سوم", "چهارم", "پنجم", "ششم", "هفتم", "هشتم"][st.turn] || fa(st.turn + 1);
+  if (st.mode === "watch") text = `${fa(Math.ceil(st.left / 60))} دقیقه از نوبت ${nth} مانده`;
   else if (st.mode === "break") {
     const t = new Date(st.until);
     text = `نوبت بعدی ساعت ${fa(t.getHours())}:${String(t.getMinutes()).padStart(2, "0").replace(/\d/g, (d) => fa(+d))} باز می‌شود`;
