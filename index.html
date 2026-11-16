@@ -183,7 +183,7 @@ function deviceLabel() {
   return "لپ‌تاپ یا کامپیوتر";
 }
 save("deviceLabel", deviceLabel());
-const syncBody = (extra) => JSON.stringify({ device, label: deviceLabel(), data: mine, ...extra });
+const syncBody = (extra) => JSON.stringify({ device, label: deviceLabel(), resetSeen, data: mine, ...extra });
 let watch = {}, vwatch = {};
 function addStores(a, b) {
   const out = {};
@@ -196,13 +196,26 @@ function addStores(a, b) {
 function combine() { watch = addStores(mine.watch, others.watch); vwatch = addStores(mine.vwatch, others.vwatch); }
 combine();
 let syncing = false;
-async function sync() {
+let resetSeen = Number(load("resetSeen")) || 0;
+function wipe(ts) { // parents reset every device's time on the server
+  mine.watch = {}; mine.vwatch = {}; mine.turnEnds = {}; others = {};
+  for (const k of ["watch", "vwatch", "turnEnds", "others"]) save(k, "{}");
+  resetSeen = ts; save("resetSeen", String(ts));
+  combine();
+}
+async function sync(again = true) {
   if (syncing) return;
   syncing = true;
+  let wiped = false;
   try {
     const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain" }, body: syncBody() });
-    if (r.ok) { others = await r.json(); save("others", JSON.stringify(others)); combine(); }
+    if (r.ok) {
+      const j = await r.json();
+      if (j.reset && j.reset > resetSeen) { wipe(j.reset); wiped = true; }
+      else { others = j; save("others", JSON.stringify(others)); combine(); }
+    }
   } catch (e) { /* offline: keep the last reply */ } finally { syncing = false; }
+  if (wiped && again) return sync(false);
 }
 function dayKey(offset = 0) {
   const d = new Date(); d.setDate(d.getDate() - offset);

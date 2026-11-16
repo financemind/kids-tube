@@ -14,6 +14,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DATA_FILE = os.environ.get("STATS_FILE", "/var/lib/kids-tube/stats.json")
+RESET_FILE = os.path.join(os.path.dirname(DATA_FILE), "reset")  # holds a ms timestamp; see reset_at()
 PORT = int(os.environ.get("STATS_PORT", "8080"))
 ORIGINS = {"https://ntv.financemind.com", "https://financemind.github.io", "http://localhost:8765"}
 MAX_BODY = 200_000
@@ -38,6 +39,17 @@ def store(devices):
     with open(tmp, "w") as f:
         json.dump(devices, f)
     os.replace(tmp, DATA_FILE)
+
+
+def reset_at():
+    """Parents can wipe every device's counts: write a new ms timestamp to
+    RESET_FILE (and empty DATA_FILE). Devices that have not seen it yet are
+    told to clear their own copy, and their old numbers are not stored."""
+    try:
+        with open(RESET_FILE) as f:
+            return int(f.read().strip() or 0)
+    except (OSError, ValueError):
+        return 0
 
 
 def clean_counts(raw):
@@ -129,16 +141,22 @@ class Handler(BaseHTTPRequestHandler):
         mine = {"watch": clean_counts(data.get("watch")), "vwatch": clean_counts(data.get("vwatch")),
                 "turnEnds": clean_ends(data.get("turnEnds")),
                 "label": label[:40] if isinstance(label, str) else "", "seen": int(time.time() * 1000)}
+        reset = reset_at()
+        seen = body.get("resetSeen")
+        if reset and (not isinstance(seen, (int, float)) or seen < reset):
+            return self.reply(200, {"reset": reset})  # clear first, then sync again
         with lock:
             devices = load()
             if device not in devices and len(devices) >= MAX_DEVICES:
                 return self.reply(403, {"error": "too many devices"})
             devices[device] = mine
             store(devices)
+            result_reset = reset
             if body.get("all"):  # parents' report: every device, each on its own
                 result = {"me": device, "devices": devices}
             else:
                 result = others(devices, device)
+        result["reset"] = result_reset
         self.reply(200, result)
 
     def log_message(self, fmt, *args):

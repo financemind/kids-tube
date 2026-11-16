@@ -125,14 +125,23 @@ function addStores(a, b) {
   return out;
 }
 // Send this device's counts and get every device back (needs the app opened once on this device).
-async function getDevices() {
+async function getDevices(again = true) {
   const device = localStorage.getItem("device");
   if (!device) return null;
   try {
-    const body = JSON.stringify({ device, all: true, label: localStorage.getItem("deviceLabel") || "",
+    const resetSeen = Number(localStorage.getItem("resetSeen")) || 0;
+    const body = JSON.stringify({ device, all: true, label: localStorage.getItem("deviceLabel") || "", resetSeen,
       data: { watch, vwatch, turnEnds: read("turnEnds") } });
     const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain" }, body });
-    return r.ok ? await r.json() : null;
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (j.reset && j.reset > resetSeen) { // time was reset: clear this device too, then ask again
+      for (const k of ["watch", "vwatch", "turnEnds", "others"]) localStorage.setItem(k, "{}");
+      localStorage.setItem("resetSeen", String(j.reset));
+      watch = {}; vwatch = {};
+      return again ? getDevices(false) : null;
+    }
+    return j;
   } catch (e) { return null; }
 }
 const fa = (n) => n.toLocaleString("fa-IR");
