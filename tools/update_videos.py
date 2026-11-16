@@ -26,6 +26,22 @@ CHANNELS = [
     ("songs", "Super Simple Songs", "UCLsooMJoIpl_7ux2jvdPB-Q", None),
     ("peppa", "Peppa Pig", "UCAOtE1V7Ots4DjM8JLlrYgg", LIMITED),
     ("paw", "PAW Patrol", "UCSVSJ1OCSv5ClFgKFTHIDew", LIMITED),
+    # Added 2026-11-16 from the parents' list.
+    ("postman", "Postman Pat", "UCqrVPwN_DhavUC386xH9SDw", None),
+    ("babyeinstein", "Baby Einstein", "UCtBOJ9bEAoMOY9keGK6p2hQ", None),
+    ("sarahduck", "Sarah & Duck", "UC3OUMU3s7Oy6Ta0wnpZFBWw", None),
+    ("bing", "Bing", "UCyG6ZCj6weaA2_JvnUWWlVA", None),
+    ("danieltiger", "Daniel Tiger", "UCDqgSnRMGVx3dP4sn3ATZMA", None),
+    ("franklin", "Franklin", "UCQJ8D7gkhMCqP1qtusqmfgg", None),
+    ("littlebear", "Little Bear", "UCncFzSeWqySvOXEbQoEJsZg", None),
+    ("arthur", "Arthur", "UCSPzXeCRf12qayHCAtuffzw", None),
+    ("carebears", "Care Bears", "UChRHU6dbz5cpM2qVBK0Omng", None),
+    ("puffin", "Puffin Rock", "UCBx2mmZhRBkPC2MK4bqcSHQ", None),
+    ("mrrogers", "Mister Rogers", "UCQr37RLNViAkEwli9WiaUug", None),
+    ("clifford", "Clifford", "UCqu9w7Mw14mAUQMzcyV3D4A", None),
+    ("magicbus", "Magic School Bus", "UCi7STzPDqcOvmjm7-bEsvDg", None),
+    ("berenstain", "Berenstain Bears", "UCGtFbbGApG0s_8mMuJd-zKg", None),
+    ("moomin", "Moomin", "UC82jKc_wW8iHVXU9GrYRunw", None),
 ]
 # The official handle of each channel. Before building, every channel id is
 # checked against it, so a look-alike channel (anyone can name a channel
@@ -34,7 +50,34 @@ OFFICIAL = {
     "sesame": "@SesameStreet", "blippi": "@Blippi", "numberblocks": "@Numberblocks",
     "bluey": "@BlueyOfficialChannel", "songs": "@SuperSimpleSongs",
     "peppa": "@PeppaPigOfficial", "paw": "@PAWPatrolOfficial",
+    "postman": "@PostmanPat", "babyeinstein": "@BabyEinstein", "sarahduck": "@SarahAndDuckOfficial",
+    "bing": "@BingBunny", "danieltiger": "@DanielTigersNeighbourhood", "franklin": "@officialfranklin",
+    "littlebear": "@OfficialLittleBear", "arthur": "@arthur", "carebears": "@carebears", "puffin": "@PuffinRock",
+    "mrrogers": "@MisterRogersNeighborhood", "clifford": "@CliffordtheBigRedDogClassic",
+    "magicbus": "@TheMagicSchoolBusOfficial", "berenstain": "@OfficialBerenstainBears", "moomin": "@MoominOfficial",
 }
+# Official playlists to take videos from, besides each channel's 15 newest
+# uploads. A playlist is used when its title contains one of these words
+# (case does not matter) and none of SKIP_PLAYLIST.
+PLAYLIST_WORDS = {
+    "sesame": ["favorite episodes", "sing and dance", "abcs, 123s", "animal songs", "fruits & vegetables",
+               "nature explorers", "abc & 123 songs", "i spy songs", "sesame street babies"],
+    "blippi": ["vehicle adventures", "roar & explore", "jump, wiggle", "playtime adventures", "job show",
+               "tasty adventures", "learns stem"],
+    "numberblocks": ["course - level 1", "course - level 2", "course - level 3", "season 8 | full episodes"],
+    "bluey": ["full episodes", "full episode collection", "minisodes", "book reads", "music with bluey",
+              "play the bluey way", "family fun"],
+    "songs": ["counting songs", "all about the alphabet", "big big animals", "big cars and trucks", "bugs",
+              "family songs", "healthy kids", "super simple essentials", "top 20", "vehicles"],
+    "peppa": ["most popular stories", "peppa pig and friends", "planes, trains"],
+    "paw": ["full episodes", "to the rescue", "search & rescue", "water rescue", "air rescue", "fire rescue"],
+}
+# Channels not listed in PLAYLIST_WORDS use these.
+DEFAULT_PLAYLIST_WORDS = ["full episode", "episodes", "season", "compilation", "best of", "songs", "stories"]
+SKIP_PLAYLIST = ["live", "#shorts", "shorts", "halloween", "christmas", "holiday", "sponsored", "toys", "roblox", "movie"]
+MAX_PER_CHANNEL = 80   # videos per show at most (newest uploads first, then playlists)
+MIN_SECONDS = 60
+
 # Topics the child can pick. Videos come from searching YouTube for
 # "<show> <query>" and keeping only results from the channels above whose
 # title contains one of the words.
@@ -78,7 +121,7 @@ OUT = pathlib.Path(__file__).resolve().parent.parent / "videos.json"
 
 
 def get(url):
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9"})
     with urllib.request.urlopen(req, timeout=20) as r:
         return r.read()
 
@@ -184,12 +227,66 @@ def group_topics(topics):
     return out
 
 
+def page_data(url):
+    html = get(url).decode("utf-8", "replace")
+    m = re.search(r"var ytInitialData = (\{.*?\});</script>", html)
+    return json.loads(m.group(1)) if m else {}
+
+
+def lockups(o, out):
+    """Every lockupViewModel (YouTube's card for a video or playlist) in the page data."""
+    if isinstance(o, dict):
+        if "lockupViewModel" in o:
+            out.append(o["lockupViewModel"])
+        for v in o.values():
+            lockups(v, out)
+    elif isinstance(o, list):
+        for v in o:
+            lockups(v, out)
+    return out
+
+
+def card_title(lv):
+    return lv.get("metadata", {}).get("lockupMetadataViewModel", {}).get("title", {}).get("content", "")
+
+
+def to_seconds(text):
+    secs = 0
+    for part in text.split(":"):
+        secs = secs * 60 + int(part)
+    return secs
+
+
+def playlist_videos(key, cid):
+    """(video id, title, playlist title) from the channel's chosen official playlists."""
+    words = PLAYLIST_WORDS.get(key, DEFAULT_PLAYLIST_WORDS)
+    out = []
+    for lv in lockups(page_data(f"https://www.youtube.com/channel/{cid}/playlists"), []):
+        name = card_title(lv)
+        low = name.lower()
+        if not lv.get("contentId") or not any(w in low for w in words) or any(w in low for w in SKIP_PLAYLIST):
+            continue
+        short = name.split("|")[0].strip()
+        found = 0
+        for v in lockups(page_data(f"https://www.youtube.com/playlist?list={lv['contentId']}"), []):
+            if v.get("contentType") != "LOCKUP_CONTENT_TYPE_VIDEO":
+                continue
+            dur = re.findall(r'"text": "(\d+:\d\d(?::\d\d)?)"', json.dumps(v))
+            secs = to_seconds(dur[0]) if dur else None
+            if secs is None or secs < MIN_SECONDS or secs > MAX_MINUTES * 60:
+                continue
+            out.append((v["contentId"], card_title(v), short))
+            found += 1
+        print(f"  playlist {short}: {found} videos")
+    return out
+
+
 def check_channels():
     for key, title, cid, _ in CHANNELS:
         html = get(f"https://www.youtube.com/channel/{cid}").decode("utf-8", "replace")
         m = re.search(r'"canonicalBaseUrl":"/(@[^"]+)"', html)
         handle = m.group(1) if m else None
-        if handle != OFFICIAL.get(key):
+        if not handle or handle.lower() != (OFFICIAL.get(key) or "").lower():
             raise SystemExit(f"{title}: channel {cid} is {handle}, not the official {OFFICIAL.get(key)}. Stopped.")
         print(f"{title}: official channel {handle}")
 
@@ -207,7 +304,15 @@ def main():
             vid = e.find("yt:videoId", NS).text
             if not embeddable(vid) or is_live(vid):
                 continue
-            videos.append({"id": vid, "title": e.find("a:title", NS).text})
+            videos.append({"id": vid, "title": e.find("a:title", NS).text, "list": "تازه‌ها"})
+        seen = {v["id"] for v in videos}
+        for vid, vtitle, plist in playlist_videos(key, cid):
+            if len(videos) >= MAX_PER_CHANNEL:
+                break
+            if vid in seen or not embeddable(vid):
+                continue
+            seen.add(vid)
+            videos.append({"id": vid, "title": vtitle, "list": plist})
         print(f"{title}: {len(videos)} videos")
         if videos:
             cat = {"key": key, "title": title, "channel": cid, "videos": videos}

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>همهٔ ویدیوها</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap">
+<style>
+/* Layout: counts table first, then one section per show and per topic, each a grid of picture cards that open the video on YouTube. */
+:root {
+  --bg: #f3f7fb;
+  --ink: #1d2b4f;
+  --muted: #5f6b86;
+  --card: #ffffff;
+  --line: #dde5ef;
+  --bar: #4a6fd8;
+  --warn: #d9483b;
+  --font: "Vazirmatn", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--font); }
+.wrap {
+  max-width: 1200px; margin: 0 auto; display: grid; gap: 18px;
+  padding-block: max(16px, env(safe-area-inset-top)) 48px;
+  padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right));
+}
+header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+h1 { font-size: 24px; margin: 0; }
+h2 { font-size: 19px; margin: 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+a.back { color: var(--bar); font-weight: 700; text-decoration: none; padding: 8px 14px; border: 2px solid var(--bar); border-radius: 12px; }
+.note { color: var(--muted); font-size: 14px; margin: 0; }
+section { background: var(--card); border-radius: 16px; padding: 16px; border: 1px solid var(--line); min-width: 0; display: grid; gap: 12px; }
+.count { font-size: 13px; font-weight: 700; background: var(--bg); border: 1px solid var(--line); border-radius: 99px; padding: 1px 10px; color: var(--muted); }
+.tag { font-size: 12px; font-weight: 700; border-radius: 99px; padding: 1px 9px; color: #fff; background: var(--warn); }
+.jump { display: flex; flex-wrap: wrap; gap: 8px; }
+.jump a { text-decoration: none; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 4px 10px; font-size: 14px; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { padding: 7px 6px; border-bottom: 1px solid var(--line); text-align: right; }
+th { color: var(--muted); font-weight: 500; font-size: 13px; }
+td.n { font-variant-numeric: tabular-nums; }
+.table { overflow-x: auto; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.card { display: grid; gap: 6px; text-decoration: none; color: var(--ink); border-radius: 12px; }
+.card img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 12px; background: var(--line); display: block; }
+.card:hover img, .card:focus-visible img { outline: 3px solid var(--bar); outline-offset: 2px; }
+.card .t { direction: ltr; text-align: left; font-size: 13px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card .m { font-size: 12px; color: var(--muted); }
+h3 { font-size: 15px; margin: 6px 0 0; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>همهٔ ویدیوهای برنامه</h1>
+    <a class="back" href="parents.html">برگشت به گزارش</a>
+  </header>
+  <p class="note" id="intro">در حال خواندن فهرست…</p>
+
+  <section>
+    <h2>چقدر از هر چیز داریم</h2>
+    <div class="table"><table>
+      <thead><tr><th>برنامه</th><th>از کانال</th><th>از موضوع‌ها</th><th>همه (بدون تکرار)</th><th>کانال رسمی</th></tr></thead>
+      <tbody id="shows"></tbody>
+    </table></div>
+    <div class="table"><table>
+      <thead><tr><th>موضوع</th><th>تعداد</th><th>از کدام برنامه‌ها</th></tr></thead>
+      <tbody id="topics"></tbody>
+    </table></div>
+    <div class="jump" id="jump"></div>
+  </section>
+
+  <div id="sections" style="display:grid;gap:18px"></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const fa = (n) => n.toLocaleString("fa-IR");
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const CHANNEL_HANDLE = { sesame: "@SesameStreet", blippi: "@Blippi", numberblocks: "@Numberblocks", bluey: "@BlueyOfficialChannel",
+  songs: "@SuperSimpleSongs", peppa: "@PeppaPigOfficial", paw: "@PAWPatrolOfficial",
+  postman: "@PostmanPat", babyeinstein: "@BabyEinstein", sarahduck: "@SarahAndDuckOfficial", bing: "@BingBunny",
+  danieltiger: "@DanielTigersNeighbourhood", franklin: "@officialfranklin", littlebear: "@OfficialLittleBear", arthur: "@arthur",
+  carebears: "@carebears", puffin: "@PuffinRock", mrrogers: "@MisterRogersNeighborhood", clifford: "@CliffordtheBigRedDogClassic",
+  magicbus: "@TheMagicSchoolBusOfficial", berenstain: "@OfficialBerenstainBears", moomin: "@MoominOfficial" };
+
+function card(v, meta) {
+  const a = el("a", "card");
+  a.href = `https://www.youtube.com/watch?v=${v.id}`;
+  a.target = "_blank"; a.rel = "noopener";
+  const img = el("img"); img.loading = "lazy"; img.alt = ""; img.src = `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`;
+  a.append(img, el("div", "t", v.title), el("div", "m", meta));
+  return a;
+}
+// groups: [[subtitle or "", cards], ...]; one grid per group under its own small heading.
+function section(id, title, count, tag, groups) {
+  const s = el("section"); s.id = id;
+  const h = el("h2", "", title); h.append(el("span", "count", `${fa(count)} ویدیو`));
+  if (tag) h.append(el("span", "tag", tag));
+  s.append(h);
+  for (const [sub, cards] of groups) {
+    if (sub) { const h3 = el("h3", "", sub); h3.append(el("span", "count", fa(cards.length))); s.append(h3); }
+    const g = el("div", "grid"); cards.forEach((c) => g.append(c));
+    s.append(g);
+  }
+  $("sections").append(s);
+  const j = el("a", "", `${title} (${fa(count)})`); j.href = "#" + id; $("jump").append(j);
+}
+
+fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()).then((data) => {
+  const showTitle = {}, topicsOf = {}, all = new Set();
+  for (const c of data.categories) showTitle[c.key] = c.title;
+  for (const t of data.topics || []) for (const v of t.videos) (topicsOf[v.id] = topicsOf[v.id] || []).push(t.title);
+
+  // Counts per show: from the channel's own feed, from the topic searches, and both together.
+  for (const c of data.categories) {
+    const fromTopics = new Set();
+    for (const t of data.topics || []) for (const v of t.videos) if (v.show === c.key) fromTopics.add(v.id);
+    const ids = new Set([...c.videos.map((v) => v.id), ...fromTopics]);
+    ids.forEach((i) => all.add(i));
+    const tr = el("tr");
+    const name = el("td", "", c.title + (c.limit ? " · محدود" : ""));
+    const link = el("td"); const a = el("a", "", CHANNEL_HANDLE[c.key] || c.channel);
+    a.href = `https://www.youtube.com/channel/${c.channel}`; a.target = "_blank"; a.rel = "noopener"; a.style.direction = "ltr"; a.style.unicodeBidi = "isolate"; link.append(a);
+    tr.append(name, el("td", "n", fa(c.videos.length)), el("td", "n", fa(fromTopics.size)), el("td", "n", fa(ids.size)), link);
+    $("shows").append(tr);
+  }
+  for (const t of data.topics || []) {
+    const shows = [...new Set(t.videos.map((v) => showTitle[v.show] || v.show))].join("، ");
+    const tr = el("tr"); tr.append(el("td", "", `${t.icon || ""} ${t.title}`), el("td", "n", fa(t.videos.length)), el("td", "", shows));
+    $("topics").append(tr);
+  }
+  $("intro").textContent = `روی هم ${fa(all.size)} ویدیوی جدا از ${fa(data.categories.length)} برنامه. هر روز ${fa((data.daily || {}).size || 0)} تا از این‌ها به نویان نشان داده می‌شود. روی هر عکس بزنید تا ویدیو در یوتیوب باز شود.`;
+
+  // One section per show, split by the official playlist each video came from
+  // ("تازه‌ها" = the channel's newest uploads), then the topic-only videos; then one per topic.
+  for (const c of data.categories) {
+    const seen = new Set(), groups = new Map();
+    const add = (name, v, meta) => { if (!groups.has(name)) groups.set(name, []); groups.get(name).push(card(v, meta)); };
+    for (const v of c.videos) { seen.add(v.id); add(v.list || "تازه‌ها", v, (topicsOf[v.id] || []).join("، ")); }
+    for (const t of data.topics || []) for (const v of t.videos) if (v.show === c.key && !seen.has(v.id)) {
+      seen.add(v.id); add("فقط از موضوع‌ها", v, topicsOf[v.id].join("، "));
+    }
+    section("show-" + c.key, c.title, seen.size, c.limit ? `محدود: ${fa(c.limit.day)} دقیقه در روز` : "", [...groups]);
+  }
+  for (const t of data.topics || []) {
+    section("topic-" + t.key, `${t.icon || ""} موضوع: ${t.title}`, t.videos.length, "", [["", t.videos.map((v) => card(v, showTitle[v.show] || ""))]]);
+  }
+});
+</script>
+</body>
+</html>
