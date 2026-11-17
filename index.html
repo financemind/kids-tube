@@ -59,7 +59,15 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 20px; direction: ltr; }
 /* TV and big landscape screens: every picture fits on one screen, no scrolling (sizes set in fitGrid). */
-.home.fit { max-width: none; padding-bottom: 16px; gap: 12px; }
+.home.fit { max-width: none; padding-bottom: 16px; gap: 12px; padding-left: 104px; padding-right: 104px; }
+/* Big arrows at the sides (TV and big screens): with a TV pointer, OK on an arrow turns the page. */
+.pagebtn { display: none; position: fixed; top: 50%; transform: translateY(-50%); width: 80px; height: 160px; border-radius: 40px;
+  background: var(--card); box-shadow: 0 6px 0 var(--shade); z-index: 2; place-items: center; }
+.pagebtn svg { width: 54px; height: 54px; fill: var(--ink); }
+.pagebtn.prev { left: 12px; }
+.pagebtn.next { right: 12px; }
+.home.fit .pagebtn { display: grid; }
+.pagebtn:hover { background: #fff4c7; outline: 6px solid var(--sun); }
 .home.fit .grid { gap: 14px; justify-content: center; }
 /* TV remote: each picture shows its number, so pressing that number on the remote opens it. */
 .video .num { position: absolute; top: 8px; left: 8px; min-width: 44px; height: 44px; padding: 0 8px; border-radius: 22px;
@@ -164,6 +172,8 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 <body>
 
 <main class="home" id="home">
+  <button class="pagebtn prev" id="prevPage" aria-label="Previous videos"><svg viewBox="0 0 24 24"><path d="M15.5 4 7 12l8.5 8 1.9-2-6.4-6 6.4-6z"/></svg></button>
+  <button class="pagebtn next" id="nextPage" aria-label="More videos"><svg viewBox="0 0 24 24"><path d="M8.5 4 17 12l-8.5 8-1.9-2 6.4-6-6.4-6z"/></svg></button>
   <div class="budget" id="budget" role="img" aria-label="Watching time left today">
     <span class="sun" aria-hidden="true">☀️</span>
     <div class="tracks" id="tracks"></div>
@@ -730,6 +740,7 @@ const BACK_CODES = new Set([10009, 461, 8, 27]); // Tizen, webOS, others
 function focusables() {
   return [...document.querySelectorAll("button")].filter((b) => {
     if (b.id === "parentsBtn" || b.disabled) return false; // the lock stays a touch-only thing
+    if (b.classList.contains("pagebtn")) return false; // arrow keys turn pages at the edges instead
     const r = b.getBoundingClientRect();
     return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== "hidden";
   });
@@ -756,6 +767,15 @@ function moveFocus(dir) {
   const tiles = [...$("grid").children], at = tiles.indexOf(cur);
   if (at >= 0 && (dir === "ArrowRight" || dir === "ArrowLeft")) turnPage(dir === "ArrowRight" ? 1 : -1, at);
 }
+/* Some TV browsers move a mouse pointer with the remote's arrows instead of
+   sending arrow keys. Then the yellow frame follows the pointer, and the big
+   side arrows turn the page. */
+document.addEventListener("mouseover", (e) => {
+  const b = e.target.closest && e.target.closest("button");
+  if (b && b !== document.activeElement && focusables().includes(b)) b.focus({ preventScroll: true });
+});
+$("nextPage").onclick = () => turnPage(1, 0);
+$("prevPage").onclick = () => turnPage(-1, 0);
 function turnPage(step, at) {
   const pages = pageTopics().length + 1;
   page = (page + step + pages) % pages;
