@@ -371,7 +371,8 @@ Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), 
   // Today's actions, newest first.
   const ACT = { app: "برنامه باز شد", show: "برگشت به برنامه", hide: "از برنامه بیرون رفت", open: "ویدیو را باز کرد",
     play: "پخش", pause: "توقف", home: "برگشت به صفحهٔ اصلی", end: "ویدیو تمام شد", again: "دوباره از اول (بعد از پایان)",
-    restart: "دکمهٔ از اول", timeup: "وقت تمام شد ⏰", rotate: "چرخاندن تصویر", error: "ویدیو باز نشد" };
+    restart: "دکمهٔ از اول", timeup: "وقت تمام شد ⏰", rotate: "چرخاندن تصویر", error: "ویدیو باز نشد", page: "ورق زد" };
+  const topicTitle = Object.fromEntries((data.topics || []).map((t) => [t.key, t]));
   const clock = (ms) => new Date(ms).toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" });
   const mmss = (sec) => `${fa(Math.floor(sec / 60))}:${fa(sec % 60).padStart(2, "۰")}`;
   const events = ((all && all.log) || []).slice().reverse();
@@ -381,6 +382,7 @@ Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), 
     if (["app", "show", "hide", "rotate"].includes(e.a)) tr.className = "quiet";
     let what = ACT[e.a] || e.a;
     if (e.a === "open" && e.from) what += ` (ادامه از ${mmss(e.from)})`;
+    if (e.a === "page") what += `: ${e.s === "today" ? "⭐ فهرست امروز" : ((topicTitle[e.s] || {}).icon || "") + " " + ((topicTitle[e.s] || {}).title || e.s)}`;
     const v = e.v ? (info[e.v] || { title: "ویدیویی که دیگر در فهرست نیست" }).title : "";
     tr.append(cell(clock(e.at), "n"), cell(what), cell(v, v ? "t" : ""), cell(e.w ? mmss(e.w) : "", "n"),
       cell(e.t != null && e.v ? mmss(e.t) : "", "n"), cell(e.dl || ""));

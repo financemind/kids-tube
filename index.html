@@ -41,7 +41,7 @@ body {
 button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
 button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 /* TV remote: the picked picture grows and gets a thick yellow ring. */
-.video:focus-visible { outline: 8px solid var(--sun); outline-offset: 4px; transform: scale(1.04); transition: transform .15s; }
+.video:focus-visible, .video:focus { outline: 8px solid var(--sun); outline-offset: 4px; transform: scale(1.05); transition: transform .15s; z-index: 1; }
 
 .home {
   max-width: 1200px; margin: 0 auto;
@@ -69,6 +69,11 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .today-topic { justify-self: start; margin: 0; display: inline-flex; align-items: center; gap: 8px; background: var(--card);
   border-radius: 99px; padding: 4px 16px 4px 10px; box-shadow: 0 4px 0 var(--shade); font: 700 17px/1.4 var(--body); }
 .today-topic b { font-size: 32px; line-height: 1; }
+/* A new page slides in from the side the child pressed. */
+.grid.slide-l { animation: slideL .35s ease-out; }
+.grid.slide-r { animation: slideR .35s ease-out; }
+@keyframes slideL { from { transform: translateX(60px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes slideR { from { transform: translateX(-60px); opacity: 0; } to { transform: none; opacity: 1; } }
 .video .topic { position: absolute; top: 6px; right: 8px; font-size: 40px; line-height: 1; filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
 .video.picked { outline: 8px solid var(--sun); outline-offset: 4px; }
 .video {
@@ -399,15 +404,31 @@ function topicOfDay() {
   if (!ts.length) return null;
   return ts[Math.floor(seeded("topic" + dayKey())() * ts.length)];
 }
-function dailyList() {
-  const seen = new Set(), pool = [];
+/* Pages: page 0 is today's mixed list; each further page is 16 videos from one
+   more topic. On the TV remote, pressing right past the last picture of a row
+   opens the next page, left past the first picture goes back. */
+let page = 0;
+const topicByKey = (key) => (data.topics || []).find((t) => t.key === key);
+function pageTopics() { // the day's order of topics, the topic of the day first
+  const ts = (data.topics || []).filter((t) => t.videos.length >= 8), rnd = seeded("pages" + dayKey());
+  const order = ts.map((t) => ({ t, r: rnd() })).sort((a, b) => a.r - b.r).map((x) => x.t);
+  const tod = topicOfDay();
+  return tod ? [tod, ...order.filter((t) => t !== tod)] : order;
+}
+const pageTopic = () => (page > 0 ? pageTopics()[(page - 1) % pageTopics().length] : null);
+const currentList = () => dailyList(pageTopic() ? pageTopic().key : null);
+function dailyList(topicKey = null) {
+  const seen = new Set(), pool = [], only = topicKey && topicByKey(topicKey);
   const add = (v, show) => { if (!seen.has(v.id)) { seen.add(v.id); pool.push({ ...v, show }); } };
-  for (const c of data.categories) for (const v of c.videos) add(v, c.key);
-  for (const tp of data.topics || []) for (const v of tp.videos) add(v, v.show);
-  const k = cfg(), size = k.size || 6, rnd = seeded(dayKey());
+  if (only) for (const v of only.videos) add(v, v.show);
+  else {
+    for (const c of data.categories) for (const v of c.videos) add(v, c.key);
+    for (const tp of data.topics || []) for (const v of tp.videos) add(v, v.show);
+  }
+  const k = cfg(), size = k.size || 6, rnd = seeded(dayKey() + (only ? only.key : ""));
   let cands = pool.map((v) => ({ v, w: score(v) * fit(v) })).filter((x) => x.w > 0);
   const perShow = {}, list = [], got = { exciting: 0, fantasy: 0, learn: 0, calm: 0, topic: 0 };
-  const today = topicOfDay(), inTopic = new Set(today ? today.videos.map((v) => v.id) : []);
+  const today = only || topicOfDay(), inTopic = new Set(today ? today.videos.map((v) => v.id) : []);
   while (list.length < size && cands.length) {
     // Weighted draw: a higher score means a better chance; balance() keeps the day's mix.
     const wantTopic = got.topic < (k.topicPerDay ?? 4);
@@ -473,10 +494,11 @@ function renderGrid() {
     fitGrid();
     return;
   }
-  const tod = topicOfDay();
-  $("todayTopic").hidden = !tod;
-  if (tod) $("todayTopic").innerHTML = `<b aria-hidden="true">${tod.icon}</b>موضوع امروز: ${tod.title}`;
-  for (const v of dailyList()) {
+  const tod = topicOfDay(), pt = pageTopic();
+  $("todayTopic").hidden = !tod && !pt;
+  if (pt) $("todayTopic").innerHTML = `<b aria-hidden="true">${pt.icon}</b>${pt.title}`;
+  else if (tod) $("todayTopic").innerHTML = `<b aria-hidden="true">⭐</b>فهرست امروز · موضوع امروز: ${tod.icon} ${tod.title}`;
+  for (const v of currentList()) {
     const b = document.createElement("button");
     b.className = "video";
     // Picture only: the child can't read. The title stays for screen readers.
@@ -575,7 +597,7 @@ function onTick() {
    skipping shows that reached their limit. */
 let autoNext = null;
 function nextVideo() {
-  const list = dailyList(), i = list.findIndex((v) => v.id === playingId);
+  const list = currentList(), i = list.findIndex((v) => v.id === playingId);
   for (let j = 1; j <= list.length; j++) {
     const v = list[(i + j + list.length) % list.length], c = showOf(v.show);
     if (v.id !== playingId && c && allowed(c)) return { v, c };
@@ -729,7 +751,24 @@ function moveFocus(dir) {
     const d = along + across * 2;
     if (d < bestD) { bestD = d; best = b; }
   }
-  if (best) { best.focus(); best.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+  if (best) { best.focus(); best.scrollIntoView({ block: "center", behavior: "smooth" }); return; }
+  // Past the right or left edge of a row of pictures: show the next or previous 16.
+  const tiles = [...$("grid").children], at = tiles.indexOf(cur);
+  if (at >= 0 && (dir === "ArrowRight" || dir === "ArrowLeft")) turnPage(dir === "ArrowRight" ? 1 : -1, at);
+}
+function turnPage(step, at) {
+  const pages = pageTopics().length + 1;
+  page = (page + step + pages) % pages;
+  logAction("page", { s: pageTopic() ? pageTopic().key : "today" });
+  const cols = getComputedStyle($("grid")).gridTemplateColumns.split(" ").length;
+  const row = Math.floor(at / cols);
+  renderGrid();
+  const tiles = [...$("grid").children];
+  // Enter the new page on the same row, from the side the child came from.
+  const target = tiles[Math.min(tiles.length - 1, row * cols + (step > 0 ? 0 : cols - 1))] || tiles[0];
+  if (target) { target.focus(); target.scrollIntoView({ block: "center", behavior: "smooth" }); }
+  $("grid").classList.remove("slide-l", "slide-r"); void $("grid").offsetWidth;
+  $("grid").classList.add(step > 0 ? "slide-l" : "slide-r");
 }
 /* Number keys on the remote open that picture: 1-9 at once; for 10-16 press
    two numbers quickly (after "1" it waits a moment for a second number). */
