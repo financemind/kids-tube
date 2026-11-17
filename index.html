@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icon-180.png">
-<meta name="theme-color" content="#dff1ff">
+<meta name="theme-color" content="#dcf2d8">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -19,7 +19,7 @@
 <style>
 /* Layout: big show buttons on top, a grid of large thumbnails below; the player covers the whole screen. */
 :root {
-  --sky: #dff1ff;
+  --sky: #dcf2d8;
   --ink: #1d2b4f;
   --sun: #ffc93c;
   --tomato: #ff6b5b;
@@ -93,7 +93,7 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .video img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: var(--shade); }
 .video img { border-radius: 19px; }
 /* Pictures are shown with weak colours, so the brightest thumbnail does not win the child's choice. */
-.video img { filter: saturate(.35); }
+.video img { filter: saturate(.5); }
 
 /* Top row: today's topic on one side, the time circles in the other corner. */
 .top { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap-reverse; }
@@ -109,6 +109,26 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .track.last { --c: var(--tomato); }
 .track.waiting { opacity: .45; }
 .left-text { margin: 0; font-size: 13px; opacity: .6; }
+/* TV and big screens: two parts. Videos on the right, a big clock on the left.
+   The clock's coloured slice is the time left in this turn; its hand ticks
+   every second, so it is clear the clock is alive. */
+.bigclock { display: none; }
+.home.fit { grid-template-columns: minmax(0, 1fr) clamp(260px, 30vw, 560px); grid-template-rows: auto 1fr; column-gap: 32px; align-items: start; }
+.home.fit .top { display: contents; }
+.home.fit .today-topic { grid-column: 1; grid-row: 1; }
+.home.fit .grid { grid-column: 1; grid-row: 2; }
+.home.fit .clock { grid-column: 2; grid-row: 1 / span 2; margin: 0; align-self: center; gap: 18px; }
+.home.fit .bigclock { display: block; position: relative; width: clamp(240px, 27vw, 520px); aspect-ratio: 1; border-radius: 50%;
+  border: 10px solid var(--card); box-shadow: 0 10px 0 var(--shade);
+  background: conic-gradient(var(--c, var(--leaf)) calc(var(--p, 1) * 1turn), #dfe7f0 0); transition: background .6s; }
+.home.fit .bigclock.low { --c: var(--sun); }
+.home.fit .bigclock.last { --c: var(--tomato); }
+.bigclock .hand { position: absolute; left: calc(50% - 4px); top: 9%; width: 8px; height: 41%; border-radius: 4px; background: var(--ink);
+  transform-origin: 50% 100%; animation: tick 60s steps(60) infinite; }
+.bigclock.still .hand { animation-play-state: paused; opacity: .35; }
+.bigclock .dot { position: absolute; left: calc(50% - 14px); top: calc(50% - 14px); width: 28px; height: 28px; border-radius: 50%; background: var(--ink); }
+@keyframes tick { to { transform: rotate(360deg); } }
+.home.fit .left-text { font-size: 20px; opacity: .75; }
 .rest { display: grid; justify-items: center; gap: 12px; padding-block: 12vh; text-align: center; }
 .rest .moon { font-size: clamp(110px, 22vw, 180px); line-height: 1; animation: bob 2.4s ease-in-out infinite; }
 .rest p { margin: 0; font-family: var(--body); font-weight: 700; font-size: 20px; opacity: .75; }
@@ -176,6 +196,7 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
   <div class="top">
     <p class="today-topic" id="todayTopic" hidden></p>
     <div class="clock">
+      <div class="bigclock" id="bigClock" aria-hidden="true"><i class="hand"></i><i class="dot"></i></div>
       <div class="tracks" id="tracks" role="img" aria-label="Watching time left today"></div>
       <p class="left-text" id="leftText"></p>
     </div>
@@ -434,7 +455,7 @@ function dailyList(topicKey = null) {
     for (const c of data.categories) for (const v of c.videos) add(v, c.key);
     for (const tp of data.topics || []) for (const v of tp.videos) add(v, v.show);
   }
-  const k = cfg(), size = k.size || 6, rnd = seeded(dayKey() + (only ? only.key : ""));
+  const k = cfg(), size = bigScreen() ? (k.tvSize || 9) : (k.size || 12), rnd = seeded(dayKey() + (only ? only.key : ""));
   let cands = pool.map((v) => ({ v, w: score(v) * fit(v) })).filter((x) => x.w > 0);
   const perShow = {}, list = [], got = { exciting: 0, fantasy: 0, learn: 0, calm: 0, topic: 0 };
   const today = only || topicOfDay(), inTopic = new Set(today ? today.videos.map((v) => v.id) : []);
@@ -477,6 +498,10 @@ function renderBudget() {
       + (i === st.turn && frac <= 1 / 3 ? " last" : i === st.turn && frac <= 2 / 3 ? " low" : "")
       + (i > st.turn || (st.mode === "break" && i === st.turn) ? " waiting" : "");
   });
+  const bc = $("bigClock");
+  const curFrac = st.mode === "watch" ? st.left / T : 0;
+  bc.style.setProperty("--p", curFrac.toFixed(3));
+  bc.className = "bigclock" + (curFrac <= 1 / 3 ? " last" : curFrac <= 2 / 3 ? " low" : "") + (st.mode === "watch" ? "" : " still");
   const fa = (x) => x.toLocaleString("fa-IR");
   let text = "";
   const nth = ["اول", "دوم", "سوم", "چهارم", "پنجم", "ششم", "هفتم", "هشتم"][st.turn] || fa(st.turn + 1);
@@ -521,9 +546,10 @@ function renderGrid() {
 
 /* On a big landscape screen (TV, laptop) pick the column count that gives the
    largest pictures while all of them fit on the screen without scrolling. */
+const bigScreen = () => innerWidth >= 900 && innerWidth >= innerHeight;
 function fitGrid() {
   const home = $("home"), grid = $("grid"), n = grid.children.length;
-  const big = innerWidth >= 900 && innerWidth >= innerHeight;
+  const big = bigScreen();
   home.classList.toggle("fit", big && n > 0);
   if (!big || !n || home.hidden) { grid.style.gridTemplateColumns = ""; return; }
   const gap = 14, frame = 10; // the white border around each picture
@@ -538,7 +564,12 @@ function fitGrid() {
   }
   grid.style.gridTemplateColumns = `repeat(${best.c}, ${Math.floor(best.w)}px)`;
 }
-addEventListener("resize", fitGrid);
+// Turning a tablet or resizing a window between phone and TV size redraws the list (12 or 9 videos).
+let wasBig = bigScreen();
+addEventListener("resize", () => {
+  if (bigScreen() !== wasBig && !$("home").hidden && data.categories.length) { wasBig = bigScreen(); renderGrid(); }
+  else fitGrid();
+});
 
 function showCover(html, bg) {
   const cv = $("cover");
