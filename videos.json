@@ -18,7 +18,8 @@
   "turnMinutes": 15,
   "breakTimes": 4,
   "topicPerDay": 3,
-  "tvSize": 9
+  "tvSize": 9,
+  "breakMinutes": 20
  },
  "topics": [
   {

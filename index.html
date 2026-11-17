@@ -383,13 +383,15 @@ function score(v) {
 }
 function todaySeconds() { return Object.values(watch[dayKey()] || {}).reduce((a, b) => a + b, 0); }
 
-/* Turns: the day has a few short turns with a break after each (breakTimes ×
+/* Turns: the day has a few short turns with a break after each (breakMinutes,
+   or breakTimes ×
    the turn length). Parents can set today's turns in the report (server
    plans); otherwise the default in videos.json. Only playing time counts. */
 function plan() {
   const p = (others.plans || {})[dayKey()];
   return p || { turns: cfg().turns || 4, minutes: cfg().turnMinutes || 15 };
 }
+const breakMinutes = () => cfg().breakMinutes ?? plan().minutes * (cfg().breakTimes || 4);
 const turnSecs = () => plan().minutes * 60;
 const turnCount = () => plan().turns;
 function turnEnds() { // when each finished turn ended today (ms timestamps); the earliest device wins
@@ -404,7 +406,7 @@ function timeState() {
   if (used > 0) {
     const ends = turnEnds();
     if (!ends[used - 1]) { ends[used - 1] = Date.now(); mine.turnEnds = { [dayKey()]: ends }; save("turnEnds", JSON.stringify(mine.turnEnds)); sync(); }
-    const until = ends[used - 1] + plan().minutes * (cfg().breakTimes || 4) * 60000;
+    const until = ends[used - 1] + breakMinutes() * 60000;
     if (Date.now() < until) return { mode: "break", turn: used, until };
   }
   return { mode: "watch", turn: used, left: (used + 1) * T - s };

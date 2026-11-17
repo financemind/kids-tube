@@ -251,7 +251,7 @@ function showPlan(daily, plans) {
   const def = { turns: daily.turns || 4, minutes: daily.turnMinutes || 15 };
   const today = (plans || {})[dayKey(0)];
   const p = today || def;
-  const brk = p.minutes * (daily.breakTimes || 4);
+  const brk = daily.breakMinutes ?? p.minutes * (daily.breakTimes || 4);
   $("planNow").textContent = `امروز: ${planText(p)}${today ? "" : " (پیش‌فرض)"} · بین نوبت‌ها ${dur(brk * 60)} استراحت. پیش‌فرض هر روز: ${planText(def)}.`;
   $("planTurns").value = p.turns; $("planMinutes").value = p.minutes;
   [...$("presets").children].forEach((b) => b.classList.toggle("on", +b.dataset.t === p.turns && +b.dataset.m === p.minutes));
