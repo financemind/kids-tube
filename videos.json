@@ -6,7 +6,7 @@
    "minLearn": 6,
    "minCalm": 6
   },
-  "size": 16,
+  "size": 12,
   "start": "2026-11-16",
   "perShow": 4,
   "perLessShow": 1,
@@ -17,7 +17,7 @@
   "turns": 4,
   "turnMinutes": 15,
   "breakTimes": 4,
-  "topicPerDay": 4
+  "topicPerDay": 3
  },
  "topics": [
   {

@@ -95,21 +95,20 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 /* Pictures are shown with weak colours, so the brightest thumbnail does not win the child's choice. */
 .video img { filter: saturate(.35); }
 
-/* Time left today: a big bar that shrinks from the sun toward the moon.
-   White lines split it into 10-minute pieces the child can see go away. */
-.budget { display: flex; align-items: center; gap: 12px; direction: ltr; }
-.budget .sun, .budget .moon-s { font-size: 40px; line-height: 1; }
-.track {
-  flex: 1; height: 38px; border-radius: 19px; background: var(--card); overflow: hidden; position: relative;
-  box-shadow: inset 0 3px 0 var(--shade);
-}
-.tracks { flex: 1; display: flex; gap: 14px; }
+/* Top row: today's topic on one side, the time circles in the other corner. */
+.top { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap-reverse; }
+.top .today-topic { white-space: nowrap; }
+/* Time left today: one circle per turn, like a clock; the coloured slice
+   of the current turn gets smaller while a video plays. */
+.clock { margin-inline-start: auto; display: grid; justify-items: center; gap: 4px; }
+.tracks { display: flex; align-items: center; gap: 10px; direction: ltr; }
+.track { width: 46px; height: 46px; border-radius: 50%; border: 4px solid var(--card); box-shadow: 0 4px 0 var(--shade);
+  background: conic-gradient(var(--c, var(--leaf)) calc(var(--p, 1) * 1turn), #dfe7f0 0); transition: width .3s, height .3s; }
+.track.now { width: 72px; height: 72px; }
+.track.low { --c: var(--sun); }
+.track.last { --c: var(--tomato); }
 .track.waiting { opacity: .45; }
-.track i { display: block; height: 100%; width: 100%; background: var(--leaf); border-radius: 19px; transition: width .6s, background .6s; }
-.track i.low { background: var(--sun); }
-.track i.last { background: var(--tomato); }
-.track::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(var(--piece) - 2px), var(--card) calc(var(--piece) - 2px) calc(var(--piece) + 2px), transparent calc(var(--piece) + 2px)); }
-.left-text { margin: -10px 0 0; text-align: center; font-size: 14px; opacity: .6; }
+.left-text { margin: 0; font-size: 13px; opacity: .6; }
 .rest { display: grid; justify-items: center; gap: 12px; padding-block: 12vh; text-align: center; }
 .rest .moon { font-size: clamp(110px, 22vw, 180px); line-height: 1; animation: bob 2.4s ease-in-out infinite; }
 .rest p { margin: 0; font-family: var(--body); font-weight: 700; font-size: 20px; opacity: .75; }
@@ -174,13 +173,13 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 <main class="home" id="home">
   <button class="pagebtn prev" id="prevPage" aria-label="Previous videos"><svg viewBox="0 0 24 24"><path d="M15.5 4 7 12l8.5 8 1.9-2-6.4-6 6.4-6z"/></svg></button>
   <button class="pagebtn next" id="nextPage" aria-label="More videos"><svg viewBox="0 0 24 24"><path d="M8.5 4 17 12l-8.5 8-1.9-2 6.4-6-6.4-6z"/></svg></button>
-  <div class="budget" id="budget" role="img" aria-label="Watching time left today">
-    <span class="sun" aria-hidden="true">☀️</span>
-    <div class="tracks" id="tracks"></div>
-    <span class="moon-s" aria-hidden="true">🌙</span>
+  <div class="top">
+    <p class="today-topic" id="todayTopic" hidden></p>
+    <div class="clock">
+      <div class="tracks" id="tracks" role="img" aria-label="Watching time left today"></div>
+      <p class="left-text" id="leftText"></p>
+    </div>
   </div>
-  <p class="left-text" id="leftText"></p>
-  <p class="today-topic" id="todayTopic" hidden></p>
   <section class="grid" id="grid" aria-live="polite"></section>
   <section class="rest" id="rest" hidden><div class="moon" id="restIcon" aria-hidden="true">🌙</div><p id="restText">برای امروز بس است. فردا دوباره.</p></section>
 </main>
@@ -469,15 +468,14 @@ function renderBudget() {
   const st = timeState(), T = turnSecs(), n = turnCount(), box = $("tracks");
   if (box.children.length !== n) {
     box.innerHTML = "";
-    for (let i = 0; i < n; i++) box.insertAdjacentHTML("beforeend", '<div class="track"><i></i></div>');
+    for (let i = 0; i < n; i++) box.insertAdjacentHTML("beforeend", '<div class="track"></div>');
   }
   [...box.children].forEach((tr, i) => {
     const frac = i < st.turn ? 0 : i > st.turn ? 1 : st.mode === "watch" ? st.left / T : 1; // in a break the next turn waits, full
-    const bar = tr.firstChild;
-    bar.style.width = (100 * frac).toFixed(1) + "%";
-    bar.className = i === st.turn && frac <= 1 / 3 ? "last" : i === st.turn && frac <= 2 / 3 ? "low" : "";
-    tr.classList.toggle("waiting", i > st.turn || (st.mode === "break" && i === st.turn));
-    tr.style.setProperty("--piece", (100 / Math.max(1, Math.round(T / 600))).toFixed(3) + "%");
+    tr.style.setProperty("--p", frac.toFixed(3));
+    tr.className = "track" + (i === st.turn && st.mode === "watch" ? " now" : "")
+      + (i === st.turn && frac <= 1 / 3 ? " last" : i === st.turn && frac <= 2 / 3 ? " low" : "")
+      + (i > st.turn || (st.mode === "break" && i === st.turn) ? " waiting" : "");
   });
   const fa = (x) => x.toLocaleString("fa-IR");
   let text = "";
@@ -507,7 +505,7 @@ function renderGrid() {
   const tod = topicOfDay(), pt = pageTopic();
   $("todayTopic").hidden = !tod && !pt;
   if (pt) $("todayTopic").innerHTML = `<b aria-hidden="true">${pt.icon}</b>${pt.title}`;
-  else if (tod) $("todayTopic").innerHTML = `<b aria-hidden="true">⭐</b>فهرست امروز · موضوع امروز: ${tod.icon} ${tod.title}`;
+  else if (tod) $("todayTopic").innerHTML = `<b aria-hidden="true">${tod.icon}</b>موضوع امروز: ${tod.title}`;
   for (const v of currentList()) {
     const b = document.createElement("button");
     b.className = "video";

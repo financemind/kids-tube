@@ -157,7 +157,7 @@ TOPICS = [
 # maxFantasy magical shows (real <= 2), and tries for at least minLearn
 # teaching shows (learn >= 4) and minCalm quiet shows (calm >= 4).
 # topicPerDay: how many of the day's videos come from the topic of the day.
-DAILY = {"topicPerDay": 4, "balance": {"maxExciting": 3, "maxFantasy": 5, "minLearn": 6, "minCalm": 6}, "size": 16, "start": "2026-11-16", "perShow": 4, "perLessShow": 1, "videoRestMinutes": 10, "videoHalfMinutes": 10, "showHalfMinutes": 20, "taperPerWeek": 0.7, "turns": 4, "turnMinutes": 15, "breakTimes": 4}
+DAILY = {"topicPerDay": 3, "balance": {"maxExciting": 3, "maxFantasy": 5, "minLearn": 6, "minCalm": 6}, "size": 12, "start": "2026-11-16", "perShow": 4, "perLessShow": 1, "videoRestMinutes": 10, "videoHalfMinutes": 10, "showHalfMinutes": 20, "taperPerWeek": 0.7, "turns": 4, "turnMinutes": 15, "breakTimes": 4}
 
 MAX_MINUTES = 60
 NS = {"a": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015"}
