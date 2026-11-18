@@ -200,12 +200,13 @@ async function resetToday() {
   }
 }
 async function getDevices(again = true) {
-  const device = localStorage.getItem("device");
-  if (!device || !API) return null;
+  if (!API) return null;
+  // A browser that never opened the app has no device id: it only reads.
+  const device = localStorage.getItem("device"), readonly = !device;
   try {
     const resetSeen = Number(localStorage.getItem("resetSeen")) || 0;
     const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
-    const body = JSON.stringify({ device, all: true, label: localStorage.getItem("deviceLabel") || "", resetSeen, logSince: midnight.getTime(),
+    const body = JSON.stringify({ device: device || "viewer", readonly, all: true, label: localStorage.getItem("deviceLabel") || "", resetSeen, logSince: midnight.getTime(),
       data: { watch, vwatch, turnEnds: read("turnEnds") } });
     const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain" }, body });
     if (!r.ok) return null;

@@ -265,6 +265,17 @@ class Handler(BaseHTTPRequestHandler):
             assert isinstance(device, str) and KEY.match(device)
         except (ValueError, KeyError, AssertionError, TypeError):
             return self.reply(400, {"error": "bad request"})
+        if body.get("readonly") and body.get("all"):
+            # The report opened in a browser that never ran the app: show every
+            # device without adding this browser as a device.
+            since = body.get("logSince")
+            with lock:
+                result = {"me": None, "devices": load()}
+            if isinstance(since, (int, float)):
+                result["log"] = read_log(since)
+            reset, reset_day = reset_at()
+            result.update({"reset": 0, "resetDay": reset_day, "plans": load_plans(), "logged": 0})
+            return self.reply(200, result)
         label = body.get("label")
         mine = {"watch": clean_counts(data.get("watch")), "vwatch": clean_counts(data.get("vwatch")),
                 "turnEnds": clean_ends(data.get("turnEnds")), "pos": clean_pos(data.get("pos")),
