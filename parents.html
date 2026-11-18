@@ -246,7 +246,7 @@ function emptyRow(tbody, cols, text) {
 $("resetBtn").onclick = resetToday;
 
 /* Today's turns: quick picks or any count × minutes. Saved on the server for every device. */
-const PRESETS = [[2, 30], [3, 30], [4, 15], [6, 15]];
+const PRESETS = [[2, 30], [3, 25], [3, 30], [4, 15], [5, 20], [6, 15]];
 function planText(p) { return `${fa(p.turns)} نوبت ${fa(p.minutes)} دقیقه‌ای`; }
 function showPlan(daily, plans) {
   const def = { turns: daily.turns || 4, minutes: daily.turnMinutes || 15 };
@@ -273,7 +273,7 @@ async function savePlan(daily, turns, minutes) {
 }
 function setupPlan(daily, plans) {
   for (let n = 1; n <= 8; n++) $("planTurns").insertAdjacentHTML("beforeend", `<option value="${n}">${fa(n)}</option>`);
-  for (const m of [10, 15, 20, 30, 45, 60]) $("planMinutes").insertAdjacentHTML("beforeend", `<option value="${m}">${fa(m)}</option>`);
+  for (const m of [10, 15, 20, 25, 30, 45, 60]) $("planMinutes").insertAdjacentHTML("beforeend", `<option value="${m}">${fa(m)}</option>`);
   for (const [t, m] of PRESETS) {
     const b = document.createElement("button");
     b.type = "button"; b.dataset.t = t; b.dataset.m = m; b.textContent = planText({ turns: t, minutes: m });
