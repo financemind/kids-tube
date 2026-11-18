@@ -1,4 +1,4 @@
-ntv.financemind.com {
+noyantv.com, ntv.financemind.com {
 	encode gzip
 	handle /api/* {
 		reverse_proxy 127.0.0.1:8080

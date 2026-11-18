@@ -254,7 +254,10 @@ function load(k) { if (PREVIEW) return memory.has(k) ? memory.get(k) : null; try
 // A copy opened on this computer for testing (localhost) never talks to the real
 // server, so tests do not count toward Noyan's time or show in the report.
 const LOCAL_TEST = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname) || location.hostname.endsWith(".localhost");
-const API = LOCAL_TEST || PREVIEW ? null : "https://ntv.financemind.com/api/sync";
+// On our own addresses the stats server is on the same site; elsewhere (the
+// GitHub copy) it is reached at ntv.financemind.com.
+const OWN_HOSTS = ["noyantv.com", "ntv.financemind.com"];
+const API = LOCAL_TEST || PREVIEW ? null : OWN_HOSTS.includes(location.hostname) ? location.origin + "/api/sync" : "https://ntv.financemind.com/api/sync";
 function parse(k) { try { return JSON.parse(load(k) || "{}") || {}; } catch (e) { return {}; } }
 const mine = { watch: parse("watch"), vwatch: parse("vwatch"), turnEnds: parse("turnEnds"), pos: parse("pos") };
 /* Action log: every open, play, pause, home, end, time-up… with the time, the
