@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>پیش‌نمایش طراحی</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap">
+<style>
+/* Layout: a bar of device buttons on top; below it the app in real device sizes, scaled down to fit. */
+:root {
+  --bg: #2b3140;
+  --ink: #f3f6fb;
+  --muted: #aab3c5;
+  --bar: #4a6fd8;
+  --frame: #11141b;
+  --font: "Vazirmatn", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font); display: grid; grid-template-rows: auto 1fr; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px; }
+h1 { font-size: 18px; margin: 0 0 0 auto; }
+header button, header a { font: inherit; font-weight: 700; color: var(--ink); background: transparent; border: 2px solid #4b5468; border-radius: 10px; padding: 6px 12px; cursor: pointer; text-decoration: none; }
+header button.on { background: var(--bar); border-color: var(--bar); }
+.note { width: 100%; margin: 0; color: var(--muted); font-size: 13px; }
+main { position: relative; overflow: auto; padding: 8px 16px 24px; display: flex; flex-wrap: wrap; gap: 24px; justify-content: center; align-items: flex-start; }
+figure { margin: 0; display: grid; gap: 6px; justify-items: center; }
+figcaption { color: var(--muted); font-size: 13px; direction: ltr; }
+.device { background: var(--frame); border-radius: 18px; padding: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.screen { position: relative; overflow: hidden; border-radius: 8px; background: #fff; }
+.screen iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>پیش‌نمایش طراحی</h1>
+  <button type="button" data-show="all" class="on">همه</button>
+  <button type="button" data-show="tv">تلویزیون</button>
+  <button type="button" data-show="tablet">تبلت افقی</button>
+  <button type="button" data-show="tabletp">تبلت عمودی</button>
+  <button type="button" data-show="phone">گوشی</button>
+  <button type="button" id="reload">تازه کردن</button>
+  <a href="./">برگشت به برنامه</a>
+  <p class="note">هر صفحه همان برنامهٔ واقعی است، در اندازهٔ واقعی آن دستگاه، کوچک‌شده تا جا شود. اینجا هیچ چیزی به سرور نمی‌رود و از وقت نویان کم نمی‌شود.</p>
+</header>
+<main id="stage"></main>
+
+<script>
+const DEVICES = [
+  { key: "tv", name: "TV 1920 × 1080", w: 1920, h: 1080 },
+  { key: "tablet", name: "Tablet 1180 × 820", w: 1180, h: 820 },
+  { key: "tabletp", name: "Tablet 820 × 1180", w: 820, h: 1180 },
+  { key: "phone", name: "Phone 390 × 844", w: 390, h: 844 },
+];
+let show = "all";
+const frames = {};
+
+function build() {
+  const stage = document.getElementById("stage");
+  for (const d of DEVICES) {
+    const fig = document.createElement("figure");
+    fig.innerHTML = `<div class="device"><div class="screen"><iframe title="${d.name}" src="index.html?preview" width="${d.w}" height="${d.h}"
+      allow="autoplay; encrypted-media"></iframe></div></div><figcaption>${d.name}</figcaption>`;
+    stage.appendChild(fig);
+    frames[d.key] = { d, fig, screen: fig.querySelector(".screen"), iframe: fig.querySelector("iframe") };
+  }
+}
+
+// Scale each device so the visible ones fit the window: one device fills the
+// space; "all" puts them side by side at one shared height.
+function layout() {
+  const stage = document.getElementById("stage");
+  const W = stage.clientWidth - 32, H = stage.clientHeight - 60;
+  const visible = DEVICES.filter((d) => show === "all" || d.key === show);
+  let scaleOf;
+  if (visible.length === 1) {
+    const d = visible[0], s = Math.min(1, (W - 20) / d.w, (H - 20) / d.h);
+    scaleOf = () => s;
+  } else {
+    // Same screen height for all; pick the height that makes the row fit.
+    const gaps = 24 * (visible.length - 1) + 20 * visible.length;
+    const ratioSum = visible.reduce((a, d) => a + d.w / d.h, 0);
+    const h = Math.max(160, Math.min(H - 20, ((W - gaps) / ratioSum) * 0.96));
+    scaleOf = (d) => h / d.h;
+  }
+  for (const { d, fig, screen, iframe } of Object.values(frames)) {
+    const on = visible.includes(d);
+    fig.hidden = !on;
+    if (!on) continue;
+    const s = scaleOf(d);
+    screen.style.width = Math.round(d.w * s) + "px";
+    screen.style.height = Math.round(d.h * s) + "px";
+    iframe.style.transform = `scale(${s})`;
+  }
+}
+
+document.querySelectorAll("[data-show]").forEach((b) => b.onclick = () => {
+  show = b.dataset.show;
+  document.querySelectorAll("[data-show]").forEach((x) => x.classList.toggle("on", x === b));
+  layout();
+});
+document.getElementById("reload").onclick = () => Object.values(frames).forEach(({ iframe }) => iframe.contentWindow.location.reload());
+addEventListener("resize", layout);
+build();
+layout();
+</script>
+</body>
+</html>
