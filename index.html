@@ -49,7 +49,7 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
   padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right));
   display: grid; grid-template-rows: auto 1fr auto; gap: 8px;
 }
-.home > .grid { align-self: center; }
+.home > .grid { align-self: stretch; }
 .parents {
   position: fixed; left: calc(10px + env(safe-area-inset-left, 0px)); bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   width: 40px; height: 40px; border-radius: 50%; opacity: .35; display: grid; place-items: center;
@@ -59,12 +59,23 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .parents.holding { opacity: 1; background: var(--sun); transition: background 2s; }
 
 /* One horizontal row of pictures that scrolls sideways (finger or remote). */
-/* Room around every picture so the yellow frame (and the small grow when
-   picked) never gets cut off, and space between the pictures. */
-.grid { display: flex; gap: 40px; direction: ltr; overflow-x: auto; overflow-y: hidden; position: relative;
-  padding: 34px 44px 44px; scrollbar-width: none; scroll-padding-inline: 44px; }
+/* The videos: one big list, one under the other, that scrolls up and down
+   (finger or remote). Room around every picture so the yellow frame never
+   gets cut off, and space between the pictures. */
+.grid { display: flex; flex-direction: column; align-items: center; gap: 40px; direction: ltr; overflow-y: auto; overflow-x: hidden;
+  position: relative; height: var(--listh, 60vh); padding: 30px 40px 40px; scrollbar-width: none; }
 .grid::-webkit-scrollbar { display: none; }
-.grid .video { flex: 0 0 var(--tile, min(78vw, 520px)); }
+.grid .video { flex: 0 0 auto; width: var(--tile, 100%); }
+/* TV and big screens: the big clock on the left half, the list on the right. */
+.home.fit { direction: ltr; grid-template-columns: var(--clockcol, 40vw) minmax(0, 1fr); grid-template-rows: 1fr auto; column-gap: 24px;
+  align-items: center; padding-block: 16px; }
+.home.fit .top { grid-column: 1; grid-row: 1; justify-content: center; }
+.home.fit .clock { grid-template-columns: auto; justify-items: center; row-gap: 18px; }
+.home.fit .bigclock { grid-row: auto; }
+.home.fit .tracks { align-self: auto; gap: 14px; }
+.home.fit .track { width: calc(var(--clock) * .13); height: calc(var(--clock) * .13); }
+.home.fit .grid { grid-column: 2; grid-row: 1; }
+.home.fit .rest { grid-column: 2; grid-row: 1; direction: rtl; }
 
 /* TV remote: each picture shows its number, so pressing that number on the remote opens it. */
 .video .num { position: absolute; top: 8px; left: 8px; min-width: 44px; height: 44px; padding: 0 8px; border-radius: 22px;
@@ -92,9 +103,9 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 /* Pictures are shown with weak colours, so the brightest thumbnail does not win the child's choice. */
 .video img { filter: saturate(.5); }
 
-/* Home screen redesign: a slim top bar with the time clock and today's
-   topic, then one big row of pictures filling the rest of the screen. Sizes
-   (--clock, --tile) are worked out from the screen in fitGrid(). */
+/* Home screen: the time clock (on TV a big one on the left, on phones on
+   top) and the list of big videos. Sizes (--clock, --tile, --listh) are
+   worked out from the screen in fitGrid(). */
 .top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .top .today-topic { display: none !important; } /* the parents asked for no topic label at the top */
 .top { justify-content: flex-end; }
@@ -102,23 +113,52 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
    ticks every second, so it is clear it is alive. Small circles beside it
    show all of today's turns. */
 .clock { display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 14px; row-gap: 6px; align-items: center; direction: ltr; }
-.bigclock { grid-row: 1 / span 2; position: relative; width: var(--clock, 92px); aspect-ratio: 1; border-radius: 50%;
-  border: calc(var(--clock, 92px) * .05) solid var(--card); box-shadow: 0 6px 0 var(--shade);
-  background: conic-gradient(var(--c, var(--leaf)) calc(var(--p, 1) * 1turn), #dfe7f0 0); transition: background .6s; }
-.bigclock.low { --c: var(--sun); }
-.bigclock.last { --c: var(--tomato); }
+/* Christmas clock: a red-and-white candy-cane ring, a green slice for the
+   time left on a snowy face, a gold star on top and a red hand. */
+.bigclock { grid-row: 1 / span 2; position: relative; width: var(--clock, 92px); aspect-ratio: 1; border-radius: 50%; --c: #1e9b4f;
+  background: repeating-conic-gradient(#d62839 0 9deg, #fff 9deg 18deg);
+  box-shadow: 0 calc(var(--clock, 92px) * .05) 0 var(--shade);
+  margin: calc(var(--clock, 92px) * .16) calc(var(--clock, 92px) * .04) calc(var(--clock, 92px) * .04); } /* room for the star */
+.bigclock::before { content: ""; position: absolute; inset: calc(var(--clock, 92px) * .085); border-radius: 50%;
+  border: calc(var(--clock, 92px) * .03) solid #fff; transition: background .6s;
+  background: conic-gradient(var(--c) calc(var(--p, 1) * 1turn), #fff8ee 0); }
+.bigclock::after { content: "⭐"; position: absolute; left: 50%; top: calc(var(--clock, 92px) * -.15); transform: translateX(-50%);
+  font-size: calc(var(--clock, 92px) * .2); line-height: 1; filter: drop-shadow(0 2px 2px rgba(0,0,0,.25)); }
+.bigclock.low { --c: #f4b400; }
+.bigclock.last { --c: #d62839; }
 .bigclock .hand { position: absolute; left: calc(50% - var(--clock, 92px) * .022); top: 9%; width: calc(var(--clock, 92px) * .044); height: 41%;
-  border-radius: 99px; background: var(--ink); transform-origin: 50% 100%; animation: tick 60s steps(60) infinite; }
+  border-radius: 99px; background: #a4161a; transform-origin: 50% 100%; animation: tick 60s steps(60) infinite; }
 .bigclock.still .hand { animation-play-state: paused; opacity: .35; }
 .bigclock .dot { position: absolute; left: calc(50% - var(--clock, 92px) * .07); top: calc(50% - var(--clock, 92px) * .07);
-  width: calc(var(--clock, 92px) * .14); height: calc(var(--clock, 92px) * .14); border-radius: 50%; background: var(--ink); }
+  width: calc(var(--clock, 92px) * .14); height: calc(var(--clock, 92px) * .14); border-radius: 50%; background: #f4c430;
+  box-shadow: 0 0 0 calc(var(--clock, 92px) * .02) #a4161a; }
+/* Balloon game: balloons in the four remote colours float up a blue sky;
+   pressing a colour key (or tapping a balloon or a dot) pops one of that colour. */
+.game { position: fixed; inset: 0; z-index: 6; background: linear-gradient(#8fd3ff, #d9f2ff 70%, #c9ecc0); overflow: hidden; }
+.sky { position: absolute; inset: 0; }
+.balloon { position: absolute; width: var(--bw); height: calc(var(--bw) * 1.22); border-radius: 50% 50% 48% 52% / 58% 58% 42% 42%;
+  background: radial-gradient(circle at 32% 28%, rgba(255,255,255,.75) 0 9%, transparent 10%), var(--col);
+  box-shadow: inset -8px -10px 0 rgba(0,0,0,.12); cursor: pointer; }
+.balloon::after { content: ""; position: absolute; left: 50%; bottom: calc(var(--bw) * -.55); width: 2px; height: calc(var(--bw) * .55); background: rgba(29,43,79,.45); }
+.balloon::before { content: ""; position: absolute; left: calc(50% - 7px); bottom: -8px; border: 7px solid transparent; border-bottom: 10px solid var(--col); transform: rotate(180deg); }
+.balloon.pop { animation: pop .28s ease-out forwards; pointer-events: none; }
+@keyframes pop { to { transform: scale(1.6); opacity: 0; } }
+.bit { position: absolute; width: 14px; height: 14px; border-radius: 3px; animation: bit .8s ease-out forwards; pointer-events: none; }
+@keyframes bit { to { transform: translate(var(--dx), var(--dy)) rotate(260deg); opacity: 0; } }
+.keys { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; gap: 26px; direction: ltr; }
+.keys .k { display: block; width: 64px; height: 64px; border-radius: 50%; border: 5px solid #fff; box-shadow: 0 5px 0 rgba(0,0,0,.18); cursor: pointer; }
+.k.red { background: #e63946; } .k.green { background: #2a9d4b; } .k.yellow { background: #f6c90e; } .k.blue { background: #2f7fe0; }
+.gamehome { position: absolute; top: max(16px, env(safe-area-inset-top)); left: 16px; }
+.game .done { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; }
+.video.gamecard { display: grid; place-items: center; aspect-ratio: 16 / 9; background: linear-gradient(#8fd3ff, #d9f2ff); font-size: calc(var(--tile, 300px) * .2); }
 @keyframes tick { to { transform: rotate(360deg); } }
 .tracks { align-self: end; display: flex; align-items: center; gap: 8px; }
 .track { width: calc(var(--clock, 92px) * .24); height: calc(var(--clock, 92px) * .24); border-radius: 50%; border: 3px solid var(--card);
   box-shadow: 0 3px 0 var(--shade); background: conic-gradient(var(--c, var(--leaf)) calc(var(--p, 1) * 1turn), #dfe7f0 0); }
 .track.now { outline: 3px solid var(--ink); outline-offset: 1px; }
-.track.low { --c: var(--sun); }
-.track.last { --c: var(--tomato); }
+.track { --c: #1e9b4f; }
+.track.low { --c: #f4b400; }
+.track.last { --c: #d62839; }
 .track.waiting { opacity: .45; }
 .left-text { align-self: start; margin: 0; direction: rtl; font-size: clamp(13px, calc(var(--clock, 92px) * .1), 22px); opacity: .7; }
 .top .today-topic { font-size: clamp(16px, calc(var(--clock, 92px) * .13), 28px); }
@@ -204,6 +244,11 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 
 <button class="parents" id="parentsBtn" aria-label="Parents: hold for 2 seconds"><svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 1 1 6 0v3z"/></svg></button>
 
+<section class="game" id="game" hidden aria-label="Balloon game">
+  <div class="sky" id="sky"></div>
+  <div class="keys" aria-hidden="true"><i class="k red"></i><i class="k green"></i><i class="k yellow"></i><i class="k blue"></i></div>
+  <button class="round home-btn gamehome" id="gameHome" aria-label="Back to videos"><svg viewBox="0 0 24 24"><path d="M12 3 2 12h3v8h5v-5h4v5h5v-8h3z"/></svg></button>
+</section>
 <section class="stage" id="stage" hidden>
   <div class="frame">
     <div id="player"></div>
@@ -544,6 +589,12 @@ function renderGrid() {
   $("todayTopic").hidden = !tod && !pt;
   if (pt) $("todayTopic").innerHTML = `<b aria-hidden="true">${pt.icon}</b>${pt.title}`;
   else if (tod) $("todayTopic").innerHTML = `<b aria-hidden="true">${tod.icon}</b>موضوع امروز: ${tod.title}`;
+  // The balloon game, first in the list.
+  const g = document.createElement("button");
+  g.className = "video gamecard"; g.setAttribute("aria-label", "Balloon game");
+  g.innerHTML = `<span aria-hidden="true">🎈🎈🎈</span>`;
+  g.onclick = startGame;
+  $("grid").appendChild(g);
   for (const v of currentList()) {
     const b = document.createElement("button");
     b.className = "video";
@@ -569,16 +620,24 @@ function fitGrid() {
   const big = bigScreen();
   home.classList.toggle("fit", big && n > 0);
   if (!n || home.hidden) return;
-  // Clock: about a fifth of the screen height on TV, smaller on phones.
-  const W = innerWidth, H = innerHeight, side = big ? 32 : 16, frame = 10;
-  const clock = Math.round(big ? Math.max(130, Math.min(300, H * 0.25)) : Math.max(90, Math.min(140, Math.min(W, H) * 0.27)));
-  // Pictures: as tall as the space under the top bar allows, while a part of
-  // the next picture still shows at the side.
-  const rowH = H - 14 - clock - 8 - 78 - 18 - 12; // top padding, top bar, gap, row padding, bottom padding, spare
-  const byHeight = (rowH - frame) * 16 / 9 + frame;
-  const byWidth = (W - side * 2 - 88) / (big ? 1.3 : 1.08);
-  home.style.setProperty("--clock", clock + "px");
-  home.style.setProperty("--tile", Math.floor(Math.max(200, Math.min(byHeight, byWidth))) + "px");
+  const W = innerWidth, H = innerHeight, frame = 10, pad = big ? 80 : 48;
+  if (big) {
+    // TV: a really big clock on the left; on the right a list where one
+    // picture fills most of the height and the next one peeks in below.
+    const clock = Math.round(Math.min(H * 0.62, W * 0.34));
+    const colW = W - 32 - (clock + 40) - 24;
+    const w = Math.min(colW - pad, ((H - 32 - 70) / 1.3 - frame) * 16 / 9 + frame);
+    home.style.setProperty("--clock", clock + "px");
+    home.style.setProperty("--clockcol", clock + 40 + "px");
+    home.style.setProperty("--listh", H - 32 + "px");
+    home.style.setProperty("--tile", Math.floor(w) + "px");
+  } else {
+    // Phone: the clock on top, the list under it filling the rest of the screen.
+    const clock = Math.round(Math.max(110, Math.min(180, W * 0.42)));
+    home.style.setProperty("--clock", clock + "px");
+    home.style.setProperty("--listh", Math.max(260, H - clock - 70) + "px");
+    home.style.setProperty("--tile", Math.floor(W - 32 - pad) + "px");
+  }
 }
 // Turning a tablet or resizing a window between phone and TV size redraws the list (12 or 9 videos).
 let wasBig = bigScreen();
@@ -813,8 +872,7 @@ function moveFocus(dir) {
 function centerTile(b) {
   const grid = $("grid");
   if (b.parentElement !== grid) return b.scrollIntoView({ block: "nearest" });
-  grid.scrollTo({ left: b.offsetLeft - (grid.clientWidth - b.offsetWidth) / 2, behavior: "smooth" }); // the row is position: relative, so offsetLeft is inside it
-  b.scrollIntoView({ block: "nearest" });
+  grid.scrollTo({ top: b.offsetTop - (grid.clientHeight - b.offsetHeight) / 2, behavior: "smooth" }); // the list is position: relative, so offsetTop is inside it
 }
 /* Some TV browsers move a mouse pointer with the remote's arrows instead of
    sending arrow keys. Then the yellow frame follows the pointer, and the big
@@ -871,7 +929,103 @@ function stepRow(step) {
    - the screens after a video: red = home, yellow = next video / again. */
 const COLOR_KEYS = { 403: "red", 404: "green", 405: "yellow", 406: "blue",
   ColorF0Red: "red", ColorF1Green: "green", ColorF2Yellow: "yellow", ColorF3Blue: "blue" };
+/* ---- Balloon game ---- */
+const BALLOON = { red: "#e63946", green: "#2a9d4b", yellow: "#f6c90e", blue: "#2f7fe0" };
+const GAME_POPS = 25, GAME_SECONDS = 180; // the game ends by itself after this many pops or seconds
+let game = null;
+function popSound(color) {
+  const a = audioCtx();
+  if (!a) return;
+  const t = a.currentTime, base = { red: 523, green: 659, yellow: 784, blue: 988 }[color] || 660;
+  bell(a, base, t, 0.35, 0.18); bell(a, base * 1.5, t + 0.08, 0.3, 0.12);
+}
+function spawnBalloon() {
+  if (!game) return;
+  const sky = $("sky"), colors = Object.keys(BALLOON);
+  const color = colors[Math.floor(Math.random() * 4)];
+  const bw = Math.round(Math.min(innerWidth, innerHeight) * 0.13 + 30);
+  const el = document.createElement("div");
+  el.className = "balloon"; el.dataset.color = color;
+  el.style.setProperty("--col", BALLOON[color]); el.style.setProperty("--bw", bw + "px");
+  const x = Math.random() * (innerWidth - bw - 40) + 20;
+  el.style.left = x + "px";
+  el.onclick = () => popBalloon(el);
+  sky.appendChild(el);
+  game.balloons.push({ el, y: innerHeight + 20, speed: innerHeight / (9 + Math.random() * 4), sway: Math.random() * 6.28, x });
+}
+function popBalloon(el) {
+  if (!game || el.classList.contains("pop")) return;
+  const color = el.dataset.color, r = el.getBoundingClientRect();
+  el.classList.add("pop");
+  popSound(color);
+  for (let i = 0; i < 12; i++) { // a little burst of coloured bits
+    const b = document.createElement("i");
+    b.className = "bit";
+    b.style.left = r.left + r.width / 2 + "px"; b.style.top = r.top + r.height / 2 + "px";
+    b.style.background = [BALLOON[color], "#fff", "#ffd166"][i % 3];
+    const ang = (i / 12) * 6.28, dist = 60 + Math.random() * 60;
+    b.style.setProperty("--dx", Math.cos(ang) * dist + "px"); b.style.setProperty("--dy", Math.sin(ang) * dist + "px");
+    $("sky").appendChild(b);
+    setTimeout(() => b.remove(), 900);
+  }
+  setTimeout(() => el.remove(), 300);
+  game.balloons = game.balloons.filter((x) => x.el !== el);
+  if (++game.pops >= GAME_POPS) endGame(true);
+}
+function popColor(color) { // the balloon of that colour that is highest up
+  if (!game) return;
+  const list = game.balloons.filter((b) => b.el.dataset.color === color).sort((a, b) => a.y - b.y);
+  if (list.length) popBalloon(list[0].el);
+}
+function gameFrame(t) {
+  if (!game) return;
+  const dt = Math.min(0.05, (t - (game.last || t)) / 1000); game.last = t;
+  for (const b of game.balloons) {
+    b.y -= b.speed * dt; b.sway += dt * 1.4;
+    b.el.style.transform = `translate(${Math.sin(b.sway) * 14}px, ${b.y}px)`;
+    if (b.y < -300) { b.el.remove(); b.gone = true; }
+  }
+  game.balloons = game.balloons.filter((b) => !b.gone);
+  game.raf = requestAnimationFrame(gameFrame);
+}
+function startGame() {
+  if (!canWatch()) return renderGrid();
+  playingId = null; playingCat = null;
+  $("home").hidden = true; $("game").hidden = false;
+  $("sky").innerHTML = "";
+  game = { balloons: [], pops: 0, seconds: 0 };
+  logAction("game");
+  for (let i = 0; i < 3; i++) setTimeout(spawnBalloon, i * 500);
+  game.spawn = setInterval(() => { if (game && game.balloons.length < 8) spawnBalloon(); }, 1300);
+  // The game uses today's time like a video.
+  game.clock = setInterval(() => {
+    if (!game) return;
+    addSecond("game", "game");
+    if (++game.seconds >= GAME_SECONDS) return endGame(true);
+    if (!canWatch()) { endGame(false); stopTimeUpGame(); }
+  }, 1000);
+  game.raf = requestAnimationFrame(gameFrame);
+}
+function stopTimeUpGame() { timeUpSound(); }
+function endGame(cheer) {
+  if (!game) return;
+  clearInterval(game.spawn); clearInterval(game.clock); cancelAnimationFrame(game.raf);
+  game = null;
+  if (cheer) {
+    $("sky").innerHTML = `<div class="done"><div class="pop">🎉</div></div>`;
+    [784, 988, 1175, 1568].forEach((f, i) => { const a = audioCtx(); if (a) bell(a, f, a.currentTime + i * 0.18, 1, 0.18); });
+    setTimeout(leaveGame, 2600);
+  } else leaveGame();
+}
+function leaveGame() {
+  if (game) endGame(false);
+  $("game").hidden = true; $("home").hidden = false;
+  renderGrid();
+}
+$("gameHome").onclick = leaveGame;
+document.querySelectorAll(".keys .k").forEach((k) => k.onclick = () => popColor(k.classList[1]));
 function onColor(c) {
+  if (!$("game").hidden) return popColor(c);
   const press = (b) => { if (b && focusables().includes(b)) b.click(); };
   if ($("stage").hidden) {
     if (c === "red") stepRow(-1);
@@ -897,6 +1051,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key.startsWith("Arrow")) { e.preventDefault(); moveFocus(e.key); return; }
   const onStage = !$("stage").hidden;
   if (BACK_KEYS.has(e.key) || BACK_CODES.has(e.keyCode)) {
+    if (!$("game").hidden) { e.preventDefault(); leaveGame(); return; }
     if (onStage) { e.preventDefault(); goHome(); }
     return;
   }
