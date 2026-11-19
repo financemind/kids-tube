@@ -41,14 +41,15 @@ body {
 button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
 button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 /* TV remote: the picked picture grows and gets a thick yellow ring. */
-.video:focus-visible, .video:focus { outline: 8px solid var(--sun); outline-offset: 4px; transform: scale(1.05); transition: transform .15s; z-index: 1; }
+.video:focus-visible, .video:focus { outline: 8px solid var(--sun); outline-offset: 5px; transform: scale(1.03); transition: transform .15s; z-index: 1; }
 
 .home {
-  max-width: 1200px; margin: 0 auto;
-  padding-block: max(16px, env(safe-area-inset-top)) 40px;
+  margin: 0 auto; min-height: 100vh; min-height: 100dvh;
+  padding-block: max(14px, env(safe-area-inset-top)) 18px;
   padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right));
-  display: grid; gap: 20px;
+  display: grid; grid-template-rows: auto 1fr auto; gap: 8px;
 }
+.home > .grid { align-self: center; }
 .parents {
   position: fixed; left: calc(10px + env(safe-area-inset-left, 0px)); bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   width: 40px; height: 40px; border-radius: 50%; opacity: .35; display: grid; place-items: center;
@@ -57,19 +58,14 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .parents svg { width: 20px; height: 20px; fill: var(--ink); }
 .parents.holding { opacity: 1; background: var(--sun); transition: background 2s; }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 20px; direction: ltr; }
-/* TV and big landscape screens: every picture fits on one screen, no scrolling (sizes set in fitGrid). */
-.home.fit { max-width: none; padding-bottom: 16px; gap: 12px; padding-left: 76px; padding-right: 76px; }
-/* Big arrows at the sides (TV and big screens): with a TV pointer, OK on an arrow turns the page. */
-.pagebtn { display: none; position: fixed; top: 50%; transform: translateY(-50%); width: 56px; height: 140px; border-radius: 28px;
-  background: var(--card); box-shadow: 0 6px 0 var(--shade); z-index: 2; place-items: center; }
-.pagebtn svg { width: 54px; height: 54px; fill: var(--ink); }
-.pagebtn.prev { left: 10px; }
-.pagebtn.next { right: 10px; }
-.pagebtn svg { width: 40px; height: 40px; }
-.home.fit .pagebtn { display: grid; }
-.pagebtn:hover { background: #fff4c7; outline: 6px solid var(--sun); }
-.home.fit .grid { gap: 14px; justify-content: center; }
+/* One horizontal row of pictures that scrolls sideways (finger or remote). */
+/* Room around every picture so the yellow frame (and the small grow when
+   picked) never gets cut off, and space between the pictures. */
+.grid { display: flex; gap: 40px; direction: ltr; overflow-x: auto; overflow-y: hidden; position: relative;
+  padding: 34px 44px 44px; scrollbar-width: none; scroll-padding-inline: 44px; }
+.grid::-webkit-scrollbar { display: none; }
+.grid .video { flex: 0 0 var(--tile, min(78vw, 520px)); }
+
 /* TV remote: each picture shows its number, so pressing that number on the remote opens it. */
 .video .num { position: absolute; top: 8px; left: 8px; min-width: 44px; height: 44px; padding: 0 8px; border-radius: 22px;
   background: rgba(29, 43, 79, .82); color: #fff; font: 700 26px/44px var(--body); text-align: center; display: none; }
@@ -96,45 +92,41 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 /* Pictures are shown with weak colours, so the brightest thumbnail does not win the child's choice. */
 .video img { filter: saturate(.5); }
 
-/* Top row: today's topic on one side, the time circles in the other corner. */
-.top { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap-reverse; }
-.top .today-topic { white-space: nowrap; }
-/* Time left today: one circle per turn, like a clock; the coloured slice
-   of the current turn gets smaller while a video plays. */
-.clock { margin-inline-start: auto; display: grid; justify-items: center; gap: 4px; }
-.tracks { display: flex; align-items: center; gap: 10px; direction: ltr; }
-.track { width: 46px; height: 46px; border-radius: 50%; border: 4px solid var(--card); box-shadow: 0 4px 0 var(--shade);
-  background: conic-gradient(var(--c, var(--leaf)) calc(var(--p, 1) * 1turn), #dfe7f0 0); transition: width .3s, height .3s; }
-.track.now { width: 72px; height: 72px; }
+/* Home screen redesign: a slim top bar with the time clock and today's
+   topic, then one big row of pictures filling the rest of the screen. Sizes
+   (--clock, --tile) are worked out from the screen in fitGrid(). */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.top .today-topic { display: none !important; } /* the parents asked for no topic label at the top */
+.top { justify-content: flex-end; }
+/* The clock: its coloured slice is the time left in this turn and its hand
+   ticks every second, so it is clear it is alive. Small circles beside it
+   show all of today's turns. */
+.clock { display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 14px; row-gap: 6px; align-items: center; direction: ltr; }
+.bigclock { grid-row: 1 / span 2; position: relative; width: var(--clock, 92px); aspect-ratio: 1; border-radius: 50%;
+  border: calc(var(--clock, 92px) * .05) solid var(--card); box-shadow: 0 6px 0 var(--shade);
+  background: conic-gradient(var(--c, var(--leaf)) calc(var(--p, 1) * 1turn), #dfe7f0 0); transition: background .6s; }
+.bigclock.low { --c: var(--sun); }
+.bigclock.last { --c: var(--tomato); }
+.bigclock .hand { position: absolute; left: calc(50% - var(--clock, 92px) * .022); top: 9%; width: calc(var(--clock, 92px) * .044); height: 41%;
+  border-radius: 99px; background: var(--ink); transform-origin: 50% 100%; animation: tick 60s steps(60) infinite; }
+.bigclock.still .hand { animation-play-state: paused; opacity: .35; }
+.bigclock .dot { position: absolute; left: calc(50% - var(--clock, 92px) * .07); top: calc(50% - var(--clock, 92px) * .07);
+  width: calc(var(--clock, 92px) * .14); height: calc(var(--clock, 92px) * .14); border-radius: 50%; background: var(--ink); }
+@keyframes tick { to { transform: rotate(360deg); } }
+.tracks { align-self: end; display: flex; align-items: center; gap: 8px; }
+.track { width: calc(var(--clock, 92px) * .24); height: calc(var(--clock, 92px) * .24); border-radius: 50%; border: 3px solid var(--card);
+  box-shadow: 0 3px 0 var(--shade); background: conic-gradient(var(--c, var(--leaf)) calc(var(--p, 1) * 1turn), #dfe7f0 0); }
+.track.now { outline: 3px solid var(--ink); outline-offset: 1px; }
 .track.low { --c: var(--sun); }
 .track.last { --c: var(--tomato); }
 .track.waiting { opacity: .45; }
-.left-text { margin: 0; font-size: 13px; opacity: .6; }
-/* TV and big screens: two parts. Videos on the right, a big clock on the left.
-   The clock's coloured slice is the time left in this turn; its hand ticks
-   every second, so it is clear the clock is alive. */
-.bigclock { display: none; }
-.home.fit { grid-template-columns: minmax(0, 1fr) var(--clockcol, 30vw); grid-template-rows: auto auto; column-gap: 28px; align-items: start;
-  min-height: 100vh; align-content: center; }
-.home.fit .top { display: contents; }
-.home.fit .today-topic { grid-column: 1; grid-row: 1; }
-.home.fit .grid { grid-column: 1; grid-row: 2; }
-.home.fit .clock { grid-column: 2; grid-row: 1 / span 2; margin: 0; align-self: center; gap: 18px; }
-.home.fit .bigclock { display: block; position: relative; width: var(--clock, 27vw); aspect-ratio: 1; border-radius: 50%;
-  border: 10px solid var(--card); box-shadow: 0 10px 0 var(--shade);
-  background: conic-gradient(var(--c, var(--leaf)) calc(var(--p, 1) * 1turn), #dfe7f0 0); transition: background .6s; }
-.home.fit .bigclock.low { --c: var(--sun); }
-.home.fit .bigclock.last { --c: var(--tomato); }
-.bigclock .hand { position: absolute; left: calc(50% - 4px); top: 9%; width: 8px; height: 41%; border-radius: 4px; background: var(--ink);
-  transform-origin: 50% 100%; animation: tick 60s steps(60) infinite; }
-.bigclock.still .hand { animation-play-state: paused; opacity: .35; }
-.bigclock .dot { position: absolute; left: calc(50% - 14px); top: calc(50% - 14px); width: 28px; height: 28px; border-radius: 50%; background: var(--ink); }
-@keyframes tick { to { transform: rotate(360deg); } }
-.home.fit .left-text { font-size: 20px; opacity: .75; }
-/* On TV the number and topic badges grow and shrink with the pictures. */
-.home.fit .video .num { min-width: clamp(26px, calc(var(--tile) * .12), 52px); height: clamp(26px, calc(var(--tile) * .12), 52px);
-  line-height: clamp(26px, calc(var(--tile) * .12), 52px); border-radius: 99px; font-size: clamp(15px, calc(var(--tile) * .07), 30px); }
-.home.fit .video .topic { font-size: clamp(20px, calc(var(--tile) * .1), 44px); }
+.left-text { align-self: start; margin: 0; direction: rtl; font-size: clamp(13px, calc(var(--clock, 92px) * .1), 22px); opacity: .7; }
+.top .today-topic { font-size: clamp(16px, calc(var(--clock, 92px) * .13), 28px); }
+.top .today-topic b { font-size: 1.8em; }
+/* Number and topic badges grow and shrink with the pictures. */
+.video .num { min-width: clamp(26px, calc(var(--tile, 300px) * .1), 56px) !important; height: clamp(26px, calc(var(--tile, 300px) * .1), 56px) !important;
+  line-height: clamp(26px, calc(var(--tile, 300px) * .1), 56px) !important; font-size: clamp(15px, calc(var(--tile, 300px) * .06), 32px) !important; border-radius: 99px; }
+.video .topic { font-size: clamp(22px, calc(var(--tile, 300px) * .08), 52px) !important; }
 .rest { display: grid; justify-items: center; gap: 12px; padding-block: 12vh; text-align: center; }
 .rest .moon { font-size: clamp(110px, 22vw, 180px); line-height: 1; animation: bob 2.4s ease-in-out infinite; }
 .rest p { margin: 0; font-family: var(--body); font-weight: 700; font-size: 20px; opacity: .75; }
@@ -169,8 +161,9 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .round { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 5px 0 rgba(0,0,0,.3); }
 .round svg { width: 36px; height: 36px; fill: #fff; }
 .home-btn { background: var(--tomato); }
-.rotate-btn { background: #8a5cf6; }
-.restart-btn { background: #2fa7e0; }
+.rotate-btn { background: #2f7fe0; }
+.restart-btn { background: var(--sun); }
+.restart-btn svg { fill: var(--ink); }
 .rotate-btn svg { transition: transform .3s; }
 /* Rotate button: turns the whole player a quarter turn, for watching lying on one side. */
 .stage.r90, .stage.r270 { inset: auto; top: 50%; left: 50%; width: 100vh; height: 100vw; width: 100dvh; height: 100dvw; }
@@ -197,8 +190,6 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 <body>
 
 <main class="home" id="home">
-  <button class="pagebtn prev" id="prevPage" aria-label="Previous videos"><svg viewBox="0 0 24 24"><path d="M15.5 4 7 12l8.5 8 1.9-2-6.4-6 6.4-6z"/></svg></button>
-  <button class="pagebtn next" id="nextPage" aria-label="More videos"><svg viewBox="0 0 24 24"><path d="M8.5 4 17 12l-8.5 8-1.9-2 6.4-6-6.4-6z"/></svg></button>
   <div class="top">
     <p class="today-topic" id="todayTopic" hidden></p>
     <div class="clock">
@@ -462,8 +453,14 @@ function pageTopics() { // the day's order of topics, the topic of the day first
   return tod ? [tod, ...order.filter((t) => t !== tod)] : order;
 }
 const pageTopic = () => (page > 0 ? pageTopics()[(page - 1) % pageTopics().length] : null);
-const currentList = () => dailyList(pageTopic() ? pageTopic().key : null);
-function dailyList(topicKey = null) {
+/* The home screen is one horizontal row: today's list in its order. A video
+   watched for a while today leaves the row and the next one in line joins at
+   the end, so the row always has fresh things to look at. */
+const ROW_WATCHED = 20; // seconds watched today that count as "seen"
+const seenToday = (id) => ((vwatch[dayKey()] || {})[id] || 0) >= ROW_WATCHED;
+const fullList = () => dailyList(pageTopic() ? pageTopic().key : null, (cfg().size || 12) + 40);
+const currentList = () => fullList().filter((v) => !seenToday(v.id)).slice(0, cfg().size || 12);
+function dailyList(topicKey = null, want = null) {
   const seen = new Set(), pool = [], only = topicKey && topicByKey(topicKey);
   const add = (v, show) => { if (!seen.has(v.id)) { seen.add(v.id); pool.push({ ...v, show }); } };
   if (only) for (const v of only.videos) add(v, v.show);
@@ -471,7 +468,7 @@ function dailyList(topicKey = null) {
     for (const c of data.categories) for (const v of c.videos) add(v, c.key);
     for (const tp of data.topics || []) for (const v of tp.videos) add(v, v.show);
   }
-  const k = cfg(), size = bigScreen() ? tvPlan().n : (k.size || 12), rnd = seeded(dayKey() + (only ? only.key : ""));
+  const k = cfg(), size = want || k.size || 12, rnd = seeded(dayKey() + (only ? only.key : ""));
   let cands = pool.map((v) => ({ v, w: score(v) * fit(v) })).filter((x) => x.w > 0);
   const perShow = {}, list = [], got = { exciting: 0, fantasy: 0, learn: 0, calm: 0, topic: 0 };
   const today = only || topicOfDay(), inTopic = new Set(today ? today.videos.map((v) => v.id) : []);
@@ -552,7 +549,7 @@ function renderGrid() {
     b.className = "video";
     // Picture only: the child can't read. The title stays for screen readers.
     b.setAttribute("aria-label", v.title);
-    b.innerHTML = `<img alt="" loading="lazy" src="${thumb(v.id, "hq720")}"><span class="num" aria-hidden="true">${$("grid").children.length + 1}</span>${v.topic ? `<span class="topic" aria-hidden="true">${v.topic}</span>` : ""}`;
+    b.innerHTML = `<img alt="" loading="lazy" src="${thumb(v.id, "hq720")}">${v.topic ? `<span class="topic" aria-hidden="true">${v.topic}</span>` : ""}`;
     b.querySelector("img").onerror = function () { this.onerror = null; this.src = thumb(v.id); };
     b.onclick = () => openVideo(v, showOf(v.show));
     $("grid").appendChild(b);
@@ -567,33 +564,21 @@ const bigScreen = () => innerWidth >= 900 && innerWidth >= innerHeight;
    number of columns that makes the pictures biggest. 9 wins unless 8 gives
    clearly bigger pictures. Worked out from the window size alone, so the list
    knows how many videos to pick before it is drawn. */
-function tvPlan() {
-  const gap = 14, frame = 10, side = 76, colGap = 28;
-  const W = innerWidth - side * 2, H = innerHeight - 16 - 66 - 16; // top padding, topic label row, bottom padding
-  const clock = Math.round(Math.max(200, Math.min(H * 0.82, W * 0.27)));
-  const Wg = W - clock - colGap, Hg = H;
-  let best = null;
-  for (const n of [9, 8]) for (let c = 2; c <= 5; c++) {
-    const rows = Math.ceil(n / c);
-    if (rows * c - n >= c) continue; // no empty row
-    const byWidth = (Wg - gap * (c - 1)) / c;
-    const byHeight = ((Hg - gap * (rows - 1)) / rows - frame) * 16 / 9 + frame;
-    const w = Math.floor(Math.min(byWidth, byHeight));
-    const score = w * (n === 9 ? 1.06 : 1); // prefer 9 when sizes are close
-    if (!best || score > best.score) best = { n, c, w, score };
-  }
-  return { ...best, clock };
-}
 function fitGrid() {
   const home = $("home"), grid = $("grid"), n = grid.children.length;
   const big = bigScreen();
   home.classList.toggle("fit", big && n > 0);
-  if (!big || !n || home.hidden) { grid.style.gridTemplateColumns = ""; return; }
-  const plan = tvPlan();
-  home.style.setProperty("--clock", plan.clock + "px");
-  home.style.setProperty("--clockcol", plan.clock + 24 + "px");
-  home.style.setProperty("--tile", plan.w + "px");
-  grid.style.gridTemplateColumns = `repeat(${plan.c}, ${plan.w}px)`;
+  if (!n || home.hidden) return;
+  // Clock: about a fifth of the screen height on TV, smaller on phones.
+  const W = innerWidth, H = innerHeight, side = big ? 32 : 16, frame = 10;
+  const clock = Math.round(big ? Math.max(130, Math.min(300, H * 0.25)) : Math.max(90, Math.min(140, Math.min(W, H) * 0.27)));
+  // Pictures: as tall as the space under the top bar allows, while a part of
+  // the next picture still shows at the side.
+  const rowH = H - 14 - clock - 8 - 78 - 18 - 12; // top padding, top bar, gap, row padding, bottom padding, spare
+  const byHeight = (rowH - frame) * 16 / 9 + frame;
+  const byWidth = (W - side * 2 - 88) / (big ? 1.3 : 1.08);
+  home.style.setProperty("--clock", clock + "px");
+  home.style.setProperty("--tile", Math.floor(Math.max(200, Math.min(byHeight, byWidth))) + "px");
 }
 // Turning a tablet or resizing a window between phone and TV size redraws the list (12 or 9 videos).
 let wasBig = bigScreen();
@@ -668,10 +653,10 @@ function onTick() {
    skipping shows that reached their limit. */
 let autoNext = null;
 function nextVideo() {
-  const list = currentList(), i = list.findIndex((v) => v.id === playingId);
+  const list = fullList(), i = list.findIndex((v) => v.id === playingId);
   for (let j = 1; j <= list.length; j++) {
     const v = list[(i + j + list.length) % list.length], c = showOf(v.show);
-    if (v.id !== playingId && c && allowed(c)) return { v, c };
+    if (v.id !== playingId && !seenToday(v.id) && c && allowed(c)) return { v, c };
   }
   return null;
 }
@@ -801,7 +786,6 @@ const BACK_CODES = new Set([10009, 461, 8, 27]); // Tizen, webOS, others
 function focusables() {
   return [...document.querySelectorAll("button")].filter((b) => {
     if (b.id === "parentsBtn" || b.disabled) return false; // the lock stays a touch-only thing
-    if (b.classList.contains("pagebtn")) return false; // arrow keys turn pages at the edges instead
     const r = b.getBoundingClientRect();
     return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== "hidden";
   });
@@ -823,10 +807,14 @@ function moveFocus(dir) {
     const d = along + across * 2;
     if (d < bestD) { bestD = d; best = b; }
   }
-  if (best) { best.focus(); best.scrollIntoView({ block: "center", behavior: "smooth" }); return; }
-  // Past the right or left edge of a row of pictures: show the next or previous 16.
-  const tiles = [...$("grid").children], at = tiles.indexOf(cur);
-  if (at >= 0 && (dir === "ArrowRight" || dir === "ArrowLeft")) turnPage(dir === "ArrowRight" ? 1 : -1, at);
+  if (best) { best.focus({ preventScroll: true }); centerTile(best); }
+}
+// Slide the row so the picked picture sits in the middle (other buttons: just make them visible).
+function centerTile(b) {
+  const grid = $("grid");
+  if (b.parentElement !== grid) return b.scrollIntoView({ block: "nearest" });
+  grid.scrollTo({ left: b.offsetLeft - (grid.clientWidth - b.offsetWidth) / 2, behavior: "smooth" }); // the row is position: relative, so offsetLeft is inside it
+  b.scrollIntoView({ block: "nearest" });
 }
 /* Some TV browsers move a mouse pointer with the remote's arrows instead of
    sending arrow keys. Then the yellow frame follows the pointer, and the big
@@ -866,49 +854,46 @@ document.addEventListener("click", (e) => {
   const b = document.activeElement && document.activeElement.tagName === "BUTTON" ? document.activeElement : framed;
   if (b && document.contains(b) && focusables().includes(b)) b.click(); else moveFocus("ArrowDown");
 }, true);
-$("nextPage").onclick = () => turnPage(1, 0);
-$("prevPage").onclick = () => turnPage(-1, 0);
-function turnPage(step, at) {
-  const pages = pageTopics().length + 1;
-  page = (page + step + pages) % pages;
-  logAction("page", { s: pageTopic() ? pageTopic().key : "today" });
-  const cols = getComputedStyle($("grid")).gridTemplateColumns.split(" ").length;
-  const row = Math.floor(at / cols);
-  renderGrid();
+// The side arrows move along the row one picture at a time.
+function stepRow(step) {
   const tiles = [...$("grid").children];
-  // Enter the new page on the same row, from the side the child came from.
-  const target = tiles[Math.min(tiles.length - 1, row * cols + (step > 0 ? 0 : cols - 1))] || tiles[0];
-  if (target) { target.focus(); target.scrollIntoView({ block: "center", behavior: "smooth" }); }
-  $("grid").classList.remove("slide-l", "slide-r"); void $("grid").offsetWidth;
-  $("grid").classList.add(step > 0 ? "slide-l" : "slide-r");
+  if (!tiles.length) return;
+  let at = tiles.indexOf(document.activeElement);
+  if (at < 0) at = tiles.indexOf(framed);
+  const b = tiles[Math.max(0, Math.min(tiles.length - 1, at < 0 ? 0 : at + step))];
+  b.focus({ preventScroll: true }); centerTile(b);
 }
-/* Number keys on the remote open that picture: 1-9 at once; for 10-16 press
-   two numbers quickly (after "1" it waits a moment for a second number). */
-let numBuf = "", numTimer = null;
-function pickNumber(n) {
-  const tiles = $("grid").children, b = tiles[n - 1];
-  if (!b) return;
-  b.classList.add("picked"); b.focus();
-  setTimeout(() => { b.classList.remove("picked"); b.click(); }, 250);
-}
-function onDigit(d) {
-  const count = $("grid").children.length;
-  clearTimeout(numTimer);
-  numBuf += d;
-  const n = Number(numBuf);
-  if (numBuf.length >= 2 || n * 10 > count || n === 0) { // no two-number choice can start with this
-    numBuf = "";
-    if (n >= 1) pickNumber(n);
+/* The four colour keys every TV remote has (red, green, yellow, blue, left
+   to right). No screen needs more than these four, and each on-screen button
+   has the colour of its key:
+   - home:   red = previous picture, green = next picture, yellow = watch the framed one;
+   - player: red = home, green = pause/play, yellow = from the start, blue = turn the picture;
+   - the screens after a video: red = home, yellow = next video / again. */
+const COLOR_KEYS = { 403: "red", 404: "green", 405: "yellow", 406: "blue",
+  ColorF0Red: "red", ColorF1Green: "green", ColorF2Yellow: "yellow", ColorF3Blue: "blue" };
+function onColor(c) {
+  const press = (b) => { if (b && focusables().includes(b)) b.click(); };
+  if ($("stage").hidden) {
+    if (c === "red") stepRow(-1);
+    else if (c === "green") stepRow(1);
+    else if (c === "yellow") {
+      const tiles = [...$("grid").children];
+      const b = tiles.includes(document.activeElement) ? document.activeElement : tiles.includes(framed) ? framed : null;
+      if (b) b.click(); else stepRow(0);
+    }
     return;
   }
-  numTimer = setTimeout(() => { numBuf = ""; pickNumber(n); }, 1200);
+  const cover = $("cover");
+  const coverYellow = !cover.hidden && cover.querySelector(".bigbtn:not(#backBtn)");
+  const coverRed = !cover.hidden && cover.querySelector("#backBtn");
+  if (c === "red") press(coverRed || $("homeBtn"));
+  else if (c === "yellow") press(coverYellow || $("restartBtn"));
+  else if (c === "green") press($("playBtn"));
+  else if (c === "blue") press($("rotateBtn"));
 }
-// Show the numbers on TV and big screens, or once any remote or keyboard key is used.
-if (matchMedia("(min-width: 900px) and (orientation: landscape)").matches) document.body.classList.add("numbers");
 document.addEventListener("keydown", (e) => {
-  const digit = /^[0-9]$/.test(e.key) ? e.key : e.keyCode >= 96 && e.keyCode <= 105 ? String(e.keyCode - 96) : null;
-  document.body.classList.add("numbers");
-  if (digit !== null && $("stage").hidden && !$("home").hidden) { e.preventDefault(); onDigit(digit); return; }
+  const color = COLOR_KEYS[e.keyCode] || COLOR_KEYS[e.key];
+  if (color) { e.preventDefault(); onColor(color); return; }
   if (e.key.startsWith("Arrow")) { e.preventDefault(); moveFocus(e.key); return; }
   const onStage = !$("stage").hidden;
   if (BACK_KEYS.has(e.key) || BACK_CODES.has(e.keyCode)) {
