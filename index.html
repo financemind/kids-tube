@@ -608,7 +608,11 @@ function renderGrid() {
   // The balloon game, first in the list.
   const g = document.createElement("button");
   g.className = "video gamecard"; g.setAttribute("aria-label", "Balloon game");
-  g.innerHTML = `<span aria-hidden="true">🎈🎈🎈</span>`;
+  // Drawn balloons (not emoji: some TV browsers show emoji without colour).
+  g.innerHTML = `<svg aria-hidden="true" viewBox="0 0 120 70" width="62%">${[["#e63946", 22], ["#2a9d4b", 48], ["#f6c90e", 74], ["#2f7fe0", 100]].map(([c, x], i) =>
+    `<g transform="translate(${x} ${i % 2 ? 26 : 20})"><path d="M0 17 Q-2 30 3 40" stroke="#5b6b86" stroke-width="1" fill="none"/>
+     <ellipse cx="0" cy="0" rx="11" ry="14" fill="${c}"/><ellipse cx="-4" cy="-5" rx="3" ry="4" fill="#fff" opacity=".6"/>
+     <path d="M-3 13 L3 13 L0 17 Z" fill="${c}"/></g>`).join("")}</svg>`;
   g.onclick = startGame;
   $("grid").appendChild(g);
   for (const v of currentList()) {
