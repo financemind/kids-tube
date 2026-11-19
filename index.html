@@ -870,6 +870,34 @@ window.onYouTubeIframeAPIReady = () => { apiReady = true; if (pending) { const [
 function setPlayIcon(playing) {
   if (TV_MODE && !$("stage").hidden && !$("stage").contains(document.activeElement)) $("playBtn").focus({ preventScroll: true }); $("playBtn").innerHTML = playing ? ICON.pause : ICON.play; }
 
+/* Sound. When the browser has not seen a real click or OK press yet (on the
+   TV the colour keys may not count), YouTube starts the video muted. Then we
+   unmute it; if the browser still says no, a big speaker button asks for one
+   press of OK (it is focused, so OK on the remote presses it). Logged as
+   play with code 901 (started muted) and 902 (needed the button). */
+const SPEAKER = `<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9H3z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
+function ensureSound() {
+  try {
+    if (!player.isMuted() && player.getVolume() > 0) return;
+    logAction("play", { code: 901 });
+    player.unMute(); player.setVolume(100);
+    setTimeout(() => {
+      try {
+        if (!player.isMuted() && player.getPlayerState() === YT.PlayerState.PLAYING) return;
+        logAction("play", { code: 902 });
+        const btn = `<button class="bigbtn" id="soundBtn" aria-label="Sound on" style="color:var(--ink)">${SPEAKER}</button>`;
+        if (storyMode) storyCover(btn); else showCover(`<div class="done">${btn}</div>`, thumb(playingId));
+        const b = $("soundBtn");
+        b.onclick = () => { // the video may already be playing (muted): put the night picture or the video back, then check again
+          player.unMute(); player.setVolume(100); player.playVideo();
+          if (storyMode) storyCover(); else $("cover").hidden = true;
+          setTimeout(ensureSound, 600);
+        };
+        b.focus({ preventScroll: true });
+      } catch (e) {}
+    }, 900);
+  } catch (e) { /* player not ready */ }
+}
 function pausedCover() {
   if (storyMode) { storyCover(`<button class="bigbtn" aria-label="Play">${ICON.play}</button>`); $("cover").querySelector("button").onclick = () => { logAction("play"); player.playVideo(); }; return; }
   showCover(`<button class="bigbtn" aria-label="Play">${ICON.play}</button>`, thumb(playingId));
@@ -883,6 +911,7 @@ function onState(e) {
   if (e.data === S.PLAYING) {
     if (storyMode) storyCover(); else $("cover").hidden = true; // a story: only the sound, the picture stays hidden
     setPlayIcon(true);
+    ensureSound();
     tick = setInterval(onTick, 1000);
     return;
   }
