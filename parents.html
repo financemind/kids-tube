@@ -77,7 +77,7 @@ button.danger:disabled { opacity: .6; cursor: default; }
 <div class="wrap">
   <header>
     <h1>گزارش تماشای نویان</h1>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="back" href="catalog.html">همهٔ ویدیوها</a><a class="back" href="./">برگشت</a></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="back" href="catalog.html">همهٔ ویدیوها</a><a class="back" href="account.html">حساب</a><a class="back" href="./">برگشت</a></div>
   </header>
   <p class="note" id="note">در حال گرفتن آمار همهٔ دستگاه‌ها…</p>
 
@@ -119,6 +119,21 @@ button.danger:disabled { opacity: .6; cursor: default; }
   </section>
 
   <section>
+    <h2>ورودهای این خانواده</h2>
+    <p class="note" id="famLine"></p>
+    <div class="table"><table>
+      <thead><tr><th>چه کسی / کدام دستگاه</th><th>از کی</th><th>آخرین بار</th><th></th></tr></thead>
+      <tbody id="logins"></tbody>
+    </table></div>
+    <form id="addParent" class="plan-row" autocomplete="off">
+      <input type="email" id="apEmail" placeholder="ایمیل پدر یا مادر دیگر" dir="ltr" required>
+      <input type="password" id="apPass" placeholder="رمز (۸ حرف یا بیشتر)" dir="ltr" minlength="8" required>
+      <button class="go" type="submit">اضافه کن</button>
+    </form>
+    <p class="note" id="apMsg"></p>
+  </section>
+
+  <section>
     <h2>برنامه‌های محدود</h2>
     <div id="limits"></div>
   </section>
@@ -154,17 +169,16 @@ button.danger:disabled { opacity: .6; cursor: default; }
   </section>
 </div>
 
+<script src="auth.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 function read(k) { try { return JSON.parse(localStorage.getItem(k) || "{}") || {}; } catch (e) { return {}; } }
 let watch = read("watch"), vwatch = read("vwatch");
-// A copy opened on this computer for testing (localhost) never talks to the real
-// server, so tests do not count toward Noyan's time or show in the report.
-const LOCAL_TEST = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname) || location.hostname.endsWith(".localhost");
-// On our own addresses the stats server is on the same site; elsewhere (the
-// GitHub copy) it is reached at ntv.financemind.com.
-const OWN_HOSTS = ["noyantv.com", "ntv.financemind.com"];
-const API = LOCAL_TEST ? null : OWN_HOSTS.includes(location.hostname) ? location.origin + "/api/sync" : "https://ntv.financemind.com/api/sync";
+// Server and family login: see auth.js. Without a login the report sends you to the account page.
+const LOCAL_TEST = !NT.base;
+const API = NT.base ? NT.base + "/sync" : null;
+if (API && !NT.token()) location.replace("account.html");
+NT.onLogout = () => location.replace("account.html");
 function addStores(a, b) {
   const out = {};
   for (const s of [a, b]) for (const [day, vals] of Object.entries(s || {})) {
@@ -191,7 +205,7 @@ async function resetToday() {
   btn.disabled = true; btn.textContent = "صبر کنید…";
   try {
     if (!API) throw new Error("local test copy");
-    const r = await fetch(API.replace("/sync", "/reset"), { method: "POST", headers: { "Content-Type": "text/plain" },
+    const r = await fetch(API.replace("/sync", "/reset"), { method: "POST", headers: NT.headers(),
       body: JSON.stringify({ day: dayKey(0) }) });
     if (!r.ok) throw new Error();
     const j = await r.json();
@@ -211,7 +225,7 @@ async function getDevices(again = true) {
     const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
     const body = JSON.stringify({ device: device || "viewer", readonly, all: true, label: localStorage.getItem("deviceLabel") || "", resetSeen, logSince: midnight.getTime(),
       data: { watch, vwatch, turnEnds: read("turnEnds") } });
-    const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain" }, body });
+    const r = await fetch(API, { method: "POST", headers: NT.headers(), body });
     if (!r.ok) return null;
     const j = await r.json();
     if (j.reset && j.reset > resetSeen) { // time was reset: clear this device too, then ask again
@@ -248,6 +262,36 @@ function emptyRow(tbody, cols, text) {
 
 $("resetBtn").onclick = resetToday;
 
+/* The family's logins: parents and paired devices; a parent can remove any of them. */
+async function showLogins() {
+  const r = await NT.call("/devices");
+  if (!r.ok || !r.body) return;
+  $("famLine").textContent = "خانواده: " + (r.body.family || "") + " · پدر و مادرها: " + r.body.parents.join("، ");
+  $("logins").innerHTML = "";
+  const when = (ms) => (ms ? new Date(ms).toLocaleString("fa-IR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }) : "—");
+  for (const l of r.body.logins.sort((a, b) => (b.last || 0) - (a.last || 0))) {
+    const tr = document.createElement("tr");
+    tr.append(cell((l.kind === "parent" ? "👤 " : "📺 ") + l.who + (l.me ? " (همین‌جا)" : "")), cell(when(l.created), "n"), cell(when(l.last), "n"));
+    const td = document.createElement("td"), b = document.createElement("button");
+    b.className = "danger"; b.type = "button"; b.textContent = "بیرون کردن";
+    b.onclick = async () => {
+      if (!confirm("این دستگاه یا ورود از حساب بیرون شود؟ باید دوباره با کد QR وصل شود.")) return;
+      const x = await NT.call("/devices/remove", { id: l.id });
+      if (x.ok) showLogins(); else alert(x.status === 403 ? "فقط پدر یا مادر می‌تواند دستگاه را بیرون کند." : "نشد. دوباره امتحان کنید.");
+    };
+    td.append(b); tr.append(td);
+    $("logins").appendChild(tr);
+  }
+}
+$("addParent").onsubmit = async (e) => {
+  e.preventDefault();
+  const r = await NT.call("/parents/add", { email: $("apEmail").value, password: $("apPass").value });
+  $("apMsg").textContent = r.ok ? "✔ اضافه شد. حالا می‌تواند با همین ایمیل و رمز وارد شود."
+    : r.status === 409 ? "این ایمیل قبلاً حساب دارد." : r.status === 403 ? "فقط پدر یا مادر می‌تواند این کار را بکند." : "ایمیل درست نیست یا رمز کوتاه است.";
+  if (r.ok) { $("apEmail").value = ""; $("apPass").value = ""; showLogins(); }
+};
+if (API) showLogins();
+
 /* Today's turns: quick picks or any count × minutes. Saved on the server for every device. */
 const PRESETS = [[2, 30], [3, 25], [3, 30], [4, 15], [5, 20], [6, 15]];
 function planText(p) { return `${fa(p.turns)} نوبت ${fa(p.minutes)} دقیقه‌ای`; }
@@ -265,7 +309,7 @@ async function savePlan(daily, turns, minutes) {
   btn.disabled = true; $("planMsg").textContent = "صبر کنید…";
   try {
     if (!API) throw new Error("local test copy");
-    const r = await fetch(API.replace("/sync", "/plan"), { method: "POST", headers: { "Content-Type": "text/plain" },
+    const r = await fetch(API.replace("/sync", "/plan"), { method: "POST", headers: NT.headers(),
       body: JSON.stringify({ day: dayKey(0), turns, minutes }) });
     if (!r.ok) throw new Error();
     showPlan(daily, (await r.json()).plans);

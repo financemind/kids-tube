@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>حساب خانواده</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap">
+<style>
+/* Layout: one narrow column of cards: log in / sign up, or (when logged in) connect a TV and the family's links. */
+:root {
+  --bg: #e3f4e1;
+  --ink: #1d2b4f;
+  --muted: #5f6b86;
+  --card: #ffffff;
+  --line: #dde5ef;
+  --bar: #2f7fe0;
+  --ok: #2a9d4b;
+  --stop: #d62839;
+  --font: "Vazirmatn", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--font); }
+.wrap { max-width: 480px; margin: 0 auto; display: grid; gap: 16px;
+  padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 40px max(16px, env(safe-area-inset-left)); }
+h1 { font-size: 24px; margin: 0; }
+h2 { font-size: 18px; margin: 0 0 8px; }
+section { background: var(--card); border-radius: 18px; padding: 18px; border: 1px solid var(--line); display: grid; gap: 12px; }
+label { display: grid; gap: 4px; font-size: 14px; color: var(--muted); }
+input, select { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+input[dir="ltr"] { text-align: left; }
+button, a.btn { font: inherit; font-weight: 700; border: 0; border-radius: 12px; padding: 12px 16px; cursor: pointer; text-align: center; text-decoration: none; }
+.go { background: var(--bar); color: #fff; }
+.ok { background: var(--ok); color: #fff; }
+.plain { background: #eef3f9; color: var(--ink); }
+.tabs { display: flex; gap: 8px; }
+.tabs button { flex: 1; background: #eef3f9; color: var(--ink); }
+.tabs button.on { background: var(--bar); color: #fff; }
+.msg { margin: 0; font-size: 14px; color: var(--stop); min-height: 1em; }
+.msg.good { color: var(--ok); }
+.code { font: 700 40px/1.1 var(--font); letter-spacing: 8px; direction: ltr; text-align: center; }
+.note { margin: 0; color: var(--muted); font-size: 14px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row > * { flex: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📺 حساب خانواده</h1>
+
+  <!-- not logged in -->
+  <section id="out" hidden>
+    <div class="tabs"><button type="button" id="tabIn" class="on">ورود</button><button type="button" id="tabUp">ساختن حساب تازه</button></div>
+    <form id="formIn" autocomplete="on">
+      <section style="border:0;padding:0">
+        <label>ایمیل<input type="email" id="inEmail" dir="ltr" autocomplete="username" required></label>
+        <label>رمز<input type="password" id="inPass" dir="ltr" autocomplete="current-password" required></label>
+        <button class="go" type="submit">ورود</button>
+      </section>
+    </form>
+    <form id="formUp" hidden autocomplete="on">
+      <section style="border:0;padding:0">
+        <label>اسم خانواده (مثلاً «خانوادهٔ نویان»)<input type="text" id="upName" maxlength="60"></label>
+        <label>ایمیل<input type="email" id="upEmail" dir="ltr" autocomplete="username" required></label>
+        <label>رمز (حداقل ۸ حرف)<input type="password" id="upPass" dir="ltr" autocomplete="new-password" minlength="8" required></label>
+        <button class="go" type="submit">ساختن حساب</button>
+        <p class="note">رمز روی سرور فقط به شکل رمزگذاری‌شده نگه داشته می‌شود.</p>
+      </section>
+    </form>
+    <p class="msg" id="outMsg"></p>
+  </section>
+
+  <!-- logged in -->
+  <section id="who" hidden>
+    <h2 id="famName"></h2>
+    <p class="note" id="whoLine"></p>
+  </section>
+
+  <section id="connect" hidden>
+    <h2>وصل کردن تلویزیون یا دستگاه تازه</h2>
+    <div id="codeBox" hidden><p class="note">کد این دستگاه:</p><div class="code" id="codeShow"></div></div>
+    <label id="codeField">کدی که روی تلویزیون نوشته شده<input type="text" id="codeIn" dir="ltr" maxlength="4" autocapitalize="characters" autocomplete="off" style="font-size:28px;letter-spacing:8px;text-align:center"></label>
+    <label>این دستگاه چیست؟
+      <select id="label"><option>تلویزیون</option><option>تبلت</option><option>گوشی</option><option>لپ‌تاپ یا کامپیوتر</option></select>
+    </label>
+    <button class="ok" type="button" id="approve">وصل کن</button>
+    <p class="msg" id="connMsg"></p>
+  </section>
+
+  <section id="links" hidden>
+    <div class="row">
+      <a class="btn go" href="./">باز کردن برنامه</a>
+      <a class="btn plain" href="parents.html">گزارش مامان و بابا</a>
+    </div>
+    <button class="plain" type="button" id="logout">خروج از حساب روی این گوشی</button>
+  </section>
+</div>
+
+<script src="auth.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const urlCode = (params.get("code") || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+const ERR = { exists: "این ایمیل قبلاً حساب دارد. وارد شوید.", wrong: "ایمیل یا رمز درست نیست.", wait: "چند بار اشتباه شد. ۱۰ دقیقهٔ دیگر دوباره امتحان کنید.",
+  "bad email or password": "ایمیل درست نیست یا رمز کوتاه‌تر از ۸ حرف است.", code: "این کد پیدا نشد یا زمانش تمام شده. کد تازهٔ تلویزیون را بزنید.",
+  "parents only": "فقط با حساب پدر یا مادر می‌شود دستگاه وصل کرد." };
+const say = (el, key, good) => { el.textContent = ERR[key] || key || ""; el.classList.toggle("good", !!good); };
+
+async function show() {
+  if (!NT.base) { say($("outMsg"), "این صفحه روی این کامپیوتر به سرور وصل نیست."); $("out").hidden = false; return; }
+  const me = NT.token() ? await NT.call("/me") : { ok: false };
+  const inside = me.ok && me.body;
+  $("out").hidden = !!inside;
+  for (const id of ["who", "connect", "links"]) $(id).hidden = !inside;
+  if (!inside) { if (urlCode) say($("outMsg"), "برای وصل کردن تلویزیون (کد " + urlCode + ") اول وارد شوید یا حساب بسازید.", true); return; }
+  $("famName").textContent = me.body.family || "خانواده";
+  $("whoLine").textContent = me.body.kind === "parent" ? "وارد شده با " + me.body.who : "این دستگاه به حساب این خانواده وصل است.";
+  if (me.body.kind !== "parent") $("connect").hidden = true;
+  if (urlCode) { $("codeBox").hidden = false; $("codeShow").textContent = urlCode; $("codeField").hidden = true; $("codeIn").value = urlCode; }
+  if (params.get("back") === "app" && me.body.kind === "parent" && !urlCode) location.href = "./";
+}
+
+async function enter(path, body) {
+  const r = await NT.call(path, body);
+  if (r.ok && r.body && r.body.token) { NT.setToken(r.body.token); say($("outMsg"), ""); show(); }
+  else say($("outMsg"), (r.body && r.body.error) || "به سرور وصل نشد.");
+}
+$("formIn").onsubmit = (e) => { e.preventDefault(); enter("/login", { email: $("inEmail").value, password: $("inPass").value }); };
+$("formUp").onsubmit = (e) => { e.preventDefault(); enter("/signup", { name: $("upName").value, email: $("upEmail").value, password: $("upPass").value }); };
+$("tabIn").onclick = () => { $("formIn").hidden = false; $("formUp").hidden = true; $("tabIn").classList.add("on"); $("tabUp").classList.remove("on"); };
+$("tabUp").onclick = () => { $("formIn").hidden = true; $("formUp").hidden = false; $("tabUp").classList.add("on"); $("tabIn").classList.remove("on"); };
+$("approve").onclick = async () => {
+  const code = $("codeIn").value.toUpperCase().trim();
+  if (code.length !== 4) return say($("connMsg"), "کد ۴ حرفی تلویزیون را بزنید.");
+  const r = await NT.call("/pair/approve", { code, label: $("label").value });
+  if (r.ok) { say($("connMsg"), "✔ وصل شد! تا چند ثانیهٔ دیگر برنامه روی دستگاه باز می‌شود.", true); $("codeIn").value = ""; }
+  else say($("connMsg"), (r.body && r.body.error) || "به سرور وصل نشد.");
+};
+$("logout").onclick = async () => { await NT.call("/logout"); NT.setToken(""); show(); };
+show();
+</script>
+</body>
+</html>

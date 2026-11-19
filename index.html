@@ -129,6 +129,18 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .bigclock .dot { position: absolute; left: calc(50% - var(--clock, 92px) * .07); top: calc(50% - var(--clock, 92px) * .07);
   width: calc(var(--clock, 92px) * .14); height: calc(var(--clock, 92px) * .14); border-radius: 50%; background: #f4c430;
   box-shadow: 0 0 0 calc(var(--clock, 92px) * .02) #a4161a; }
+/* Pairing screen: shown until this device is logged in to a family. */
+.pair { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 7; display: flex; align-items: center; justify-content: center;
+  background: var(--sky); padding: 24px; overflow: auto; }
+.paircard { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 40px; max-width: 1100px; }
+.pairqr { width: min(46vh, 80vw); height: min(46vh, 80vw); background: #fff; border-radius: 24px; padding: 14px; box-shadow: 0 8px 0 var(--shade); }
+.pairqr svg { width: 100%; height: 100%; display: block; }
+.pairtext { max-width: 460px; display: grid; gap: 10px; font-family: var(--body); }
+.pairtext h1 { margin: 0; font-size: 34px; }
+.pairtext p { margin: 0; font-size: 19px; line-height: 1.7; }
+.pairmuted { opacity: .7; font-size: 16px !important; }
+.paircode { font: 700 54px/1.1 var(--body); letter-spacing: 10px; direction: ltr; text-align: center; background: #fff; border-radius: 18px; padding: 10px 18px; }
+.pairlink { color: #2f5fd0; font-weight: 700; font-size: 16px; }
 /* Balloon game: balloons in the four remote colours float up a blue sky;
    pressing a colour key (or tapping a balloon or a dot) pops one of that colour. */
 .game { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 6; background: linear-gradient(#8fd3ff, #d9f2ff 70%, #c9ecc0); overflow: hidden; }
@@ -251,6 +263,18 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 
 <button class="parents" id="parentsBtn" aria-label="Parents: hold for 2 seconds"><svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 1 1 6 0v3z"/></svg></button>
 
+<section class="pair" id="pair" hidden>
+  <div class="paircard">
+    <div class="pairqr" id="pairQr" aria-label="QR code"></div>
+    <div class="pairtext">
+      <h1>تلویزیون نویان</h1>
+      <p>برای وصل کردن این دستگاه، دوربین گوشی را رو به این کد بگیرید و وارد حساب خانواده شوید.</p>
+      <p class="pairmuted">یا روی گوشی به <b>noyantv.com</b> بروید و این کد را بزنید:</p>
+      <div class="paircode" id="pairCode">…</div>
+      <a class="pairlink" id="pairLink" href="account.html">ورود با ایمیل روی همین دستگاه</a>
+    </div>
+  </div>
+</section>
 <section class="game" id="game" hidden aria-label="Balloon game">
   <div class="sky" id="sky"></div>
   <div class="keys" aria-hidden="true"><i class="k red"></i><i class="k green"></i><i class="k yellow"></i><i class="k blue"></i></div>
@@ -270,6 +294,12 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
   </div>
 </section>
 
+<script src="auth.js"></script>
+<script>
+// A scanned pairing QR code opens /?c=CODE: go to the account page to approve it.
+if (new URLSearchParams(location.search).has("c")) location.replace("account.html?code=" + encodeURIComponent(new URLSearchParams(location.search).get("c")));
+</script>
+<script src="qr.js"></script>
 <script>
 const ICON = {
   play: '<svg viewBox="0 0 24 24"><path d="M7 4v16l14-8z"/></svg>',
@@ -294,13 +324,11 @@ function load(k) { if (PREVIEW) return memory.has(k) ? memory.get(k) : null; try
 /* Watch time, per show per local day, in seconds. Each device keeps its own
    counts (mine) and the server returns the sum of all other devices (others),
    so every phone and tablet shares one day. watch/vwatch = mine + others. */
-// A copy opened on this computer for testing (localhost) never talks to the real
-// server, so tests do not count toward Noyan's time or show in the report.
-const LOCAL_TEST = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname) || location.hostname.endsWith(".localhost");
-// On our own addresses the stats server is on the same site; elsewhere (the
-// GitHub copy) it is reached at ntv.financemind.com.
-const OWN_HOSTS = ["noyantv.com", "ntv.financemind.com"];
-const API = LOCAL_TEST || PREVIEW ? null : OWN_HOSTS.includes(location.hostname) ? location.origin + "/api/sync" : "https://ntv.financemind.com/api/sync";
+// Where the server is and the family login: see auth.js. A copy on this
+// computer (localhost) or the design preview has no server, so tests never
+// count toward Noyan's time.
+const LOCAL_TEST = NT.local;
+const API = PREVIEW || !NT.base ? null : NT.base + "/sync";
 function parse(k) { try { return JSON.parse(load(k) || "{}") || {}; } catch (e) { return {}; } }
 const mine = { watch: parse("watch"), vwatch: parse("vwatch"), turnEnds: parse("turnEnds"), pos: parse("pos") };
 /* Action log: every open, play, pause, home, end, time-up… with the time, the
@@ -372,7 +400,8 @@ async function sync(again = true) {
   let wiped = false;
   try {
     const sent = logQueue.length;
-    const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain" }, body: syncBody({ log: logQueue.slice(0, 500) }) });
+    const r = await fetch(API, { method: "POST", headers: NT.headers(), body: syncBody({ log: logQueue.slice(0, 500) }) });
+    if (r.status === 401) { NT.setToken(""); showPair(); return; } // this device was logged out
     if (r.ok) {
       const j = await r.json();
       if (j.reset && j.reset > resetSeen) { wipe(j.reset, j.resetDay); wiped = true; }
@@ -1150,14 +1179,39 @@ function refreshHome() {
 document.addEventListener("visibilitychange", () => {
   logAction(document.hidden ? "hide" : "show");
   if (document.hidden) {
-    if (API) try { navigator.sendBeacon(API, new Blob([syncBody()], { type: "text/plain" })); } catch (e) {}
+    if (API && NT.token()) try { fetch(API, { method: "POST", keepalive: true, headers: NT.headers(), body: syncBody() }); } catch (e) {}
   } else if (!$("home").hidden) { renderGrid(); sync().then(refreshHome); }
 });
 // Every 30 seconds: share counts with the other devices and notice when a break ends.
 setInterval(() => { sync().then(refreshHome); }, 30000);
 
 logAction("app", { ua: navigator.userAgent.slice(0, 200), size: innerWidth + "x" + innerHeight });
-Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), sync()]).then(([d]) => {
+/* Not logged in yet: show a QR code. A parent scans it with the phone, logs
+   in and approves; this device then gets its own login and the app starts. */
+let pairTimer = null;
+async function showPair() {
+  clearTimeout(pairTimer);
+  for (const id of ["home", "stage", "game"]) $(id).hidden = true;
+  $("pair").hidden = false;
+  const r = await NT.call("/pair/new");
+  if (!r.ok || !r.body) { $("pairCode").textContent = "…"; pairTimer = setTimeout(showPair, 5000); return; }
+  const link = location.origin + "/?c=" + r.body.code; // short, so it fits the small QR code
+  $("pairQr").innerHTML = qrSvg(link);
+  $("pairCode").textContent = r.body.code;
+  $("pairLink").href = "account.html?back=app";
+  const wait = async () => {
+    if ($("pair").hidden) return;
+    const w = await NT.call("/pair/wait", { pair: r.body.pair });
+    if (w.body && w.body.status === "ok") { NT.setToken(w.body.token); location.reload(); }
+    else if (w.body && w.body.status === "expired") showPair();
+    else pairTimer = setTimeout(wait, 2000);
+  };
+  pairTimer = setTimeout(wait, 2000);
+}
+NT.onLogout = showPair;
+
+if (API && !NT.token()) showPair();
+else Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), sync()]).then(([d]) => {
   data = d;
   renderGrid();
 });
