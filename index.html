@@ -179,9 +179,33 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .video .num { min-width: clamp(26px, calc(var(--tile, 300px) * .1), 56px) !important; height: clamp(26px, calc(var(--tile, 300px) * .1), 56px) !important;
   line-height: clamp(26px, calc(var(--tile, 300px) * .1), 56px) !important; font-size: clamp(15px, calc(var(--tile, 300px) * .06), 32px) !important; border-radius: 99px; }
 .video .topic { font-size: clamp(22px, calc(var(--tile, 300px) * .08), 52px) !important; }
-.rest { display: grid; justify-items: center; gap: 12px; padding-block: 12vh; text-align: center; }
-.rest .moon { font-size: clamp(110px, 22vw, 180px); line-height: 1; animation: bob 2.4s ease-in-out infinite; }
-.rest p { margin: 0; font-family: var(--body); font-weight: 700; font-size: 20px; opacity: .75; }
+/* Break and end of day: one full screen picture, no scrolling. Break: a
+   sunny playground slide ("go and play"). End of day: the moon and twinkling
+   stars ("see you tomorrow"). Drawn as SVG so the TV shows the colours. */
+.rest { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 4; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 2vh; padding: 4vh 16px; text-align: center; overflow: hidden; direction: rtl; }
+.rest.break { background: linear-gradient(#8fd3ff, #d9f2ff 62%, #bfe8ad); color: #1d2b4f; }
+.rest.tomorrow { background: radial-gradient(ellipse at 50% 0%, #2c3f80 0%, #14204a 55%, #0b1230 100%); color: #f2f5ff; }
+.rest .scene { width: min(78vw, 92vh); height: min(52vh, 58vw); }
+.rest .scene svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.rest h1 { margin: 0; font: 700 clamp(30px, 7vh, 64px)/1.2 var(--body); }
+.rest p { margin: 0; font: 500 clamp(16px, 3vh, 28px)/1.5 var(--body); opacity: .8; }
+.home.resting .top, .home.resting .grid { display: none !important; }
+.rest .tw { animation: twinkle 2.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes twinkle { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
+.rest .float { animation: bob 3.4s ease-in-out infinite; }
+.rest .spin { animation: spin 30s linear infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes spin { to { transform: rotate(360deg); } }
+/* Night theme: from 7 in the evening to 6 in the morning the app turns dark and calm, with stars. */
+body.night { --sky: #14204a; --ink: #eef2ff; --card: #26366a; --shade: rgba(0, 0, 0, .35);
+  background: radial-gradient(ellipse at 50% 0%, #26397a 0%, #14204a 55%, #0b1230 100%) fixed; color-scheme: dark; }
+body.night::before { content: ""; position: fixed; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; z-index: 0; opacity: .7;
+  background-image: radial-gradient(2px 2px at 8% 12%, #fff 50%, transparent 51%), radial-gradient(2px 2px at 22% 40%, #fff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 35% 8%, #fff 50%, transparent 51%), radial-gradient(2px 2px at 48% 22%, #fff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 63% 6%, #fff 50%, transparent 51%), radial-gradient(2px 2px at 77% 30%, #fff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 90% 14%, #fff 50%, transparent 51%), radial-gradient(2px 2px at 14% 78%, #fff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 56% 88%, #fff 50%, transparent 51%), radial-gradient(2px 2px at 86% 70%, #fff 50%, transparent 51%); }
+body.night .home { position: relative; z-index: 1; }
 
 /* Player screen */
 .stage { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: #0d1426; display: grid; grid-template-rows: 1fr auto; z-index: 5; }
@@ -232,6 +256,14 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .ring::after { right: -24%; border-color: transparent #fff transparent transparent; }
 @keyframes ring { from { transform: rotate(-16deg); } to { transform: rotate(16deg); } }
 @keyframes waves { from { opacity: .9; transform: scale(.8); } to { opacity: 0; transform: scale(1.3); } }
+.ring svg { width: clamp(140px, 30vmin, 230px); height: auto; display: block; }
+.donescene { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3vh; }
+.donescene.break { background: linear-gradient(#8fd3ff, #d9f2ff 62%, #bfe8ad); }
+.donescene.tomorrow { background: radial-gradient(ellipse at 50% 0%, #2c3f80 0%, #14204a 55%, #0b1230 100%); }
+.donescene .pop { width: min(64vw, 70vh); }
+.donescene .pop svg { width: 100%; height: auto; display: block; overflow: visible; }
+.donescene.break .msg { color: #1d2b4f; }
+.donescene .msg { font-size: clamp(26px, 6vh, 54px); }
 .pop { font-size: clamp(110px, 24vmin, 180px); line-height: 1; animation: pop .7s cubic-bezier(.3, 1.6, .5, 1) both, bob 2.4s ease-in-out .7s infinite; }
 @keyframes pop { from { transform: scale(0) rotate(-30deg); } to { transform: scale(1); } }
 @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
@@ -261,7 +293,11 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
     </div>
   </div>
   <section class="grid" id="grid" aria-live="polite"></section>
-  <section class="rest" id="rest" hidden><div class="moon" id="restIcon" aria-hidden="true">🌙</div><p id="restText">برای امروز بس است. فردا دوباره.</p></section>
+  <section class="rest" id="rest" hidden>
+    <div class="scene" id="restScene" aria-hidden="true"></div>
+    <h1 id="restTitle"></h1>
+    <p id="restText"></p>
+  </section>
 </main>
 
 <button class="parents" id="parentsBtn" aria-label="Parents: hold for 2 seconds"><svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 1 1 6 0v3z"/></svg></button>
@@ -620,17 +656,55 @@ function renderBudget() {
   return st;
 }
 
+const SLIDE_SCENE = `<svg viewBox="0 0 400 260">
+  <g class="spin"><circle cx="335" cy="55" r="30" fill="#ffd23f"/>${Array.from({ length: 10 }, (_, i) => { const a = i * 36 * Math.PI / 180;
+    return `<line x1="${335 + Math.cos(a) * 38}" y1="${55 + Math.sin(a) * 38}" x2="${335 + Math.cos(a) * 50}" y2="${55 + Math.sin(a) * 50}" stroke="#ffd23f" stroke-width="6" stroke-linecap="round"/>`; }).join("")}</g>
+  <g class="float" fill="#fff" opacity=".95"><ellipse cx="80" cy="50" rx="34" ry="16"/><ellipse cx="106" cy="42" rx="24" ry="16"/><ellipse cx="200" cy="30" rx="26" ry="12"/></g>
+  <ellipse cx="200" cy="250" rx="260" ry="34" fill="#7cc96b"/>
+  <g stroke="#5b3a9e" stroke-width="7" stroke-linecap="round"><line x1="104" y1="228" x2="122" y2="92"/><line x1="140" y1="228" x2="152" y2="92"/>
+    ${[200, 172, 144, 116].map((y) => `<line x1="${108 + (228 - y) * 0.13}" y1="${y}" x2="${142 + (228 - y) * 0.09}" y2="${y}"/>`).join("")}</g>
+  <rect x="112" y="80" width="54" height="14" rx="6" fill="#5b3a9e"/>
+  <path d="M160 88 C 220 92, 230 200, 330 214" stroke="#e63946" stroke-width="26" fill="none" stroke-linecap="round"/>
+  <path d="M160 88 C 220 92, 230 200, 330 214" stroke="#ff8a95" stroke-width="8" fill="none" stroke-linecap="round" opacity=".8"/>
+  <line x1="300" y1="212" x2="300" y2="230" stroke="#5b3a9e" stroke-width="7" stroke-linecap="round"/>
+  <g transform="translate(246 158) rotate(28)"><circle cx="0" cy="-22" r="11" fill="#f4c7a1"/><rect x="-9" y="-12" width="18" height="22" rx="8" fill="#2f7fe0"/>
+    <line x1="-8" y1="-6" x2="-20" y2="-16" stroke="#f4c7a1" stroke-width="5" stroke-linecap="round"/><line x1="8" y1="-6" x2="20" y2="-16" stroke="#f4c7a1" stroke-width="5" stroke-linecap="round"/>
+    <path d="M-6 -24 q6 6 12 0" stroke="#5b3a2e" stroke-width="2" fill="none"/></g>
+</svg>`;
+const ALARM_SVG = `<svg viewBox="0 0 120 120"><g stroke="#d62839" stroke-width="7" stroke-linecap="round"><line x1="30" y1="104" x2="22" y2="114"/><line x1="90" y1="104" x2="98" y2="114"/></g>
+  <circle cx="26" cy="26" r="16" fill="#f4b400"/><circle cx="94" cy="26" r="16" fill="#f4b400"/>
+  <circle cx="60" cy="66" r="44" fill="#d62839"/><circle cx="60" cy="66" r="35" fill="#fff"/>
+  <g stroke="#1d2b4f" stroke-width="5" stroke-linecap="round"><line x1="60" y1="66" x2="60" y2="42"/><line x1="60" y1="66" x2="76" y2="74"/></g><circle cx="60" cy="66" r="5" fill="#1d2b4f"/>
+  <rect x="54" y="14" width="12" height="10" rx="3" fill="#d62839"/></svg>`;
+const NIGHT_SCENE = `<svg viewBox="0 0 400 260">
+  <defs><mask id="crescent"><rect width="400" height="260" fill="#fff"/><circle cx="232" cy="92" r="58" fill="#000"/></mask></defs>
+  <g class="float"><circle cx="200" cy="110" r="68" fill="#ffe08a" mask="url(#crescent)"/>
+    <circle cx="170" cy="120" r="6" fill="#e0b84f" opacity=".6" mask="url(#crescent)"/><circle cx="160" cy="92" r="4" fill="#e0b84f" opacity=".6" mask="url(#crescent)"/>
+    <path d="M148 120 q8 7 16 0" stroke="#7a5a10" stroke-width="3" fill="none" stroke-linecap="round" mask="url(#crescent)"/>
+    <path d="M140 104 q6 -4 12 0" stroke="#7a5a10" stroke-width="3" fill="none" stroke-linecap="round"/></g>
+  ${[[50, 50, 1], [96, 150, 0.7], [300, 40, 1.1], [350, 120, 0.8], [270, 190, 0.6], [40, 200, 0.9], [330, 220, 0.7], [120, 30, 0.6]].map(([x, y, k], i) =>
+    `<path class="tw" style="animation-delay:${i * 0.35}s" transform="translate(${x} ${y}) scale(${k})" d="M0 -12 L3 -4 L12 -4 L5 1 L8 10 L0 5 L-8 10 L-5 1 L-12 -4 L-3 -4 Z" fill="#fff6c8"/>`).join("")}
+  <g class="float" style="animation-delay:.8s"><ellipse cx="290" cy="200" rx="44" ry="18" fill="#3d4f8f"/><ellipse cx="312" cy="188" rx="26" ry="16" fill="#3d4f8f"/>
+    <text x="318" y="160" fill="#c9d4ff" font-size="22" font-family="Fredoka, sans-serif">z</text><text x="334" y="142" fill="#c9d4ff" font-size="16" font-family="Fredoka, sans-serif">z</text></g>
+</svg>`;
+// Night theme from 7 pm to 6 am.
+function applyNight() { const h = new Date().getHours(); document.body.classList.toggle("night", h >= 19 || h < 6); }
+applyNight();
+setInterval(applyNight, 60000);
 function renderGrid() {
   const st = renderBudget();
   lastMode = st.mode;
   $("grid").innerHTML = "";
   $("rest").hidden = st.mode === "watch";
+  $("home").classList.toggle("resting", st.mode !== "watch");
   if (st.mode !== "watch") {
     // Break: go and play. Last turn used: see you tomorrow.
-    $("restIcon").textContent = st.mode === "break" ? "🛝" : "🌙";
-    $("restText").textContent = st.mode === "break" ? "وقت بازی! بعداً دوباره." : "برای امروز بس است. فردا دوباره.";
+    const brk = st.mode === "break";
+    $("rest").className = "rest " + (brk ? "break" : "tomorrow");
+    $("restScene").innerHTML = brk ? SLIDE_SCENE : NIGHT_SCENE;
+    $("restTitle").textContent = brk ? "وقت بازی!" : "برای امروز بس است";
+    $("restText").textContent = brk ? $("leftText").textContent : "شب بخیر. فردا دوباره.";
     $("todayTopic").hidden = true;
-    fitGrid();
     return;
   }
   const tod = topicOfDay(), pt = pageTopic();
@@ -808,11 +882,11 @@ function stopForToday() {
   const brk = timeState().mode === "break";
   // A child can't read: first an alarm clock rings with a soft bell, then the
   // slide (go and play) or the moon (see you tomorrow) pops in with a little tune.
-  showCover(`<div class="done"><div class="ring" aria-label="Time is up">⏰</div></div>`, null);
+  showCover(`<div class="done"><div class="ring" aria-label="Time is up">${ALARM_SVG}</div></div>`, null);
   timeUpSound();
   setTimeout(() => {
     if ($("stage").hidden) return;
-    showCover(`<div class="done"><div class="pop">${brk ? "🛝" : "🌙"}</div><div class="msg small">${brk ? "وقت بازی! بعداً دوباره." : "برای امروز بس است. فردا دوباره."}</div>${homeButton("backBtn")}</div>`, null);
+    showCover(`<div class="donescene ${brk ? "break" : "tomorrow"}"><div class="pop">${brk ? SLIDE_SCENE : NIGHT_SCENE}</div><div class="msg">${brk ? "وقت بازی!" : "برای امروز بس است"}</div>${homeButton("backBtn")}</div>`, null);
     $("backBtn").onclick = goHome;
   }, 2600);
 }
