@@ -56,7 +56,7 @@ ORIGINS = {"https://noyantv.com", "https://ntv.financemind.com", "https://financ
 if os.environ.get("STATS_DEV"):
     ORIGINS.add("http://localhost:8765")  # local testing only
 MAX_BODY = 200_000
-MAX_DEVICES = 30
+MAX_DEVICES = 100  # per family; old devices that stopped syncing stay in the history
 PAIR_SECONDS = 600
 DAY = re.compile(r"^\d{4}-\d{1,2}-\d{1,2}$")
 KEY = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
