@@ -18,6 +18,11 @@ Pairing a TV (or any device) with a QR code
     POST /api/devices                           (auth) -> the family's logins
     POST /api/devices/remove {id}               (parent auth)
 
+Parents' code (4 digits, so the child cannot open the report)
+    POST /api/pin/status                        (auth) -> {set}
+    POST /api/pin/check {pin}                   (auth) -> ok; 5 wrong tries lock it for 10 minutes
+    POST /api/pin/set {pin, old?}               (parent auth; old needed to change an existing code)
+
 Watch data (all need auth and only touch that family's files)
     POST /api/sync, /api/reset, /api/plan       as before (see the app).
     Each device sends its own counts; the reply is the sum of the family's
@@ -61,6 +66,8 @@ CODE_CHARS = "ACDEFGHJKMNPQRTUVWXY3479"  # no look-alikes (0/O, 1/I/L, 5/S, 8/B,
 lock = threading.Lock()
 pairs = {}        # pair id -> {code, created, fid, token}
 fails = {}        # (ip, email) -> [count, first fail time]
+pin_fails = {}    # family id -> [count, first fail time]
+PIN = re.compile(r"^[0-9]{4}$")
 
 
 # ---------- small file helpers ----------
@@ -241,6 +248,40 @@ def remove_login(fid, short_id):
                 write_json(SESSIONS, sessions)
                 return True
         return False
+
+
+# ---------- parents' code ----------
+
+def pin_info(fid):
+    return read_json(fam_path(fid, "settings.json"), {})
+
+
+def pin_ok(fid, pin):
+    """True / False, or None while locked after too many wrong tries."""
+    f = pin_fails.get(fid)
+    if f and time.time() - f[1] > 600:
+        pin_fails.pop(fid, None)
+        f = None
+    if f and f[0] >= 5:
+        return None
+    info = pin_info(fid)
+    if not info.get("pin_hash"):
+        return True
+    good = hmac.compare_digest(hash_password(pin, info["pin_salt"])[1], info["pin_hash"])
+    if good:
+        pin_fails.pop(fid, None)
+    else:
+        f = pin_fails.setdefault(fid, [0, time.time()])
+        f[0] += 1
+    return good
+
+
+def pin_set(fid, pin):
+    salt, h = hash_password(pin)
+    with lock:
+        info = pin_info(fid)
+        info.update({"pin_salt": salt, "pin_hash": h})
+        write_json(fam_path(fid, "settings.json"), info)
 
 
 # ---------- one family's watch data ----------
@@ -494,6 +535,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {"kind": s["kind"], "who": s["who"], "family": acc["families"].get(fid, {}).get("name", "")})
         if path == "/api/devices":
             return self.reply(200, family_logins(fid, sha(tok)))
+        if path == "/api/pin/status":
+            return self.reply(200, {"set": bool(pin_info(fid).get("pin_hash"))})
+        if path == "/api/pin/check":
+            ok = pin_ok(fid, str(body.get("pin", "")))
+            if ok is None:
+                return self.reply(429, {"error": "wait"})
+            return self.reply(200, {"ok": True}) if ok else self.reply(403, {"error": "pin"})
         if path == "/api/sync":
             if not (isinstance(body.get("device"), str) and KEY.match(body["device"])):
                 return self.reply(400, {"error": "bad request"})
@@ -514,6 +562,16 @@ class Handler(BaseHTTPRequestHandler):
         # --- parents only ---
         if s["kind"] != "parent":
             return self.reply(403, {"error": "parents only"})
+        if path == "/api/pin/set":
+            pin = str(body.get("pin", ""))
+            if not PIN.match(pin):
+                return self.reply(400, {"error": "pin must be 4 digits"})
+            if pin_info(fid).get("pin_hash"):
+                ok = pin_ok(fid, str(body.get("old", "")))
+                if not ok:
+                    return self.reply(429 if ok is None else 403, {"error": "old pin"})
+            pin_set(fid, pin)
+            return self.reply(200, {"ok": True})
         if path == "/api/pair/approve":
             code = str(body.get("code", "")).strip().upper()
             ok = pair_approve(code, fid, str(body.get("label", ""))[:40])

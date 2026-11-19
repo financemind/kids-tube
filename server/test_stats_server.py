@@ -110,6 +110,21 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.post("/api/devices/remove", {"id": mine["id"]}, a)[1]["ok"], True)
         self.assertEqual(self.post("/api/sync", {"device": "a2", "data": {}}, a)[0], 401)
 
+    def test_parents_code(self):
+        parent = self.signup()
+        self.assertEqual(self.post("/api/pin/status", {}, parent)[1]["set"], False)
+        self.assertEqual(self.post("/api/pin/set", {"pin": "12a4"}, parent)[0], 400)
+        self.assertEqual(self.post("/api/pin/set", {"pin": "4321"}, parent)[0], 200)
+        self.assertEqual(self.post("/api/pin/check", {"pin": "4321"}, parent)[0], 200)
+        self.assertEqual(self.post("/api/pin/check", {"pin": "0000"}, parent)[0], 403)
+        self.assertEqual(self.post("/api/pin/set", {"pin": "1111"}, parent)[0], 403)  # changing needs the old code
+        self.assertEqual(self.post("/api/pin/set", {"pin": "1111", "old": "4321"}, parent)[0], 200)
+        for _ in range(5):
+            self.post("/api/pin/check", {"pin": "9999"}, parent)
+        self.assertEqual(self.post("/api/pin/check", {"pin": "1111"}, parent)[0], 429)  # locked after 5 wrong tries
+        other = self.signup("dad@example.org")
+        self.assertEqual(self.post("/api/pin/status", {}, other)[1]["set"], False)  # each family has its own code
+
     def test_plan_and_reset_stay_in_family(self):
         a, b = self.signup(), self.signup("dad@example.org")
         self.post("/api/plan", {"day": "2026-11-19", "turns": 3, "minutes": 25}, a)

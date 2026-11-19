@@ -58,6 +58,14 @@ td.n { font-variant-numeric: tabular-nums; white-space: nowrap; }
 td.t { direction: ltr; text-align: left; min-width: 180px; }
 tr.quiet td { color: var(--muted); font-size: 13px; }
 .empty { color: var(--muted); }
+.pingate { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 20; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.pinbox { background: var(--card); border-radius: 20px; padding: 22px; width: min(340px, 100%); display: grid; gap: 12px; justify-items: center; border: 1px solid var(--line); }
+.pindots { display: flex; gap: 14px; direction: ltr; }
+.pindots i { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--bar); }
+.pindots i.on { background: var(--bar); }
+.pinpad { display: grid; grid-template-columns: repeat(3, 72px); gap: 10px; direction: ltr; }
+.pinpad button { font: 700 26px/1 var(--font); height: 64px; border-radius: 16px; border: 1px solid var(--line); background: #f3f7fb; color: var(--ink); cursor: pointer; }
+.pinmsg { color: var(--stop); min-height: 1.2em; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
 .chips button, button.go { font: inherit; font-weight: 700; border-radius: 12px; padding: 8px 14px; cursor: pointer; }
 .chips button { background: var(--bg); color: var(--ink); border: 2px solid var(--line); }
@@ -74,6 +82,17 @@ button.danger:disabled { opacity: .6; cursor: default; }
 </style>
 </head>
 <body>
+<!-- Parents' code: a 4-digit code before the report opens, so the child cannot get in. -->
+<div class="pingate" id="pinGate" hidden>
+  <div class="pinbox">
+    <h2 id="pinTitle">کد پدر و مادر</h2>
+    <p class="note" id="pinHelp">کد ۴ رقمی را بزنید.</p>
+    <div class="pindots" id="pinDots"><i></i><i></i><i></i><i></i></div>
+    <div class="pinpad" id="pinPad"></div>
+    <p class="note pinmsg" id="pinMsg"></p>
+    <a class="back" href="./">برگشت</a>
+  </div>
+</div>
 <div class="wrap">
   <header>
     <h1>گزارش تماشای نویان</h1>
@@ -178,6 +197,54 @@ let watch = read("watch"), vwatch = read("vwatch");
 const LOCAL_TEST = !NT.base;
 const API = NT.base ? NT.base + "/sync" : null;
 if (API && !NT.token()) location.replace("account.html");
+
+/* Parents' code. A correct code is remembered in this tab for 15 minutes.
+   No code yet: a parent's phone is asked to make one (typed twice). */
+function pinGate() {
+  return new Promise(async (done) => {
+    let okUntil = 0;
+    try { okUntil = Number(sessionStorage.getItem("pinOk")) || 0; } catch (e) {}
+    if (!API || okUntil > Date.now()) return done();
+    const st = await NT.call("/pin/status"), me = await NT.call("/me");
+    if (!st.ok) return done();
+    const making = !st.body.set;
+    if (making && !(me.body && me.body.kind === "parent")) return done(); // a TV before any code exists
+    let typed = "", first = null;
+    $("pinGate").hidden = false;
+    $("pinTitle").textContent = making ? "ساختن کد پدر و مادر" : "کد پدر و مادر";
+    $("pinHelp").textContent = making ? "یک کد ۴ رقمی بسازید که نویان نداند. از این به بعد برای باز کردن گزارش لازم است." : "کد ۴ رقمی را بزنید.";
+    const dots = () => [...$("pinDots").children].forEach((d, i) => d.classList.toggle("on", i < typed.length));
+    const press = async (k) => {
+      $("pinMsg").textContent = "";
+      if (k === "⌫") typed = typed.slice(0, -1); else if (typed.length < 4) typed += k;
+      dots();
+      if (typed.length < 4) return;
+      const code = typed; typed = ""; setTimeout(dots, 200);
+      if (making && first === null) { first = code; $("pinHelp").textContent = "یک بار دیگر همان کد را بزنید."; return; }
+      if (making) {
+        if (code !== first) { first = null; $("pinMsg").textContent = "دو کد یکی نبود. از اول بزنید."; $("pinHelp").textContent = "یک کد ۴ رقمی بسازید."; return; }
+        const r = await NT.call("/pin/set", { pin: code });
+        if (!r.ok) { $("pinMsg").textContent = "نشد. دوباره امتحان کنید."; first = null; return; }
+      } else {
+        const r = await NT.call("/pin/check", { pin: code });
+        if (r.status === 429) { $("pinMsg").textContent = "چند بار اشتباه شد. ۱۰ دقیقهٔ دیگر دوباره امتحان کنید."; return; }
+        if (!r.ok) { $("pinMsg").textContent = "کد درست نیست."; return; }
+      }
+      try { sessionStorage.setItem("pinOk", String(Date.now() + 15 * 60000)); } catch (e) {}
+      $("pinGate").hidden = true;
+      done();
+    };
+    $("pinPad").innerHTML = "";
+    for (const k of ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"]) {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = k ? (k === "⌫" ? k : Number(k).toLocaleString("fa-IR")) : "";
+      if (!k) b.style.visibility = "hidden"; else b.onclick = () => press(k);
+      $("pinPad").appendChild(b);
+    }
+    dots();
+  });
+}
+const gate = pinGate(); // everything below waits for it
 NT.onLogout = () => location.replace("account.html");
 function addStores(a, b) {
   const out = {};
@@ -290,7 +357,7 @@ $("addParent").onsubmit = async (e) => {
     : r.status === 409 ? "این ایمیل قبلاً حساب دارد." : r.status === 403 ? "فقط پدر یا مادر می‌تواند این کار را بکند." : "ایمیل درست نیست یا رمز کوتاه است.";
   if (r.ok) { $("apEmail").value = ""; $("apPass").value = ""; showLogins(); }
 };
-if (API) showLogins();
+if (API) gate.then(showLogins);
 
 /* Today's turns: quick picks or any count × minutes. Saved on the server for every device. */
 const PRESETS = [[2, 30], [3, 25], [3, 30], [4, 15], [5, 20], [6, 15]];
@@ -330,7 +397,7 @@ function setupPlan(daily, plans) {
   $("planBtn").onclick = () => savePlan(daily, +$("planTurns").value, +$("planMinutes").value);
   showPlan(daily, plans);
 }
-Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), getDevices()]).then(([data, all]) => {
+gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), getDevices()]).then(([data, all]) => {
   if (all && all.devices) {
     const list = Object.entries(all.devices);
     watch = {}; vwatch = {};
@@ -436,7 +503,7 @@ Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), 
       cell(e.t != null && e.v ? mmss(e.t) : "", "n"), cell(e.dl || ""));
     $("log").appendChild(tr);
   }
-});
+}));
 </script>
 </body>
 </html>

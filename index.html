@@ -107,6 +107,8 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
    top) and the list of big videos. Sizes (--clock, --tile, --listh) are
    worked out from the screen in fitGrid(). */
 .top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.parentstop { margin-inline-end: auto; align-self: flex-start; background: var(--card); color: var(--ink); text-decoration: none; font: 700 15px/1 var(--body);
+  padding: 10px 14px; border-radius: 99px; box-shadow: 0 4px 0 var(--shade); }
 .top .today-topic { display: none !important; } /* the parents asked for no topic label at the top */
 .top { justify-content: flex-end; }
 /* The clock: its coloured slice is the time left in this turn and its hand
@@ -241,6 +243,7 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 
 <main class="home" id="home">
   <div class="top">
+    <a class="parentstop" id="parentsTop" href="parents.html" hidden>👤 پدر و مادر</a>
     <p class="today-topic" id="todayTopic" hidden></p>
     <div class="clock">
       <div class="bigclock" id="bigClock" aria-hidden="true">
@@ -1210,6 +1213,8 @@ async function showPair() {
 }
 NT.onLogout = showPair;
 
+// A parent's own phone gets a "parents" button at the top (the report asks for the 4-digit code).
+if (API && NT.token()) NT.call("/me").then((r) => { if (r.ok && r.body && r.body.kind === "parent") $("parentsTop").hidden = false; });
 if (API && !NT.token()) showPair();
 else Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), sync()]).then(([d]) => {
   data = d;
