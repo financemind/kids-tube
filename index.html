@@ -113,20 +113,17 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
    ticks every second, so it is clear it is alive. Small circles beside it
    show all of today's turns. */
 .clock { display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 14px; row-gap: 6px; align-items: center; direction: ltr; }
-/* Christmas clock: a red-and-white candy-cane ring, a green slice for the
-   time left on a snowy face, a gold star on top and a red hand. */
-.bigclock { grid-row: 1 / span 2; position: relative; width: var(--clock, 92px); aspect-ratio: 1; border-radius: 50%; --c: #1e9b4f;
-  background: repeating-conic-gradient(#d62839 0 9deg, #fff 9deg 18deg);
-  box-shadow: 0 calc(var(--clock, 92px) * .05) 0 var(--shade);
+/* Christmas clock, drawn as SVG so older TV browsers show it too: a
+   red-and-white candy-cane ring, a green slice for the time left on a snowy
+   face, a gold star on top and a red hand. */
+.bigclock { grid-row: 1 / span 2; position: relative; width: var(--clock, 92px); height: var(--clock, 92px); border-radius: 50%;
+  box-shadow: 0 6px 0 var(--shade);
   margin: calc(var(--clock, 92px) * .16) calc(var(--clock, 92px) * .04) calc(var(--clock, 92px) * .04); } /* room for the star */
-.bigclock::before { content: ""; position: absolute; inset: calc(var(--clock, 92px) * .085); border-radius: 50%;
-  border: calc(var(--clock, 92px) * .03) solid #fff; transition: background .6s;
-  background: conic-gradient(var(--c) calc(var(--p, 1) * 1turn), #fff8ee 0); }
-.bigclock::after { content: "⭐"; position: absolute; left: 50%; top: calc(var(--clock, 92px) * -.15); transform: translateX(-50%);
-  font-size: calc(var(--clock, 92px) * .2); line-height: 1; filter: drop-shadow(0 2px 2px rgba(0,0,0,.25)); }
-.bigclock.low { --c: #f4b400; }
-.bigclock.last { --c: #d62839; }
-.bigclock .hand { position: absolute; left: calc(50% - var(--clock, 92px) * .022); top: 9%; width: calc(var(--clock, 92px) * .044); height: 41%;
+.bigclock .face { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.bigclock .star { position: absolute; left: 50%; top: calc(var(--clock, 92px) * -.15); width: calc(var(--clock, 92px) * .22);
+  height: calc(var(--clock, 92px) * .22); margin-left: calc(var(--clock, 92px) * -.11); }
+
+.bigclock .hand { position: absolute; left: calc(50% - var(--clock, 92px) * .022); top: 14%; width: calc(var(--clock, 92px) * .044); height: 36%;
   border-radius: 99px; background: #a4161a; transform-origin: 50% 100%; animation: tick 60s steps(60) infinite; }
 .bigclock.still .hand { animation-play-state: paused; opacity: .35; }
 .bigclock .dot { position: absolute; left: calc(50% - var(--clock, 92px) * .07); top: calc(50% - var(--clock, 92px) * .07);
@@ -134,10 +131,10 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
   box-shadow: 0 0 0 calc(var(--clock, 92px) * .02) #a4161a; }
 /* Balloon game: balloons in the four remote colours float up a blue sky;
    pressing a colour key (or tapping a balloon or a dot) pops one of that colour. */
-.game { position: fixed; inset: 0; z-index: 6; background: linear-gradient(#8fd3ff, #d9f2ff 70%, #c9ecc0); overflow: hidden; }
-.sky { position: absolute; inset: 0; }
-.balloon { position: absolute; width: var(--bw); height: calc(var(--bw) * 1.22); border-radius: 50% 50% 48% 52% / 58% 58% 42% 42%;
-  background: radial-gradient(circle at 32% 28%, rgba(255,255,255,.75) 0 9%, transparent 10%), var(--col);
+.game { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 6; background: linear-gradient(#8fd3ff, #d9f2ff 70%, #c9ecc0); overflow: hidden; }
+.sky { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
+.balloon { position: absolute; top: 0; width: var(--bw); height: calc(var(--bw) * 1.22); border-radius: 50% 50% 48% 52% / 58% 58% 42% 42%;
+  background-image: radial-gradient(circle at 32% 28%, rgba(255,255,255,.75) 0, rgba(255,255,255,.75) 9%, rgba(255,255,255,0) 10%);
   box-shadow: inset -8px -10px 0 rgba(0,0,0,.12); cursor: pointer; }
 .balloon::after { content: ""; position: absolute; left: 50%; bottom: calc(var(--bw) * -.55); width: 2px; height: calc(var(--bw) * .55); background: rgba(29,43,79,.45); }
 .balloon::before { content: ""; position: absolute; left: calc(50% - 7px); bottom: -8px; border: 7px solid transparent; border-bottom: 10px solid var(--col); transform: rotate(180deg); }
@@ -149,16 +146,17 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .keys .k { display: block; width: 64px; height: 64px; border-radius: 50%; border: 5px solid #fff; box-shadow: 0 5px 0 rgba(0,0,0,.18); cursor: pointer; }
 .k.red { background: #e63946; } .k.green { background: #2a9d4b; } .k.yellow { background: #f6c90e; } .k.blue { background: #2f7fe0; }
 .gamehome { position: absolute; top: max(16px, env(safe-area-inset-top)); left: 16px; }
-.game .done { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; }
-.video.gamecard { display: grid; place-items: center; aspect-ratio: 16 / 9; background: linear-gradient(#8fd3ff, #d9f2ff); font-size: calc(var(--tile, 300px) * .2); }
+.game .done { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: grid; place-items: center; align-content: center; }
+.video.gamecard { display: flex; align-items: center; justify-content: center; height: calc(var(--tile, 300px) * .5625);
+  background: #bfe6ff; background-image: linear-gradient(#8fd3ff, #d9f2ff); font-size: calc(var(--tile, 300px) * .2); }
 @keyframes tick { to { transform: rotate(360deg); } }
 .tracks { align-self: end; display: flex; align-items: center; gap: 8px; }
 .track { width: calc(var(--clock, 92px) * .24); height: calc(var(--clock, 92px) * .24); border-radius: 50%; border: 3px solid var(--card);
-  box-shadow: 0 3px 0 var(--shade); background: conic-gradient(var(--c, var(--leaf)) calc(var(--p, 1) * 1turn), #dfe7f0 0); }
+  box-shadow: 0 3px 0 var(--shade); background: #1e9b4f; }
+.track.spent { background: #dfe7f0; }
 .track.now { outline: 3px solid var(--ink); outline-offset: 1px; }
-.track { --c: #1e9b4f; }
-.track.low { --c: #f4b400; }
-.track.last { --c: #d62839; }
+.track.low { background: #f4b400; }
+.track.last { background: #d62839; }
 .track.waiting { opacity: .45; }
 .left-text { align-self: start; margin: 0; direction: rtl; font-size: clamp(13px, calc(var(--clock, 92px) * .1), 22px); opacity: .7; }
 .top .today-topic { font-size: clamp(16px, calc(var(--clock, 92px) * .13), 28px); }
@@ -172,18 +170,18 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .rest p { margin: 0; font-family: var(--body); font-weight: 700; font-size: 20px; opacity: .75; }
 
 /* Player screen */
-.stage { position: fixed; inset: 0; background: #0d1426; display: grid; grid-template-rows: 1fr auto; z-index: 5; }
+.stage { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: #0d1426; display: grid; grid-template-rows: 1fr auto; z-index: 5; }
 .frame { position: relative; overflow: hidden; }
-.frame > div, .frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.frame > div, .frame iframe { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; border: 0; }
 /* The video itself also plays with softer colours. */
 .frame iframe, #player { filter: saturate(.5); }
 /* Shield: stops every tap from reaching YouTube (no titles, logos, or suggested videos can be opened). */
-.shield { position: absolute; inset: 0; z-index: 2; }
+.shield { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 2; }
 .cover {
-  position: absolute; inset: 0; z-index: 3; display: grid; place-items: center;
+  position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 3; display: grid; place-items: center;
   background: #0d1426 center/cover no-repeat;
 }
-.cover::before { content: ""; position: absolute; inset: 0; background: rgba(13, 20, 38, .45); }
+.cover::before { content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: rgba(13, 20, 38, .45); }
 .bigbtn {
   position: relative; width: 132px; height: 132px; border-radius: 50%; background: var(--sun);
   display: grid; place-items: center; box-shadow: 0 8px 0 rgba(0,0,0,.25);
@@ -191,7 +189,7 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .bigbtn svg { width: 64px; height: 64px; fill: var(--ink); }
 /* Next video: a ring around the play button empties over 4 seconds, then it plays. */
 .bigbtn.next { overflow: visible; }
-.bigbtn .count { position: absolute; inset: -14px; width: calc(100% + 28px); height: calc(100% + 28px); transform: rotate(-90deg); fill: none; }
+.bigbtn .count { position: absolute; top: -14px; right: -14px; bottom: -14px; left: -14px; width: calc(100% + 28px); height: calc(100% + 28px); transform: rotate(-90deg); fill: none; }
 .bigbtn .count circle { stroke: #fff; stroke-width: 8; stroke-linecap: round; stroke-dasharray: 402; animation: countdown 4s linear forwards; }
 @keyframes countdown { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 402; } }
 .bar {
@@ -206,7 +204,7 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .restart-btn svg { fill: var(--ink); }
 .rotate-btn svg { transition: transform .3s; }
 /* Rotate button: turns the whole player a quarter turn, for watching lying on one side. */
-.stage.r90, .stage.r270 { inset: auto; top: 50%; left: 50%; width: 100vh; height: 100vw; width: 100dvh; height: 100dvw; }
+.stage.r90, .stage.r270 { top: auto; right: auto; bottom: auto; left: auto; top: 50%; left: 50%; width: 100vh; height: 100vw; width: 100dvh; height: 100dvw; }
 .stage.r90 { transform: translate(-50%, -50%) rotate(90deg); }
 .stage.r180 { transform: rotate(180deg); }
 .stage.r270 { transform: translate(-50%, -50%) rotate(270deg); }
@@ -233,7 +231,16 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
   <div class="top">
     <p class="today-topic" id="todayTopic" hidden></p>
     <div class="clock">
-      <div class="bigclock" id="bigClock" aria-hidden="true"><i class="hand"></i><i class="dot"></i></div>
+      <div class="bigclock" id="bigClock" aria-hidden="true">
+        <svg class="face" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="50" fill="#fff"/>
+          <circle cx="50" cy="50" r="45.5" fill="none" stroke="#d62839" stroke-width="8" stroke-dasharray="7.147 7.147"/>
+          <circle cx="50" cy="50" r="40" fill="#fff8ee" stroke="#fff" stroke-width="3"/>
+          <path id="clockSlice" fill="#1e9b4f" d=""/>
+        </svg>
+        <svg class="star" viewBox="0 0 24 24"><path d="M12 2l3 6.9 7.5.6-5.7 4.9 1.8 7.3L12 17.8 5.4 21.7l1.8-7.3L1.5 9.5 9 8.9z" fill="#f6c90e" stroke="#d99a00" stroke-width="1"/></svg>
+        <i class="hand"></i><i class="dot"></i>
+      </div>
       <div class="tracks" id="tracks" role="img" aria-label="Watching time left today"></div>
       <p class="left-text" id="leftText"></p>
     </div>
@@ -543,6 +550,15 @@ function dailyList(topicKey = null, want = null) {
 }
 
 let lastMode = null;
+// The green slice of the clock: a pie piece from 12 o'clock, clockwise, for the part of the turn that is left.
+function drawSlice(frac, color) {
+  const p = $("clockSlice"), r = 40, f = Math.max(0, Math.min(1, frac));
+  p.setAttribute("fill", color);
+  if (f >= 0.999) { p.setAttribute("d", "M50 10 A40 40 0 1 1 49.99 10 Z"); return; }
+  if (f <= 0.001) { p.setAttribute("d", ""); return; }
+  const a = f * 2 * Math.PI, x = 50 + r * Math.sin(a), y = 50 - r * Math.cos(a);
+  p.setAttribute("d", `M50 50 L50 10 A40 40 0 ${f > 0.5 ? 1 : 0} 1 ${x.toFixed(2)} ${y.toFixed(2)} Z`);
+}
 function renderBudget() {
   const st = timeState(), T = turnSecs(), n = turnCount(), box = $("tracks");
   if (box.children.length !== n) {
@@ -552,14 +568,14 @@ function renderBudget() {
   [...box.children].forEach((tr, i) => {
     const frac = i < st.turn ? 0 : i > st.turn ? 1 : st.mode === "watch" ? st.left / T : 1; // in a break the next turn waits, full
     tr.style.setProperty("--p", frac.toFixed(3));
-    tr.className = "track" + (i === st.turn && st.mode === "watch" ? " now" : "")
+    tr.className = "track" + (frac <= 0 ? " spent" : "") + (i === st.turn && st.mode === "watch" ? " now" : "")
       + (i === st.turn && frac <= 1 / 3 ? " last" : i === st.turn && frac <= 2 / 3 ? " low" : "")
       + (i > st.turn || (st.mode === "break" && i === st.turn) ? " waiting" : "");
   });
   const bc = $("bigClock");
   const curFrac = st.mode === "watch" ? st.left / T : 0;
-  bc.style.setProperty("--p", curFrac.toFixed(3));
-  bc.className = "bigclock" + (curFrac <= 1 / 3 ? " last" : curFrac <= 2 / 3 ? " low" : "") + (st.mode === "watch" ? "" : " still");
+  bc.className = "bigclock" + (st.mode === "watch" ? "" : " still");
+  drawSlice(curFrac, curFrac <= 1 / 3 ? "#d62839" : curFrac <= 2 / 3 ? "#f4b400" : "#1e9b4f");
   const fa = (x) => x.toLocaleString("fa-IR");
   let text = "";
   const nth = ["اول", "دوم", "سوم", "چهارم", "پنجم", "ششم", "هفتم", "هشتم"][st.turn] || fa(st.turn + 1);
@@ -947,6 +963,7 @@ function spawnBalloon() {
   const el = document.createElement("div");
   el.className = "balloon"; el.dataset.color = color;
   el.style.setProperty("--col", BALLOON[color]); el.style.setProperty("--bw", bw + "px");
+  el.style.backgroundColor = BALLOON[color]; el.style.width = bw + "px"; el.style.height = Math.round(bw * 1.22) + "px";
   const x = Math.random() * (innerWidth - bw - 40) + 20;
   el.style.left = x + "px";
   el.onclick = () => popBalloon(el);
@@ -1099,7 +1116,7 @@ document.addEventListener("visibilitychange", () => {
 // Every 30 seconds: share counts with the other devices and notice when a break ends.
 setInterval(() => { sync().then(refreshHome); }, 30000);
 
-logAction("app");
+logAction("app", { ua: navigator.userAgent.slice(0, 200), size: innerWidth + "x" + innerHeight });
 Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), sync()]).then(([d]) => {
   data = d;
   renderGrid();

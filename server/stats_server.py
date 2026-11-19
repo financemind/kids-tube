@@ -110,6 +110,9 @@ def clean_event(ev, device, label):
     for k in ("v", "s"):
         if isinstance(ev.get(k), str) and KEY.match(ev[k]):
             out[k] = ev[k]
+    for k in ("ua", "size"):  # browser name and screen size (on "app"), to see what a TV runs
+        if isinstance(ev.get(k), str):
+            out[k] = ev[k][:200]
     for k in ("t", "w", "from", "deg", "code"):
         if isinstance(ev.get(k), (int, float)) and 0 <= ev[k] <= 10 ** 7:
             out[k] = int(ev[k])
