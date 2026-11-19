@@ -953,11 +953,47 @@ const COLOR_KEYS = { 403: "red", 404: "green", 405: "yellow", 406: "blue",
 const BALLOON = { red: "#e63946", green: "#2a9d4b", yellow: "#f6c90e", blue: "#2f7fe0" };
 const GAME_POPS = 25, GAME_SECONDS = 180; // the game ends by itself after this many pops or seconds
 let game = null;
-function popSound(color) {
+/* Balloon pop sounds, made in the browser: a burst of noise shaped like a
+   real "pop", in five flavours picked at random, each slightly different
+   every time. */
+function noiseBurst(a, at, len, vol, type, freq) {
+  const buf = a.createBuffer(1, Math.ceil(a.sampleRate * len), a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3); // sharp start, quick fade
+  const src = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  src.buffer = buf; f.type = type; f.frequency.value = freq; g.gain.value = vol;
+  src.connect(f); f.connect(g); g.connect(a.destination);
+  src.start(at);
+}
+function thump(a, at, from, to, len, vol) { // a short low "boom" under the pop
+  const o = a.createOscillator(), g = a.createGain();
+  o.frequency.setValueAtTime(from, at); o.frequency.exponentialRampToValueAtTime(to, at + len);
+  g.gain.setValueAtTime(vol, at); g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+  o.connect(g); g.connect(a.destination); o.start(at); o.stop(at + len + 0.02);
+}
+function whistle(a, at, from, to, len, vol) { // the squeaky air rushing out
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = "triangle";
+  o.frequency.setValueAtTime(from, at); o.frequency.exponentialRampToValueAtTime(to, at + len);
+  g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(vol, at + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+  o.connect(g); g.connect(a.destination); o.start(at); o.stop(at + len + 0.02);
+}
+function popSound() {
   const a = audioCtx();
   if (!a) return;
-  const t = a.currentTime, base = { red: 523, green: 659, yellow: 784, blue: 988 }[color] || 660;
-  bell(a, base, t, 0.35, 0.18); bell(a, base * 1.5, t + 0.08, 0.3, 0.12);
+  const t = a.currentTime + 0.01, j = 0.85 + Math.random() * 0.3; // small random change every time
+  const kind = Math.floor(Math.random() * 5);
+  if (kind === 0) { // sharp, bright pop
+    noiseBurst(a, t, 0.07, 0.9, "highpass", 1400 * j);
+  } else if (kind === 1) { // big, deep pop
+    noiseBurst(a, t, 0.14, 0.8, "lowpass", 2200 * j); thump(a, t, 160 * j, 45, 0.18, 0.5);
+  } else if (kind === 2) { // pop and sparkles
+    noiseBurst(a, t, 0.08, 0.8, "highpass", 1100 * j);
+    [1568, 2093, 2637].forEach((f, i) => bell(a, f * j, t + 0.06 + i * 0.07, 0.25, 0.08));
+  } else if (kind === 3) { // pop, then the air squeaks out
+    noiseBurst(a, t, 0.06, 0.7, "bandpass", 1800 * j); whistle(a, t + 0.05, 1100 * j, 260, 0.45, 0.12);
+  } else { // double pop
+    noiseBurst(a, t, 0.06, 0.8, "highpass", 1300 * j); noiseBurst(a, t + 0.11, 0.08, 0.7, "lowpass", 2600 * j); thump(a, t + 0.11, 130, 50, 0.12, 0.35);
+  }
 }
 function spawnBalloon() {
   if (!game) return;
@@ -978,7 +1014,7 @@ function popBalloon(el) {
   if (!game || el.classList.contains("pop")) return;
   const color = el.dataset.color, r = el.getBoundingClientRect();
   el.classList.add("pop");
-  popSound(color);
+  popSound();
   for (let i = 0; i < 12; i++) { // a little burst of coloured bits
     const b = document.createElement("i");
     b.className = "bit";
