@@ -289,7 +289,7 @@ async function getDevices(again = true) {
   const device = localStorage.getItem("device"), readonly = !device;
   try {
     const resetSeen = Number(localStorage.getItem("resetSeen")) || 0;
-    const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+    const midnight = kidNow(); midnight.setHours(DAY_START_HOUR, 0, 0, 0); // when the child's day began (7 am)
     const body = JSON.stringify({ device: device || "viewer", readonly, all: true, label: localStorage.getItem("deviceLabel") || "", resetSeen, logSince: midnight.getTime(),
       data: { watch, vwatch, turnEnds: read("turnEnds") } });
     const r = await fetch(API, { method: "POST", headers: NT.headers(), body });
@@ -303,8 +303,12 @@ async function getDevices(again = true) {
   } catch (e) { return null; }
 }
 const fa = (n) => n.toLocaleString("fa-IR");
+/* A child's day runs from 7 in the morning to 7 the next morning (not
+   midnight to midnight), so turns used in the evening still count after 12. */
+const DAY_START_HOUR = 7;
+const kidNow = () => new Date(Date.now() - DAY_START_HOUR * 3600000);
 function dayKey(offset = 0) {
-  const d = new Date(); d.setDate(d.getDate() - offset);
+  const d = kidNow(); d.setDate(d.getDate() - offset);
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 function sum(store, key, from, to) { // days offset from..to inclusive; key null = everything
@@ -449,7 +453,7 @@ gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r
   const max = Math.max(60, ...totals);
   const names = ["یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه"];
   totals.forEach((t, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (6 - i));
+    const d = kidNow(); d.setDate(d.getDate() - (6 - i));
     const el = document.createElement("div");
     el.className = "day";
     el.innerHTML = `<span>${fa(Math.round(t / 60))}</span><div class="col"><i style="height:${(100 * t / max).toFixed(1)}%"></i></div><span>${i === 6 ? "امروز" : names[d.getDay()]}</span>`;

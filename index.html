@@ -190,13 +190,27 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .rest .scene svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .rest h1 { margin: 0; font: 700 clamp(30px, 7vh, 64px)/1.2 var(--body); }
 .rest p { margin: 0; font: 500 clamp(16px, 3vh, 28px)/1.5 var(--body); opacity: .8; }
+/* Bedtime: only stories, as sound. Three big story cards to pick from. */
+.rest.story { justify-content: flex-start; padding-top: 3vh; gap: 1.5vh; }
+.rest.story .scene { height: min(30vh, 40vw); }
+.rest.story .scene * { animation: none !important; }
+.stories { display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(12px, 3vw, 32px); margin-top: 1vh; }
+.stories button { width: clamp(150px, 26vw, 340px); aspect-ratio: 16 / 9; border-radius: 22px; border: 5px solid #ffe08a; padding: 0; position: relative;
+  background: #26366a center/cover no-repeat; box-shadow: 0 8px 0 rgba(0, 0, 0, .35); cursor: pointer; }
+.stories button:focus, .stories button:hover { outline: 6px solid #fff; outline-offset: 4px; transform: scale(1.04); }
+.stories button svg { position: absolute; left: 50%; top: 50%; width: 34%; height: auto; transform: translate(-50%, -50%); }
+.storycover { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3vh;
+  background: radial-gradient(ellipse at 50% 0%, #2c3f80 0%, #14204a 55%, #0b1230 100%); }
+.storycover .pic { width: min(60vw, 60vh); }
+.storycover .pic svg { width: 100%; height: auto; display: block; overflow: visible; }
+.storycover .pic * { animation: none !important; }
 .home.resting .top, .home.resting .grid { display: none !important; }
 .rest .tw { animation: twinkle 2.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes twinkle { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
 .rest .float { animation: bob 3.4s ease-in-out infinite; }
 .rest .spin { animation: spin 30s linear infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes spin { to { transform: rotate(360deg); } }
-/* Night theme: from 7 in the evening to 6 in the morning the app turns dark and calm, with stars. */
+/* Night theme: from 7 in the evening to 7 in the morning the app turns dark and calm, with stars. */
 body.night { --sky: #14204a; --ink: #eef2ff; --card: #26366a; --shade: rgba(0, 0, 0, .35);
   background: radial-gradient(ellipse at 50% 0%, #26397a 0%, #14204a 55%, #0b1230 100%) fixed; color-scheme: dark; }
 body.night::before { content: ""; position: fixed; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; z-index: 0; opacity: .7;
@@ -297,6 +311,7 @@ body.night .home { position: relative; z-index: 1; }
     <div class="scene" id="restScene" aria-hidden="true"></div>
     <h1 id="restTitle"></h1>
     <p id="restText"></p>
+    <div class="stories" id="storyList"></div>
   </section>
 </main>
 
@@ -452,8 +467,12 @@ async function sync(again = true) {
   } catch (e) { /* offline: keep the last reply */ } finally { syncing = false; }
   if (wiped && again) return sync(false);
 }
+/* A child's day runs from 7 in the morning to 7 the next morning (not
+   midnight to midnight), so turns used in the evening still count after 12. */
+const DAY_START_HOUR = 7;
+const kidNow = () => new Date(Date.now() - DAY_START_HOUR * 3600000);
 function dayKey(offset = 0) {
-  const d = new Date(); d.setDate(d.getDate() - offset);
+  const d = kidNow(); d.setDate(d.getDate() - offset);
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 function secs(key, offset) { return (watch[dayKey(offset)] || {})[key] || 0; }
@@ -524,7 +543,10 @@ function turnEnds() { // when each finished turn ended today (ms timestamps); th
   return Array.from({ length: Math.max(a.length, b.length) }, (_, i) =>
     a[i] && b[i] ? Math.min(a[i], b[i]) : a[i] || b[i] || null);
 }
+// Bedtime (from bedtimeHour, 9 pm, to wakeHour, 7 am, local time): no videos, only stories.
+function isBedtime() { const h = new Date().getHours(), b = cfg().bedtimeHour ?? 21, w = cfg().wakeHour ?? 7; return h >= b || h < w; }
 function timeState() {
+  if (isBedtime()) return { mode: "bedtime", turn: turnCount() };
   const s = todaySeconds(), T = turnSecs(), n = turnCount();
   const used = Math.min(n, Math.floor(s / T)); // turns fully used
   if (used >= n) return { mode: "tomorrow", turn: n };
@@ -687,10 +709,53 @@ const NIGHT_SCENE = `<svg viewBox="0 0 400 260">
   <g class="float" style="animation-delay:.8s"><ellipse cx="290" cy="200" rx="44" ry="18" fill="#3d4f8f"/><ellipse cx="312" cy="188" rx="26" ry="16" fill="#3d4f8f"/>
     <text x="318" y="160" fill="#c9d4ff" font-size="22" font-family="Fredoka, sans-serif">z</text><text x="334" y="142" fill="#c9d4ff" font-size="16" font-family="Fredoka, sans-serif">z</text></g>
 </svg>`;
-// Night theme from 7 pm to 6 am.
-function applyNight() { const h = new Date().getHours(); document.body.classList.toggle("night", h >= 19 || h < 6); }
+// Each copy of the night picture needs its own mask id, or a hidden copy breaks the moon shape of the others.
+let maskN = 0;
+const nightScene = () => NIGHT_SCENE.replace(/crescent/g, "crescent" + (++maskN));
+// Night theme from 7 pm to 7 am.
+function applyNight() { const h = new Date().getHours(); document.body.classList.toggle("night", h >= 19 || h < 7); }
 applyNight();
 setInterval(applyNight, 60000);
+/* ---- Bedtime stories ----
+   After bedtime the only thing that plays is a story, read aloud, with no
+   time limit. Only the sound: the video stays hidden under a still night
+   picture the whole time, so nothing moves on the screen. Each night three
+   stories are offered, ones not heard lately first. */
+let stories = [], storyMode = false;
+fetch("stories.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => { stories = d.stories || []; if (lastMode === "bedtime") renderGrid(); }).catch(() => {});
+const MOON_BADGE = `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="rgba(11,18,48,.75)"/><path d="M40 30 L72 50 L40 70 Z" fill="#ffe08a"/></svg>`;
+function nightStories() {
+  const heard = JSON.parse(load("storiesHeard") || "{}"), day = dayKey();
+  let seed = [...day].reduce((a, ch) => a * 31 + ch.charCodeAt(0) | 0, 7);
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  return stories.map((x) => ({ x, k: (heard[x.id] || 0) + rnd() })).sort((a, b) => a.k - b.k).slice(0, 3).map((o) => o.x);
+}
+function renderStories() {
+  $("rest").className = "rest tomorrow story";
+  $("restScene").innerHTML = nightScene();
+  $("restTitle").textContent = "وقت قصه";
+  $("restText").textContent = "یک قصه انتخاب کن، چشم‌هایت را ببند و گوش کن.";
+  $("todayTopic").hidden = true;
+  const box = $("storyList");
+  for (const st of nightStories()) {
+    const b = document.createElement("button");
+    b.style.backgroundImage = `url(${thumb(st.id)})`;
+    b.setAttribute("aria-label", st.title);
+    b.innerHTML = MOON_BADGE;
+    b.onclick = () => openStory(st);
+    box.appendChild(b);
+  }
+}
+function storyCover(html) {
+  showCover(`<div class="storycover"><div class="pic">${nightScene()}</div>${html || ""}</div>`, null);
+}
+function openStory(st) {
+  storyMode = true;
+  const heard = JSON.parse(load("storiesHeard") || "{}");
+  heard[st.id] = Date.now() / 864e5; // newer = bigger, so heard stories go to the back
+  save("storiesHeard", JSON.stringify(heard));
+  openVideo({ id: st.id }, null);
+}
 function renderGrid() {
   const st = renderBudget();
   lastMode = st.mode;
@@ -699,9 +764,11 @@ function renderGrid() {
   $("home").classList.toggle("resting", st.mode !== "watch");
   if (st.mode !== "watch") {
     // Break: go and play. Last turn used: see you tomorrow.
+    $("storyList").innerHTML = "";
+    if (st.mode === "bedtime") return renderStories();
     const brk = st.mode === "break";
     $("rest").className = "rest " + (brk ? "break" : "tomorrow");
-    $("restScene").innerHTML = brk ? SLIDE_SCENE : NIGHT_SCENE;
+    $("restScene").innerHTML = brk ? SLIDE_SCENE : nightScene();
     $("restTitle").textContent = brk ? "وقت بازی!" : "برای امروز بس است";
     $("restText").textContent = brk ? $("leftText").textContent : "شب بخیر. فردا دوباره.";
     $("todayTopic").hidden = true;
@@ -787,7 +854,8 @@ function openVideo(v, c) {
   $("home").hidden = true;
   $("stage").hidden = false;
   setPlayIcon(false);
-  showCover(`<div class="msg">...</div>`, thumb(v.id));
+  if (c) storyMode = false;
+  if (storyMode) storyCover(); else showCover(`<div class="msg">...</div>`, thumb(v.id));
   if (!apiReady) { pending = [v, c]; return; }
   if (player) { player.loadVideoById({ videoId: v.id, startSeconds: start }); return; }
   player = new YT.Player("player", {
@@ -803,6 +871,7 @@ function setPlayIcon(playing) {
   if (TV_MODE && !$("stage").hidden && !$("stage").contains(document.activeElement)) $("playBtn").focus({ preventScroll: true }); $("playBtn").innerHTML = playing ? ICON.pause : ICON.play; }
 
 function pausedCover() {
+  if (storyMode) { storyCover(`<button class="bigbtn" aria-label="Play">${ICON.play}</button>`); $("cover").querySelector("button").onclick = () => { logAction("play"); player.playVideo(); }; return; }
   showCover(`<button class="bigbtn" aria-label="Play">${ICON.play}</button>`, thumb(playingId));
   $("cover").querySelector("button").onclick = () => { logAction("play"); player.playVideo(); };
 }
@@ -812,7 +881,8 @@ function onState(e) {
   clearInterval(tick);
   if (locked) { if (e.data === S.PLAYING) player.pauseVideo(); return; }
   if (e.data === S.PLAYING) {
-    $("cover").hidden = true; setPlayIcon(true);
+    if (storyMode) storyCover(); else $("cover").hidden = true; // a story: only the sound, the picture stays hidden
+    setPlayIcon(true);
     tick = setInterval(onTick, 1000);
     return;
   }
@@ -820,7 +890,7 @@ function onState(e) {
   if (e.data === S.ENDED) finish();
   else if (e.data === S.PAUSED) pausedCover();
   // Loading or buffering: keep YouTube's own overlays hidden behind the picture.
-  else showCover("", thumb(playingId));
+  else if (storyMode) storyCover(); else showCover("", thumb(playingId));
 }
 
 function onTick() {
@@ -851,6 +921,11 @@ function finish() {
   locked = true; clearInterval(tick);
   player.pauseVideo();
   setPlayIcon(false);
+  if (storyMode) { // the story is over: good night, back to the stories with the red key
+    storyCover(`<div class="msg">قصه تمام شد. شب بخیر.</div>${homeButton("backBtn")}`);
+    $("backBtn").onclick = goHome;
+    return;
+  }
   if (!canWatch()) return stopForToday();
   // Go on to the next video in today's list by itself, after a 4-second countdown.
   const next = nextVideo();
@@ -886,7 +961,7 @@ function stopForToday() {
   timeUpSound();
   setTimeout(() => {
     if ($("stage").hidden) return;
-    showCover(`<div class="donescene ${brk ? "break" : "tomorrow"}"><div class="pop">${brk ? SLIDE_SCENE : NIGHT_SCENE}</div><div class="msg">${brk ? "وقت بازی!" : "برای امروز بس است"}</div>${homeButton("backBtn")}</div>`, null);
+    showCover(`<div class="donescene ${brk ? "break" : "tomorrow"}"><div class="pop">${brk ? SLIDE_SCENE : nightScene()}</div><div class="msg">${brk ? "وقت بازی!" : "برای امروز بس است"}</div>${homeButton("backBtn")}</div>`, null);
     $("backBtn").onclick = goHome;
   }, 2600);
 }
@@ -1190,6 +1265,14 @@ document.querySelectorAll(".keys .k").forEach((k) => k.onclick = () => popColor(
 function onColor(c) {
   if (!$("game").hidden) return popColor(c);
   const press = (b) => { if (b && focusables().includes(b)) b.click(); };
+  if ($("stage").hidden && $("storyList").children.length) { // bedtime: red/green move between the stories, yellow plays
+    const list = [...$("storyList").children];
+    let at = list.indexOf(document.activeElement);
+    if (c === "yellow") { (list[at] || list[0]).click(); return; }
+    at = Math.max(0, Math.min(list.length - 1, at < 0 ? 0 : at + (c === "red" ? -1 : c === "green" ? 1 : 0)));
+    list[at].focus({ preventScroll: true });
+    return;
+  }
   if ($("stage").hidden) {
     if (c === "red") stepRow(-1);
     else if (c === "green") stepRow(1);

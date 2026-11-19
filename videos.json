@@ -19,7 +19,9 @@
   "breakTimes": 4,
   "topicPerDay": 3,
   "tvSize": 9,
-  "breakMinutes": 20
+  "breakMinutes": 20,
+  "bedtimeHour": 21,
+  "wakeHour": 7
  },
  "topics": [
   {

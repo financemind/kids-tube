@@ -157,8 +157,10 @@ TOPICS = [
 # balance: each day's list keeps at most maxExciting fast shows (calm <= 2) and
 # maxFantasy magical shows (real <= 2), and tries for at least minLearn
 # teaching shows (learn >= 4) and minCalm quiet shows (calm >= 4).
+# bedtimeHour/wakeHour: from bedtime to wake-up (local hours) no videos, only
+# bedtime stories as sound (stories.json, from update_stories.py).
 # topicPerDay: how many of the day's videos come from the topic of the day.
-DAILY = {"topicPerDay": 3, "balance": {"maxExciting": 3, "maxFantasy": 5, "minLearn": 6, "minCalm": 6}, "size": 12, "tvSize": 9, "start": "2026-11-16", "perShow": 4, "perLessShow": 1, "videoRestMinutes": 10, "videoHalfMinutes": 10, "showHalfMinutes": 20, "taperPerWeek": 0.7, "turns": 4, "turnMinutes": 15, "breakTimes": 4, "breakMinutes": 20}
+DAILY = {"topicPerDay": 3, "balance": {"maxExciting": 3, "maxFantasy": 5, "minLearn": 6, "minCalm": 6}, "size": 12, "tvSize": 9, "start": "2026-11-16", "perShow": 4, "perLessShow": 1, "videoRestMinutes": 10, "videoHalfMinutes": 10, "showHalfMinutes": 20, "taperPerWeek": 0.7, "turns": 4, "turnMinutes": 15, "breakTimes": 4, "breakMinutes": 20, "bedtimeHour": 21, "wakeHour": 7}
 
 MAX_MINUTES = 60
 NS = {"a": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015"}
