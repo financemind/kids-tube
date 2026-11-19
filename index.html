@@ -270,6 +270,7 @@ body.night .home { position: relative; z-index: 1; }
 .ring::after { right: -24%; border-color: transparent #fff transparent transparent; }
 @keyframes ring { from { transform: rotate(-16deg); } to { transform: rotate(16deg); } }
 @keyframes waves { from { opacity: .9; transform: scale(.8); } to { opacity: 0; transform: scale(1.3); } }
+.okhint { font: 700 28px/1 var(--body); letter-spacing: 2px; opacity: .85; direction: ltr; }
 .ring svg { width: clamp(140px, 30vmin, 230px); height: auto; display: block; }
 .donescene { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3vh; }
 .donescene.break { background: linear-gradient(#8fd3ff, #d9f2ff 62%, #bfe8ad); }
@@ -847,10 +848,27 @@ function showCover(html, bg) {
 }
 function homeButton(id) { return `<button class="bigbtn" id="${id}" aria-label="Back to videos" style="background:var(--tomato)">${ICON.home}</button>`; }
 
+/* The TV browser plays sound only after a real press: a click, or OK on the
+   remote (the colour keys don't count). If there was none yet since the page
+   opened, YouTube plays silently. So first a big button, already picked, asks
+   for one OK press. Logged as open with code 1 (had a press) or 0 (asked). */
+const hadPress = () => !navigator.userActivation || navigator.userActivation.hasBeenActive;
+function askForPress(v, c) {
+  logAction("open", { code: 0, v: v.id });
+  $("home").hidden = true;
+  $("stage").hidden = false;
+  setPlayIcon(false);
+  const btn = `<button class="bigbtn" id="okBtn" aria-label="Play">${ICON.play}</button><div class="msg okhint">OK</div>`;
+  if (!c) storyCover(btn); else showCover(`<div class="done">${btn}</div>`, thumb(v.id));
+  const b = $("okBtn");
+  b.onclick = () => openVideo(v, c);
+  b.focus({ preventScroll: true });
+}
 function openVideo(v, c) {
+  if (!hadPress()) return askForPress(v, c);
   playingCat = c; playingId = v.id; locked = false; sessionSecs = 0;
   const start = resumeAt(v.id);
-  logAction("open", { from: start, t: start });
+  logAction("open", { from: start, t: start, code: 1 });
   $("home").hidden = true;
   $("stage").hidden = false;
   setPlayIcon(false);
