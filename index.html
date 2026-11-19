@@ -865,6 +865,7 @@ function askForPress(v, c) {
   b.focus({ preventScroll: true });
 }
 function openVideo(v, c) {
+  quietApp();
   if (!hadPress()) return askForPress(v, c);
   playingCat = c; playingId = v.id; locked = false; sessionSecs = 0;
   const start = resumeAt(v.id);
@@ -880,7 +881,7 @@ function openVideo(v, c) {
     host: "https://www.youtube-nocookie.com",
     videoId: v.id,
     playerVars: { start: Math.floor(start), autoplay: 1, controls: 0, rel: 0, modestbranding: 1, disablekb: 1, fs: 0, iv_load_policy: 3, playsinline: 1, cc_load_policy: 0 },
-    events: { onReady: (e) => e.target.playVideo(), onStateChange: onState, onError: onErr },
+    events: { onReady: (e) => { e.target.unMute(); e.target.setVolume(100); e.target.playVideo(); }, onStateChange: onState, onError: onErr },
   });
 }
 window.onYouTubeIframeAPIReady = () => { apiReady = true; if (pending) { const [v, c] = pending; pending = null; openVideo(v, c); } };
@@ -927,6 +928,7 @@ function onState(e) {
   clearInterval(tick);
   if (locked) { if (e.data === S.PLAYING) player.pauseVideo(); return; }
   if (e.data === S.PLAYING) {
+    quietApp(); // let YouTube have the sound
     if (storyMode) storyCover(); else $("cover").hidden = true; // a story: only the sound, the picture stays hidden
     setPlayIcon(true);
     ensureSound();
@@ -1017,15 +1019,24 @@ function stopForToday() {
    happy music-box tune. Browsers allow sound only after a first touch or key,
    which the child has already given by starting the video. */
 let audio = null;
+/* The app's own sounds (alarm, tune, balloon pops) are opened only when one
+   plays, and closed again a few seconds later and whenever a video or story
+   plays: on the TV only one sound can play at a time, and an open sound
+   channel of ours silenced YouTube. */
+let audioIdle = null;
 function audioCtx() {
   try {
     audio = audio || new (window.AudioContext || window.webkitAudioContext)();
     if (audio.state === "suspended") audio.resume();
+    clearTimeout(audioIdle);
+    audioIdle = setTimeout(quietApp, 8000);
   } catch (e) { audio = null; }
   return audio;
 }
-document.addEventListener("pointerdown", audioCtx);
-document.addEventListener("keydown", audioCtx);
+function quietApp() {
+  clearTimeout(audioIdle);
+  try { if (audio && audio.state === "running") audio.suspend(); } catch (e) {}
+}
 function bell(a, freq, at, len, vol) {
   for (const [mult, v] of [[1, vol], [2.76, vol * 0.25]]) { // a bell has a bright overtone
     const o = a.createOscillator(), g = a.createGain();
