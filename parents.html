@@ -471,7 +471,9 @@ gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r
   }
 
   // Videos, including ones no longer in the list.
-  const info = { game: { title: "بازی بادکنک 🎈", show: "بازی" } };
+  const info = { game: { title: "بازی بادکنک 🎈", show: "بازی" }, "game-colors": { title: "بازی رنگ‌ها را پیدا کن 🎨", show: "بازی" },
+    "game-count": { title: "بازی شمردن تا ۴ 🍎", show: "بازی" }, "game-feed": { title: "بازی غذا دادن به حیوان‌ها 🐶", show: "بازی" },
+    "game-simon": { title: "بازی تکرار کن 🎵", show: "بازی" } };
   const showTitle = {};
   for (const c of data.categories) { showTitle[c.key] = c.title; for (const v of c.videos) info[v.id] = { title: v.title, show: c.title }; }
   for (const tp of data.topics || []) for (const v of tp.videos) info[v.id] = info[v.id] || { title: v.title, show: showTitle[v.show] || "—" };
@@ -490,7 +492,7 @@ gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r
   // Today's actions, newest first.
   const ACT = { app: "برنامه باز شد", show: "برگشت به برنامه", hide: "از برنامه بیرون رفت", open: "ویدیو را باز کرد",
     play: "پخش", pause: "توقف", home: "برگشت به صفحهٔ اصلی", end: "ویدیو تمام شد", again: "دوباره از اول (بعد از پایان)",
-    restart: "دکمهٔ از اول", timeup: "وقت تمام شد ⏰", rotate: "چرخاندن تصویر", error: "ویدیو باز نشد", page: "ورق زد", game: "بازی بادکنک را باز کرد 🎈" };
+    restart: "دکمهٔ از اول", timeup: "وقت تمام شد ⏰", rotate: "چرخاندن تصویر", error: "ویدیو باز نشد", page: "ورق زد", game: "بازی را باز کرد" };
   const topicTitle = Object.fromEntries((data.topics || []).map((t) => [t.key, t]));
   const clock = (ms) => new Date(ms).toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" });
   const mmss = (sec) => `${fa(Math.floor(sec / 60))}:${fa(sec % 60).padStart(2, "۰")}`;

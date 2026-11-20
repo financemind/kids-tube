@@ -596,11 +596,11 @@ function pageTopics() { // the day's order of topics, the topic of the day first
   return tod ? [tod, ...order.filter((t) => t !== tod)] : order;
 }
 const pageTopic = () => (page > 0 ? pageTopics()[(page - 1) % pageTopics().length] : null);
-/* The home screen is one horizontal row: today's list in its order. A video
-   watched for a while today leaves the row and the next one in line joins at
-   the end, so the row always has fresh things to look at. */
-const ROW_WATCHED = 20; // seconds watched today that count as "seen"
-const seenToday = (id) => ((vwatch[dayKey()] || {})[id] || 0) >= ROW_WATCHED;
+/* The home screen is today's list in its order. A video leaves the list only
+   when it was watched to the end today; one stopped halfway stays (and goes on
+   from where it stopped). The next one in line then joins at the end. */
+const ROW_WATCHED = 20; // seconds watched today, at least
+const seenToday = (id) => ((vwatch[dayKey()] || {})[id] || 0) >= ROW_WATCHED && resumeAt(id) === 0; // at the end the saved place goes back to 0
 const fullList = () => dailyList(pageTopic() ? pageTopic().key : null, (cfg().size || 12) + 40);
 const currentList = () => fullList().filter((v) => !seenToday(v.id)).slice(0, cfg().size || 12);
 function dailyList(topicKey = null, want = null) {
@@ -779,15 +779,15 @@ function renderGrid() {
   $("todayTopic").hidden = !tod && !pt;
   if (pt) $("todayTopic").innerHTML = `<b aria-hidden="true">${pt.icon}</b>${pt.title}`;
   else if (tod) $("todayTopic").innerHTML = `<b aria-hidden="true">${tod.icon}</b>موضوع امروز: ${tod.title}`;
-  // The balloon game, first in the list.
+  // The games card, first in the list: opens the games (see games.js).
   const g = document.createElement("button");
-  g.className = "video gamecard"; g.setAttribute("aria-label", "Balloon game");
+  g.className = "video gamecard"; g.setAttribute("aria-label", "Games");
   // Drawn balloons (not emoji: some TV browsers show emoji without colour).
   g.innerHTML = `<svg aria-hidden="true" viewBox="0 0 120 70" width="62%">${[["#e63946", 22], ["#2a9d4b", 48], ["#f6c90e", 74], ["#2f7fe0", 100]].map(([c, x], i) =>
     `<g transform="translate(${x} ${i % 2 ? 26 : 20})"><path d="M0 17 Q-2 30 3 40" stroke="#5b6b86" stroke-width="1" fill="none"/>
      <ellipse cx="0" cy="0" rx="11" ry="14" fill="${c}"/><ellipse cx="-4" cy="-5" rx="3" ry="4" fill="#fff" opacity=".6"/>
      <path d="M-3 13 L3 13 L0 17 Z" fill="${c}"/></g>`).join("")}</svg>`;
-  g.onclick = startGame;
+  g.onclick = showPicker;
   $("grid").appendChild(g);
   for (const v of currentList()) {
     const b = document.createElement("button");
@@ -1284,44 +1284,52 @@ function gameFrame(t) {
   game.balloons = game.balloons.filter((b) => !b.gone);
   game.raf = requestAnimationFrame(gameFrame);
 }
-function startGame() {
-  if (!canWatch()) return renderGrid();
+/* Every game: opens full screen, uses today's time like a video (vid is its
+   name in the report), and ends by itself after GAME_SECONDS. */
+function beginGame(kind, vid) {
+  if (!canWatch()) { leaveGame(); return false; }
   playingId = null; playingCat = null;
   $("home").hidden = true; $("game").hidden = false;
+  $("game").className = "game " + kind;
   $("sky").innerHTML = "";
-  game = { balloons: [], pops: 0, seconds: 0 };
-  logAction("game");
-  for (let i = 0; i < 3; i++) setTimeout(spawnBalloon, i * 500);
-  game.spawn = setInterval(() => { if (game && game.balloons.length < 8) spawnBalloon(); }, 1300);
-  // The game uses today's time like a video.
+  game = { kind, vid, balloons: [], pops: 0, seconds: 0, rounds: 0, timers: [] };
+  logAction("game", { v: vid });
   game.clock = setInterval(() => {
     if (!game) return;
-    addSecond("game", "game");
+    addSecond("game", game.vid);
     if (++game.seconds >= GAME_SECONDS) return endGame(true);
     if (!canWatch()) { endGame(false); stopTimeUpGame(); }
   }, 1000);
+  return true;
+}
+function startGame() {
+  if (!beginGame("balloons", "game")) return;
+  for (let i = 0; i < 3; i++) setTimeout(spawnBalloon, i * 500);
+  game.spawn = setInterval(() => { if (game && game.balloons.length < 8) spawnBalloon(); }, 1300);
   game.raf = requestAnimationFrame(gameFrame);
 }
 function stopTimeUpGame() { timeUpSound(); }
 function endGame(cheer) {
   if (!game) return;
   clearInterval(game.spawn); clearInterval(game.clock); cancelAnimationFrame(game.raf);
+  (game.timers || []).forEach(clearTimeout);
   game = null;
   if (cheer) {
-    $("sky").innerHTML = `<div class="done"><div class="pop">🎉</div></div>`;
+    $("game").className = "game";
+    $("sky").innerHTML = `<div class="done"><div class="pop cheer">${CHEER_SVG}</div></div>`;
     [784, 988, 1175, 1568].forEach((f, i) => { const a = audioCtx(); if (a) bell(a, f, a.currentTime + i * 0.18, 1, 0.18); });
     setTimeout(leaveGame, 2600);
   } else leaveGame();
 }
 function leaveGame() {
   if (game) endGame(false);
-  $("game").hidden = true; $("home").hidden = false;
+  $("game").hidden = true; $("home").hidden = false; $("game").className = "game";
   renderGrid();
 }
 $("gameHome").onclick = leaveGame;
-document.querySelectorAll(".keys .k").forEach((k) => k.onclick = () => popColor(k.classList[1]));
+document.querySelectorAll(".keys .k").forEach((k) => k.onclick = () => gameColor(k.classList[1]));
 function onColor(c) {
-  if (!$("game").hidden) return popColor(c);
+  if (!$("game").hidden) return gameColor(c);
   const press = (b) => { if (b && focusables().includes(b)) b.click(); };
   if ($("stage").hidden && $("storyList").children.length) { // bedtime: red/green move between the stories, yellow plays
     const list = [...$("storyList").children];
@@ -1436,6 +1444,7 @@ else Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json
   renderGrid();
 });
 </script>
+<script src="games.js"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
