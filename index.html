@@ -1366,6 +1366,7 @@ function endGame(cheer) {
   if (!game) return;
   clearInterval(game.spawn); clearInterval(game.clock); cancelAnimationFrame(game.raf);
   (game.timers || []).forEach(clearTimeout);
+  if (game.stop) game.stop(); // e.g. the car game's phone stream
   game = null;
   if (cheer) {
     $("game").className = "game";
@@ -1497,7 +1498,7 @@ else Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json
   renderGrid();
 });
 </script>
-<script src="games.js?v=10"></script><!-- raise v whenever games.js changes, so TVs never keep an old copy -->
+<script src="games.js?v=12"></script><!-- raise v whenever games.js changes, so TVs never keep an old copy -->
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

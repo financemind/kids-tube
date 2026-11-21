@@ -176,6 +176,29 @@ class ServerTest(unittest.TestCase):
         self.post("/api/pin/set", {"pin": "1234"}, parent)
         self.assertEqual(self.post("/api/sync", {"device": "tv", "resetSeen": 0, "data": {}}, tv)[1]["theme"], "pup")  # the code keeps it
 
+    def test_phone_controller_reaches_the_tv(self):
+        tok = self.signup()
+        other = self.signup("dad@example.org")
+        _, t = self.post("/api/pad/ticket", {}, tok)
+        self.assertEqual(self.post("/api/pad", {"btn": "left"}, tok)[1]["listeners"], 0)  # no TV listening yet
+        import http.client
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        conn.request("GET", "/api/pad/listen?t=" + t["ticket"])
+        resp = conn.getresponse()
+        self.assertEqual(resp.status, 200)
+        self.assertIn(b"hello", resp.fp.readline() + resp.fp.readline())
+        resp.fp.readline()
+        self.assertEqual(self.post("/api/pad", {"btn": "honk"}, other)[1]["listeners"], 0)  # another family: not heard
+        self.assertEqual(self.post("/api/pad", {"btn": "right"}, tok)[1]["listeners"], 1)
+        line = resp.fp.readline()
+        self.assertIn(b'"btn": "right"', line)
+        conn.close()
+        self.assertEqual(self.post("/api/pad", {"btn": "jump"}, tok)[0], 400)
+        c2 = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        c2.request("GET", "/api/pad/listen?t=" + t["ticket"])  # a ticket works once
+        self.assertEqual(c2.getresponse().status, 403)
+        c2.close()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -37,6 +37,7 @@ import hashlib
 import hmac
 import json
 import os
+import queue
 import re
 import secrets
 import shutil
@@ -376,6 +377,58 @@ def live_status(fid):
         return {"now": now_ms(), "devices": {d: x for d, x in LIVE.get(fid, {}).items() if x["at"] >= cut}}
 
 
+# ---------- phone as a game controller ----------
+# A parent's phone becomes a big two-button controller for a game on the TV.
+# The phone sends each press (POST /api/pad); the server pushes it at once to
+# the family's TV, which listens on an open stream (GET /api/pad/listen, as
+# server-sent events). The TV gets a one-time ticket first, so its login never
+# goes into a web address.
+PAD_BUTTONS = {"left", "right", "up", "down", "honk"}
+PAD_TICKETS = {}  # ticket -> (fid, expires)
+PADS = {}  # fid -> list of queues, one per listening TV
+MAX_PAD_LISTENERS = 4
+
+
+def pad_ticket(fid):
+    t = secrets.token_urlsafe(18)
+    with lock:
+        for k in [k for k, (_, exp) in PAD_TICKETS.items() if exp < time.time()]:
+            del PAD_TICKETS[k]
+        PAD_TICKETS[t] = (fid, time.time() + 120)
+    return t
+
+
+def pad_join(ticket):
+    with lock:
+        fid, exp = PAD_TICKETS.pop(ticket, (None, 0))
+        if not fid or exp < time.time():
+            return None, None
+        q = queue.Queue(maxsize=50)
+        lst = PADS.setdefault(fid, [])
+        lst.append(q)
+        while len(lst) > MAX_PAD_LISTENERS:
+            lst.pop(0).put_nowait(None)  # the oldest stream ends
+    return fid, q
+
+
+def pad_leave(fid, q):
+    with lock:
+        lst = PADS.get(fid, [])
+        if q in lst:
+            lst.remove(q)
+
+
+def pad_send(fid, btn):
+    with lock:
+        lst = list(PADS.get(fid, []))
+    for q in lst:
+        try:
+            q.put_nowait({"btn": btn, "at": now_ms()})
+        except queue.Full:
+            pass
+    return len(lst)
+
+
 def clean_event(ev, device, label):
     if not isinstance(ev, dict) or ev.get("a") not in ACTIONS or not isinstance(ev.get("at"), (int, float)):
         return None
@@ -556,7 +609,38 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/health":
             return self.reply(200, {"ok": True})
+        if self.path.startswith("/api/pad/listen?t="):
+            return self.pad_stream(self.path.split("=", 1)[1])
         self.reply(404, {"error": "not found"})
+
+    def pad_stream(self, ticket):
+        fid, q = pad_join(ticket)
+        if not fid:
+            return self.reply(403, {"error": "ticket"})
+        self.send_response(200)
+        self.cors()
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+        try:
+            self.wfile.write(b"retry: 2000\n: hello\n\n")
+            self.wfile.flush()
+            while True:
+                try:
+                    msg = q.get(timeout=15)
+                except queue.Empty:
+                    self.wfile.write(b": ping\n\n")  # keeps the line open through proxies
+                    self.wfile.flush()
+                    continue
+                if msg is None:
+                    break
+                self.wfile.write(b"data: " + json.dumps(msg).encode() + b"\n\n")
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
+        finally:
+            pad_leave(fid, q)
 
     def client_ip(self):
         return self.headers.get("X-Forwarded-For", self.client_address[0]).split(",")[0].strip()
@@ -633,6 +717,13 @@ class Handler(BaseHTTPRequestHandler):
             if not (isinstance(body.get("device"), str) and KEY.match(body["device"]) and isinstance(body.get("now"), dict)):
                 return self.reply(400, {"error": "bad request"})
             return self.reply(200, live_set(fid, body["device"], body.get("label"), body["now"]))
+        if path == "/api/pad/ticket":
+            return self.reply(200, {"ticket": pad_ticket(fid)})
+        if path == "/api/pad":
+            btn = body.get("btn")
+            if btn not in PAD_BUTTONS:
+                return self.reply(400, {"error": "bad request"})
+            return self.reply(200, {"listeners": pad_send(fid, btn)})
         if path == "/api/theme":
             if s["kind"] != "parent":
                 return self.reply(403, {"error": "parents only"})

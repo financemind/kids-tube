@@ -7,6 +7,10 @@
    - count:    1 to 4 apples: press the key with that many dots;
    - feed:     four animals, one is hungry: press its colour to feed it;
    - simon:    the circles light up in a row: press the same row back;
+   - car:      a little car on a road, played with the colour keys or with a
+               parent's phone as a controller (control.html): red/left and
+               green/right change lane, yellow honks; stars to catch, cones
+               just make it wobble (no crash, no losing);
    - pet:      a little dinosaur of his own to look after: red feeds it,
                green plays ball, yellow cleans up, blue puts it to sleep.
    The picker shows the five games: red/green move, yellow opens. Every
@@ -124,9 +128,13 @@ const PICK = [
     ${[0, 1, 2].map((i) => `<circle cx="${70 + i * 30}" cy="88" r="7" fill="#1d2b4f"/>`).join("")}</svg>`],
   ["feed", `<svg viewBox="0 0 200 100"><g transform="translate(10 5) scale(.8)">${animal("chick", true)}</g><g transform="translate(100 5) scale(.8)">${animal("frog", false)}</g></svg>`],
   ["pet", `<svg viewBox="0 0 200 150">${dinoSvg({ mood: "happy" })}</svg>`],
+  ["car", `<svg viewBox="0 0 200 150"><rect x="55" y="0" width="90" height="150" fill="#5d6675"/>
+    <g fill="#fff">${[10, 50, 90, 130].map((y) => `<rect x="97" y="${y}" width="6" height="22" rx="3"/>`).join("")}</g>
+    <rect x="0" y="0" width="55" height="150" fill="#a8cf8e"/><rect x="145" y="0" width="55" height="150" fill="#a8cf8e"/>
+    <g transform="translate(100 98) scale(.9)">${carSvg()}</g>${carStar(70, 26, 14)}</svg>`],
   ["simon", `<svg viewBox="0 0 200 100">${["#e63946", "#2a9d4b", "#f6c90e", "#2f7fe0"].map((c, i) => `<circle cx="${30 + i * 47}" cy="50" r="20" fill="${c}" opacity="${i === 1 ? 1 : .4}"/>`).join("")}</svg>`],
 ];
-const PICK_VID = { balloons: "game", colors: "game-colors", count: "game-count", feed: "game-feed", simon: "game-simon", pet: "game-pet" };
+const PICK_VID = { balloons: "game", colors: "game-colors", count: "game-count", feed: "game-feed", simon: "game-simon", pet: "game-pet", car: "game-car" };
 function showPicker() {
   if (!canWatch()) return renderGrid();
   playingId = null; playingCat = null;
@@ -148,7 +156,7 @@ function playGame(kind) {
   document.querySelectorAll(".keys .k").forEach((k) => { k.innerHTML = ""; }); // the dots belong to the counting game only
   if (kind === "balloons") return startGame();
   if (!beginGame(kind, PICK_VID[kind])) return;
-  ({ colors: colorsRound, count: countRound, feed: feedRound, simon: simonStart, pet: petStart })[kind]();
+  ({ colors: colorsRound, count: countRound, feed: feedRound, simon: simonStart, pet: petStart, car: carStart })[kind]();
 }
 const later = (fn, ms) => { if (game) game.timers.push(setTimeout(() => { if (game) fn(); }, ms)); };
 const pickOther = (n, last) => { let x; do x = Math.floor(Math.random() * n); while (x === last && n > 1); return x; };
@@ -167,7 +175,7 @@ function gameColor(c) {
   }
   if (game.kind === "balloons") return popColor(c);
   if (game.busy) return;
-  ({ colors: colorsKey, count: countKey, feed: feedKey, simon: simonKey, pet: petKey })[game.kind](c);
+  ({ colors: colorsKey, count: countKey, feed: feedKey, simon: simonKey, pet: petKey, car: carKey })[game.kind](c);
 }
 
 /* ---- Find the colour ---- */
@@ -576,4 +584,187 @@ function petKey(c) {
     if (game.needs.includes("sleep")) petDone("sleep"); else happy();
   }, 3600);
   return petAnim("", 4000);
+}
+
+/* ---- The car game ----
+   Seen from above, like the old video-game car races but drawn softly: a road
+   with three lanes runs down the screen, trees and flowers pass on the grass.
+   The child moves the little red car left and right to catch stars; a cone
+   only makes the car wobble and say "boing". No crash, no losing.
+   It can be played with the colour keys, by touch, or with a parent's phone
+   (control.html): the TV gets a one-time ticket and opens a stream, and each
+   press on the phone arrives here within a moment. */
+function carSvg(lights = false) { // a top-down car with a friendly face on the windscreen, nose up, centred on 0 0
+  return `<g>
+    <ellipse cx="0" cy="44" rx="30" ry="7" fill="#1f2a1a" opacity=".22"/>
+    <rect x="-34" y="-34" width="12" height="22" rx="5" fill="#2b2b33"/><rect x="22" y="-34" width="12" height="22" rx="5" fill="#2b2b33"/>
+    <rect x="-34" y="16" width="12" height="22" rx="5" fill="#2b2b33"/><rect x="22" y="16" width="12" height="22" rx="5" fill="#2b2b33"/>
+    <path d="M-26 -36 Q-26 -50 0 -50 Q26 -50 26 -36 L28 34 Q28 44 0 44 Q-28 44 -28 34 Z" fill="#e05545"/>
+    <path d="M8 -50 Q26 -50 26 -36 L28 34 Q28 44 6 44 Q20 40 20 30 L18 -36 Q18 -46 8 -50 Z" fill="#c4433a"/>
+    <path d="M-18 -24 Q0 -32 18 -24 L16 -6 Q0 -10 -16 -6 Z" fill="#bfe3f2"/>
+    <circle cx="-7" cy="-17" r="4" fill="#fff"/><circle cx="7" cy="-17" r="4" fill="#fff"/><circle cx="-6" cy="-16.5" r="2.3" fill="#14182a"/><circle cx="8" cy="-16.5" r="2.3" fill="#14182a"/>
+    <path d="M-5 -11 Q0 -8 5 -11" stroke="#14182a" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+    <rect x="-16" y="0" width="32" height="22" rx="6" fill="#e86a5a"/><path d="M-14 26 Q0 30 14 26 L14 32 Q0 36 -14 32 Z" fill="#bfe3f2" opacity=".8"/>
+    <circle cx="-18" cy="-46" r="4.5" fill="${lights ? "#fff6a8" : "#ffe9a8"}"/><circle cx="18" cy="-46" r="4.5" fill="${lights ? "#fff6a8" : "#ffe9a8"}"/>
+    ${lights ? `<path d="M-22 -50 L-34 -90 L-6 -90 Z M22 -50 L34 -90 L6 -90 Z" fill="#fff6a8" opacity=".35"/>` : ""}
+    <rect x="-24" y="40" width="10" height="4" rx="2" fill="#a83a31"/><rect x="14" y="40" width="10" height="4" rx="2" fill="#a83a31"/>
+  </g>`;
+}
+function carStar(x, y, r) {
+  const pts = Array.from({ length: 10 }, (_, i) => { const a = Math.PI / 5 * i - Math.PI / 2, d = i % 2 ? r * .48 : r;
+    return `${(x + Math.cos(a) * d).toFixed(1)},${(y + Math.sin(a) * d).toFixed(1)}`; }).join(" ");
+  return `<polygon points="${pts}" fill="#f6c90e" stroke="#e0a800" stroke-width="${r * .12}" stroke-linejoin="round"/>
+    <circle cx="${x - r * .2}" cy="${y - r * .05}" r="${r * .09}" fill="#24324f"/><circle cx="${x + r * .2}" cy="${y - r * .05}" r="${r * .09}" fill="#24324f"/>
+    <path d="M${x - r * .18} ${y + r * .18} Q${x} ${y + r * .32} ${x + r * .18} ${y + r * .18}" stroke="#24324f" stroke-width="${r * .08}" fill="none" stroke-linecap="round"/>`;
+}
+const CONE = `<svg viewBox="0 0 100 100"><ellipse cx="50" cy="90" rx="34" ry="7" fill="#1f2a1a" opacity=".2"/><rect x="18" y="78" width="64" height="12" rx="4" fill="#e8742a"/>
+  <path d="M38 14 Q50 6 62 14 L76 80 L24 80 Z" fill="#f28c38"/><path d="M50 8 Q58 9 62 14 L76 80 L58 80 Z" fill="#d9702a"/>
+  <path d="M33 38 L67 38 L70 52 L30 52 Z" fill="#fff6e6"/></svg>`;
+const SIDE = [ // things on the grass that pass by
+  (k) => `<svg viewBox="0 0 100 100" style="width:${k}px;height:${k}px"><ellipse cx="50" cy="92" rx="30" ry="6" fill="#1f2a1a" opacity=".18"/><rect x="44" y="60" width="12" height="32" rx="4" fill="#8a6a44"/>
+    <circle cx="50" cy="42" r="30" fill="#6f9a5e"/><circle cx="34" cy="50" r="18" fill="#87b072"/><circle cx="64" cy="34" r="16" fill="#5f8a50"/></svg>`,
+  (k) => `<svg viewBox="0 0 100 100" style="width:${k * .7}px;height:${k * .7}px"><ellipse cx="50" cy="70" rx="40" ry="26" fill="#7aa88c"/><ellipse cx="34" cy="62" rx="22" ry="18" fill="#8fb99f"/><ellipse cx="66" cy="60" rx="20" ry="16" fill="#6a9a7c"/></svg>`,
+  (k) => `<svg viewBox="0 0 60 60" style="width:${k * .4}px;height:${k * .4}px">${[0, 72, 144, 216, 288].map((a) => `<ellipse rx="8" ry="13" cy="-11" transform="translate(30 30) rotate(${a})" fill="#f2a0a6"/>`).join("")}<circle cx="30" cy="30" r="7" fill="#f7d774"/></svg>`,
+];
+document.head.insertAdjacentHTML("beforeend", `<style>
+.carroom { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; overflow: hidden; background: #a8cf8e; }
+.carroom .grassdots { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: radial-gradient(#b8dba0 18%, transparent 20%); background-size: 46px 46px; }
+.carroom .road { position: absolute; top: -10%; bottom: -10%; left: 50%; width: var(--rw); transform: translateX(-50%); background: #5d6675;
+  box-shadow: inset 10px 0 0 #4f5866, inset -10px 0 0 #4f5866; }
+.carroom .curb { position: absolute; top: 0; bottom: 0; width: 14px; background-image: repeating-linear-gradient(#e86a5a 0 30px, #fff6ea 30px 60px); }
+.carroom .curb.l { left: -14px; } .carroom .curb.r { right: -14px; }
+.carroom .dash { position: absolute; top: 0; bottom: 0; width: 8px; margin-left: -4px; background-image: repeating-linear-gradient(#fff 0 60px, transparent 60px 120px); opacity: .9; }
+.carroom .me { position: absolute; bottom: 9%; width: var(--cw); height: calc(var(--cw) * 1.4); transition: left .22s cubic-bezier(.3, 1.3, .6, 1); }
+.carroom .me svg { width: 100%; height: 100%; overflow: visible; }
+.carroom .me.bonk { animation: carbonk .5s ease-in-out; }
+@keyframes carbonk { 25% { transform: rotate(-12deg); } 50% { transform: rotate(10deg); } 75% { transform: rotate(-5deg); } }
+.carroom .me.honk svg { animation: carhonk .3s ease-in-out 2; }
+@keyframes carhonk { 50% { transform: scale(1.08); } }
+.carroom .item { position: absolute; width: var(--iw); height: var(--iw); margin-left: calc(var(--iw) / -2); }
+.carroom .item svg { width: 100%; height: 100%; overflow: visible; }
+.carroom .side { position: absolute; }
+.carroom .note { position: absolute; font: 700 40px/1 Fredoka, sans-serif; color: #fff; text-shadow: 0 3px 0 rgba(0, 0, 0, .2); animation: zz 1s ease-out forwards; pointer-events: none; }
+.carhud { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, .85);
+  border-radius: 22px; padding: 6px 16px; font: 700 34px/1 Fredoka, sans-serif; color: #24324f; direction: ltr; z-index: 3; }
+.carhud svg { width: 46px; height: 46px; }
+.carqr { position: absolute; top: 16px; right: 16px; z-index: 3; background: #fff; border-radius: 18px; padding: 10px; display: grid; justify-items: center; gap: 4px;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, .15); font: 600 14px/1.3 Vazirmatn, sans-serif; color: #24324f; text-align: center; width: 150px; transition: opacity .6s; }
+.carqr svg { width: 120px; height: 120px; }
+.carqr.gone { opacity: 0; pointer-events: none; }
+.game.car .keys .k.blue { visibility: hidden; }
+</style>`);
+function carStart() {
+  const W = innerWidth, H = innerHeight - 120;
+  const rw = Math.min(W * 0.62, H * 0.95), cw = rw / 3 * 0.62;
+  Object.assign(game, { lane: 1, stars: 0, items: [], sides: [], off: 0, speed: H / 3.2, rw, cw, H, W, spawnIn: 0.8, sideIn: 0 });
+  $("sky").innerHTML = `<div class="carroom" id="carroom" style="--rw:${rw}px;--cw:${cw}px;--iw:${cw * 0.8}px">
+    <div class="grassdots" id="grassdots"></div>
+    <div class="road" id="road"><i class="curb l" id="curbL"></i><i class="curb r" id="curbR"></i>
+      <i class="dash" id="dash1" style="left:33.3%"></i><i class="dash" id="dash2" style="left:66.6%"></i></div>
+    <div class="me" id="me"><svg viewBox="-40 -56 80 104">${carSvg()}</svg></div>
+    <div class="carhud"><svg viewBox="0 0 40 40">${carStar(20, 21, 18)}</svg><span id="starCount">0</span></div>
+    <div class="carqr" id="carqr">${window.qrSvg ? qrSvg(location.origin + "/control.html") : ""}<span>با گوشی بازی کنید: این کد را با دوربین گوشی بگیرید</span></div>
+  </div>`;
+  carPlace();
+  $("carroom").addEventListener("pointerdown", (e) => carKey(e.clientX < innerWidth / 2 ? "red" : "green"));
+  game.raf = requestAnimationFrame(carFrame);
+  carListen();
+  later(() => { const q = $("carqr"); if (q && !game.padSeen) q.classList.add("gone"); }, 25000);
+}
+// Lanes: 0 (left), 1 (middle), 2 (right), as x positions on the screen.
+const laneX = (i) => game.W / 2 + (i - 1) * game.rw / 3;
+function carPlace() { const me = $("me"); if (me) me.style.left = laneX(game.lane) - game.cw / 2 + "px"; }
+function carKey(c) {
+  if (c === "red" && game.lane > 0) { game.lane--; carPlace(); tune([440], 0, 0.06); }
+  else if (c === "green" && game.lane < 2) { game.lane++; carPlace(); tune([494], 0, 0.06); }
+  else if (c === "yellow") carHonk();
+}
+function carHonk() {
+  const me = $("me");
+  me.classList.remove("honk"); void me.offsetWidth; me.classList.add("honk");
+  const a = audioCtx();
+  if (a) [0, 0.22].forEach((d) => { const o = a.createOscillator(), g = a.createGain(); o.type = "square"; o.frequency.value = 392;
+    g.gain.setValueAtTime(0.07, a.currentTime + d); g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + d + 0.18);
+    o.connect(g); g.connect(a.destination); o.start(a.currentTime + d); o.stop(a.currentTime + d + 0.2); });
+  const n = document.createElement("div");
+  n.className = "note"; n.textContent = "♪ ♫";
+  n.style.left = laneX(game.lane) + game.cw * 0.4 + "px"; n.style.bottom = "34%";
+  $("carroom").appendChild(n); setTimeout(() => n.remove(), 1000);
+}
+function carFrame(t) {
+  if (!game || game.kind !== "car") return;
+  const dt = Math.min(0.05, (t - (game.last || t)) / 1000); game.last = t;
+  const v = game.speed * dt;
+  game.off = (game.off + v) % 120;
+  for (const id of ["dash1", "dash2"]) $(id).style.backgroundPositionY = game.off + "px";
+  for (const id of ["curbL", "curbR"]) $(id).style.backgroundPositionY = (game.off % 60) + "px";
+  $("grassdots").style.backgroundPositionY = (game.off % 46) + "px";
+  const room = $("carroom");
+  // New stars and cones from the top (no two cones in a row, never in every lane).
+  game.spawnIn -= dt;
+  if (game.spawnIn <= 0) {
+    game.spawnIn = 1.1 + Math.random() * 0.7;
+    const cone = Math.random() < 0.28 && !game.lastCone;
+    game.lastCone = cone;
+    const el = document.createElement("div");
+    el.className = "item"; el.innerHTML = cone ? CONE : `<svg viewBox="0 0 40 40">${carStar(20, 21, 18)}</svg>`;
+    const lane = Math.floor(Math.random() * 3);
+    el.style.left = laneX(lane) + "px";
+    room.insertBefore(el, $("me"));
+    game.items.push({ el, lane, y: -game.cw, cone });
+  }
+  game.sideIn -= dt;
+  if (game.sideIn <= 0) { // trees, bushes and flowers on both sides
+    game.sideIn = 0.5 + Math.random() * 0.6;
+    const el = document.createElement("div"), k = game.cw * (1.5 + Math.random() * 0.7);
+    el.className = "side"; el.innerHTML = SIDE[Math.floor(Math.random() * SIDE.length)](k);
+    const left = Math.random() < 0.5, grass = (game.W - game.rw) / 2 - 20;
+    el.style.left = (left ? 10 + Math.random() * Math.max(0, grass - k) : game.W - grass + Math.random() * Math.max(0, grass - k)) + "px";
+    room.insertBefore(el, $("road"));
+    game.sides.push({ el, y: -k });
+  }
+  const carTop = game.H * 0.91 - game.cw * 1.4, carBottom = game.H * 0.91;
+  for (const it of game.items) {
+    it.y += v; it.el.style.top = it.y + "px";
+    const mid = it.y + game.cw * 0.4;
+    if (!it.hit && it.lane === game.lane && mid > carTop && mid < carBottom) {
+      it.hit = true; it.el.remove();
+      if (it.cone) { const me = $("me"); me.classList.remove("bonk"); void me.offsetWidth; me.classList.add("bonk"); tune([330, 262], 0.12, 0.08); }
+      else { game.stars++; $("starCount").textContent = game.stars.toLocaleString("fa-IR"); tune([784, 1047], 0.08, 0.14); carSparkle(); }
+    }
+    if (it.y > game.H + 40) { it.hit = true; it.el.remove(); }
+  }
+  game.items = game.items.filter((x) => !x.hit);
+  for (const sd of game.sides) { sd.y += v; sd.el.style.top = sd.y + "px"; if (sd.y > game.H + 20) { sd.el.remove(); sd.gone = true; } }
+  game.sides = game.sides.filter((x) => !x.gone);
+  game.raf = requestAnimationFrame(carFrame);
+}
+function carSparkle() {
+  const room = $("carroom"), x = laneX(game.lane), y = game.H * 0.91 - game.cw * 1.2;
+  for (let i = 0; i < 10; i++) {
+    const b = document.createElement("i");
+    b.className = "bit"; b.style.cssText = `left:${x}px;top:${y}px;background:${["#f6c90e", "#fff", "#ffd8a8"][i % 3]}`;
+    const a = i / 10 * 6.28, d = 50 + Math.random() * 50;
+    b.style.setProperty("--dx", Math.cos(a) * d + "px"); b.style.setProperty("--dy", Math.sin(a) * d + "px");
+    room.appendChild(b); setTimeout(() => b.remove(), 900);
+  }
+}
+// The phone controller: a one-time ticket, then a stream of presses.
+async function carListen() {
+  if (typeof API === "undefined" || !API || !NT.token()) return;
+  const r = await NT.call("/pad/ticket");
+  if (!game || game.kind !== "car" || !r.ok) return;
+  const es = new EventSource(NT.base + "/pad/listen?t=" + encodeURIComponent(r.body.ticket));
+  game.stop = () => es.close();
+  es.onmessage = (e) => {
+    if (!game || game.kind !== "car") return es.close();
+    let m = null;
+    try { m = JSON.parse(e.data); } catch (err) { return; }
+    if (!game.padSeen) { game.padSeen = true; const q = $("carqr"); if (q) q.classList.add("gone"); }
+    carKey({ left: "red", right: "green", honk: "yellow" }[m.btn] || "");
+  };
+  es.onerror = () => { // the stream broke (e.g. the server restarted): a new ticket in a moment
+    es.close();
+    if (game && game.kind === "car") later(carListen, 3000);
+  };
 }
