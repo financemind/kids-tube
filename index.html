@@ -120,7 +120,7 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
    face, a gold star on top and a red hand. */
 .bigclock { grid-row: 1 / span 2; position: relative; width: var(--clock, 92px); height: var(--clock, 92px); border-radius: 50%;
   box-shadow: 0 6px 0 var(--shade);
-  margin: calc(var(--clock, 92px) * .28) calc(var(--clock, 92px) * .04) calc(var(--clock, 92px) * .04); } /* room for the picture on top (star, flames, rocket…) */
+  margin: calc(var(--clock, 92px) * var(--ctop, .28)) calc(var(--clock, 92px) * .04) calc(var(--clock, 92px) * var(--cbot, .04)); } /* room for the picture on top (star, flames, rocket, a whole character…) */
 .bigclock .face { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
 /* The picture around the clock (ears, flames, a badge…): a box larger than the clock, see clock-themes.js. */
 .bigclock .deco { position: absolute; left: -30%; top: -40%; width: 160%; height: 160%; overflow: visible; pointer-events: none; }
@@ -346,7 +346,7 @@ body.night .home { position: relative; z-index: 1; }
 </section>
 
 <script src="auth.js"></script>
-<script src="clock-themes.js?v=2"></script>
+<script src="clock-themes.js?v=3"></script>
 <script>
 // A scanned pairing QR code opens /?c=CODE: go to the account page to approve it.
 if (new URLSearchParams(location.search).has("c")) location.replace("account.html?code=" + encodeURIComponent(new URLSearchParams(location.search).get("c")));
@@ -715,7 +715,10 @@ function applyClockTheme() {
   clockTheme = want; save("theme", want);
   $("clockBack").innerHTML = t.back; $("clockRing").innerHTML = t.ring; $("clockTop").innerHTML = t.top;
   $("bigClock").style.setProperty("--hand", t.hand); $("bigClock").style.setProperty("--dot", t.dot);
+  const top = t.tall ? 0.42 : 0.28; // a whole character needs more room above the clock
+  if (clockRoom !== top) { clockRoom = top; $("home").style.setProperty("--ctop", top); $("home").style.setProperty("--cbot", t.tall ? 0.2 : 0.04); fitGrid(); }
 }
+let clockRoom = 0.28; // room above the clock, as a share of its size
 function renderBudget() {
   applyClockTheme();
   const st = timeState(), T = turnSecs(), n = turnCount(), box = $("tracks");
@@ -887,7 +890,7 @@ function fitGrid() {
   if (big) {
     // TV: a really big clock on the left; on the right a list where one
     // picture fills most of the height and the next one peeks in below.
-    const clock = Math.round(Math.min(H * 0.54, W * 0.34));
+    const clock = Math.round(Math.min(H * (clockRoom > 0.3 ? 0.44 : 0.54), W * 0.34));
     const colW = W - 32 - (clock + 40) - 24;
     const w = Math.min(colW - pad, ((H - 32 - 70) / 1.3 - frame) * 16 / 9 + frame);
     home.style.setProperty("--clock", clock + "px");
@@ -898,7 +901,7 @@ function fitGrid() {
     // Phone: the clock on top, the list under it filling the rest of the screen.
     const clock = Math.round(Math.max(110, Math.min(180, W * 0.42)));
     home.style.setProperty("--clock", clock + "px");
-    home.style.setProperty("--listh", Math.max(260, H - clock * 1.12 - 70) + "px");
+    home.style.setProperty("--listh", Math.max(260, H - clock * (0.84 + clockRoom + (clockRoom > 0.3 ? 0.16 : 0)) - 70) + "px");
     home.style.setProperty("--tile", Math.floor(W - 32 - pad) + "px");
   }
 }
