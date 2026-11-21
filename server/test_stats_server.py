@@ -133,6 +133,36 @@ class ServerTest(unittest.TestCase):
         _, ra = self.post("/api/sync", {"device": "a1", "resetSeen": 0, "data": {}}, a)
         self.assertEqual(ra["plans"]["2026-11-19"]["turns"], 3)
 
+    def test_live_status_and_extra_time(self):
+        parent = self.signup()
+        _, p = self.post("/api/pair/new")
+        self.post("/api/pair/approve", {"code": p["code"], "label": "TV"}, parent)
+        tv = self.post("/api/pair/wait", {"pair": p["pair"]})[1]["token"]
+        code, r = self.post("/api/live", {"device": "tv1", "label": "TV", "now": {"state": "video", "v": "abc_123", "title": "Bluey", "t": 40, "left": 300}}, tv)
+        self.assertEqual(code, 200)
+        before = r["plansAt"]
+        self.assertEqual(self.post("/api/live/status", {}, tv)[0], 403)  # only a parent sees it
+        _, st = self.post("/api/live/status", {}, parent)
+        self.assertEqual(st["devices"]["tv1"]["v"], "abc_123")
+        self.assertEqual(st["devices"]["tv1"]["left"], 300)
+        self.assertEqual(self.post("/api/live", {"device": "tv1", "now": {"state": "x", "v": "bad id!"}}, tv)[0], 200)
+        self.assertEqual(self.post("/api/live/status", {}, parent)[1]["devices"]["tv1"]["state"], "home")  # unknown state, bad id dropped
+        import time as _t
+        _t.sleep(0.01)
+        _, pl = self.post("/api/plan", {"day": "2026-11-21", "turns": 4, "minutes": 15, "extra": 600}, parent)
+        self.assertEqual(pl["plans"]["2026-11-21"]["extra"], 600)
+        self.assertGreaterEqual(self.post("/api/live", {"device": "tv1", "now": {"state": "home"}}, tv)[1]["plansAt"], before)
+        self.assertEqual(self.post("/api/plan", {"day": "2026-11-21", "turns": 4, "minutes": 15, "extra": "lots"}, parent)[0], 400)
+
+    def test_one_dinosaur_across_devices(self):
+        tok = self.signup()
+        self.post("/api/sync", {"device": "tv", "resetSeen": 0, "data": {"pet": {"care": 12, "hatched": True, "last": 5}}}, tok)
+        self.post("/api/sync", {"device": "tab", "resetSeen": 0, "data": {"pet": {"care": "x", "hatched": "yes"}}}, tok)
+        _, r = self.post("/api/sync", {"device": "phone", "resetSeen": 0, "data": {}}, tok)
+        self.assertEqual(r["pet"], {"care": 12, "hatched": True, "last": 5})
+        _, r = self.post("/api/sync", {"device": "tv", "resetSeen": 0, "data": {"pet": {"care": 12, "hatched": True}}}, tok)
+        self.assertEqual(r["pet"]["care"], 0)  # the tablet sent nonsense: it counts as no care
+
 
 if __name__ == "__main__":
     unittest.main()

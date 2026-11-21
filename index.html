@@ -366,7 +366,7 @@ const END_TRIM = 2; // seconds: stop just before the very end (the shield alread
 const $ = (id) => document.getElementById(id);
 const thumb = (id, q = "hqdefault") => `https://i.ytimg.com/vi/${id}/${q}.jpg`;
 let data = { categories: [] }, player = null, apiReady = false, tick = null;
-let playingCat = null, playingId = null, locked = false, pending = null;
+let playingCat = null, playingId = null, locked = false, pending = null, playingTitle = "";
 
 /* Design preview (index.html?preview, shown inside preview.html): the app runs
    with its own empty memory, never touches this browser's saved data and never
@@ -385,7 +385,7 @@ function load(k) { if (PREVIEW) return memory.has(k) ? memory.get(k) : null; try
 const LOCAL_TEST = NT.local;
 const API = PREVIEW || !NT.base ? null : NT.base + "/sync";
 function parse(k) { try { return JSON.parse(load(k) || "{}") || {}; } catch (e) { return {}; } }
-const mine = { watch: parse("watch"), vwatch: parse("vwatch"), turnEnds: parse("turnEnds"), pos: parse("pos") };
+const mine = { watch: parse("watch"), vwatch: parse("vwatch"), turnEnds: parse("turnEnds"), pos: parse("pos"), pet: parse("pet") }; // pet: the little dinosaur game
 /* Action log: every open, play, pause, home, end, time-up… with the time, the
    video and how long it was watched. Kept here until the server has it. */
 let logQueue = [];
@@ -468,6 +468,47 @@ async function sync(again = true) {
   } catch (e) { /* offline: keep the last reply */ } finally { syncing = false; }
   if (wiped && again) return sync(false);
 }
+/* Live: every 5 seconds the app tells the server what it shows right now (for
+   "now watching" on the parents' page). The reply says when today's plan last
+   changed: if a parent just gave 10 more minutes, another turn, or ended the
+   turn, the app syncs at once and the screen follows, with no refresh. */
+let plansAt = null, liveBusy = false;
+function liveState() {
+  if (!$("pair").hidden) return { state: "pair" };
+  if (!$("stage").hidden) {
+    const now = { state: storyMode ? "story" : "video", v: playingId || undefined, s: playingCat ? playingCat.key : undefined, title: playingTitle };
+    try { now.t = Math.floor(player.getCurrentTime()); now.d = Math.floor(player.getDuration()); now.playing = player.getPlayerState() === YT.PlayerState.PLAYING; } catch (e) {}
+    return now;
+  }
+  if (!$("game").hidden) return $("game").classList.contains("pick") || !game ? { state: "pick" } : { state: "game", v: game.vid, title: game.kind };
+  return { state: lastMode === "watch" ? "home" : "rest" };
+}
+async function liveNow() {
+  if (!API || !NT.token() || liveBusy || document.hidden) return;
+  liveBusy = true;
+  try {
+    const st = timeState(), now = liveState();
+    now.turn = st.turn; now.turns = turnCount();
+    if (st.mode === "watch") now.left = Math.round(st.left);
+    else if (st.mode === "break") now.left = -Math.round((st.until - Date.now()) / 1000); // below 0: break, seconds until the next turn
+    if (now.state === "home" || now.state === "rest") now.title = st.mode;
+    const r = await NT.call("/live", { device, label: deviceLabel(), now });
+    if (r.ok && r.body) {
+      const changed = plansAt !== null && r.body.plansAt !== plansAt;
+      plansAt = r.body.plansAt;
+      if (changed || (r.body.reset && r.body.reset > resetSeen)) {
+        while (syncing) await new Promise((ok) => setTimeout(ok, 200)); // a sync already on its way may carry the old plan
+        await sync(); afterRemoteChange();
+      }
+    }
+  } catch (e) { /* offline: try again next time */ } finally { liveBusy = false; }
+}
+function afterRemoteChange() {
+  if (!$("home").hidden) return renderGrid();
+  // The time-up picture is showing but a parent just gave more time: back to the videos.
+  if (!$("stage").hidden && locked && $("cover").querySelector(".donescene") && canWatch()) goHome();
+}
+setInterval(liveNow, 5000);
 /* A child's day runs from 7 in the morning to 7 the next morning (not
    midnight to midnight), so turns used in the evening still count after 12. */
 const DAY_START_HOUR = 7;
@@ -548,7 +589,8 @@ function turnEnds() { // when each finished turn ended today (ms timestamps); th
 function isBedtime() { const h = new Date().getHours(), b = cfg().bedtimeHour ?? 21, w = cfg().wakeHour ?? 7; return h >= b || h < w; }
 function timeState() {
   if (isBedtime()) return { mode: "bedtime", turn: turnCount() };
-  const s = todaySeconds(), T = turnSecs(), n = turnCount();
+  // extra: a parent's "+10 minutes" (or, below 0, "end this turn now")
+  const s = Math.max(0, todaySeconds() - (plan().extra || 0)), T = turnSecs(), n = turnCount();
   const used = Math.min(n, Math.floor(s / T)); // turns fully used
   if (used >= n) return { mode: "tomorrow", turn: n };
   if (used > 0) {
@@ -755,7 +797,7 @@ function openStory(st) {
   const heard = JSON.parse(load("storiesHeard") || "{}");
   heard[st.id] = Date.now() / 864e5; // newer = bigger, so heard stories go to the back
   save("storiesHeard", JSON.stringify(heard));
-  openVideo({ id: st.id }, null);
+  openVideo({ id: st.id, title: st.title }, null);
 }
 function renderGrid() {
   const st = renderBudget();
@@ -867,6 +909,8 @@ function askForPress(v, c) {
 function openVideo(v, c) {
   quietApp();
   if (!hadPress()) return askForPress(v, c);
+  playingTitle = v.title || "";
+  setTimeout(liveNow, 1500);
   playingCat = c; playingId = v.id; locked = false; sessionSecs = 0;
   const start = resumeAt(v.id);
   logAction("open", { from: start, t: start, code: 1 });
@@ -1444,7 +1488,7 @@ else Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json
   renderGrid();
 });
 </script>
-<script src="games.js"></script>
+<script src="games.js?v=10"></script><!-- raise v whenever games.js changes, so TVs never keep an old copy -->
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

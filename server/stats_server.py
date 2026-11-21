@@ -306,13 +306,58 @@ def do_reset(fid, day):
     return at
 
 
-def save_plan(fid, day, turns, minutes):
+def save_plan(fid, day, turns, minutes, extra=0):
+    """extra: seconds given (or, below 0, taken away) on top of the turns, e.g. +10 minutes for this turn."""
     with lock:
         plans = read_json(fam_path(fid, "plans.json"), {})
-        plans[day] = {"turns": turns, "minutes": minutes}
+        plans[day] = {"turns": turns, "minutes": minutes, "extra": extra}
         plans = {d: plans[d] for d in sorted(plans, reverse=True)[:7]}
         write_json(fam_path(fid, "plans.json"), plans)
     return plans
+
+
+# ---------- live: what each open app shows right now (kept in memory only) ----------
+# Every open app tells the server every few seconds what it shows (a video,
+# a story, a game, home, a break). The parents' page reads it to show "now
+# watching", and the app's reply carries when today's plan last changed, so a
+# change made by a parent reaches the TV within seconds, without a refresh.
+LIVE = {}  # fid -> device -> status
+LIVE_FOR_MS = 30_000  # a status older than this is not "now" any more
+LIVE_STATES = {"video", "story", "game", "home", "rest", "pick", "pair"}
+
+
+def plans_changed_at(fid):
+    try:
+        return int(os.path.getmtime(fam_path(fid, "plans.json")) * 1000)
+    except OSError:
+        return 0
+
+
+def live_set(fid, device, label, now):
+    st = {"state": now.get("state") if now.get("state") in LIVE_STATES else "home", "at": now_ms(),
+          "label": label[:40] if isinstance(label, str) else ""}
+    for k in ("v", "s"):
+        if isinstance(now.get(k), str) and KEY.match(now[k]):
+            st[k] = now[k]
+    if isinstance(now.get("title"), str):
+        st["title"] = now["title"][:150]
+    for k in ("t", "d", "left", "turn", "turns"):
+        if isinstance(now.get(k), (int, float)) and -10 ** 6 <= now[k] <= 10 ** 7:
+            st[k] = int(now[k])
+    if isinstance(now.get("playing"), bool):
+        st["playing"] = now["playing"]
+    with lock:
+        fam = LIVE.setdefault(fid, {})
+        fam[device] = st
+        for d in [d for d, x in fam.items() if now_ms() - x["at"] > 3_600_000]:
+            del fam[d]  # forget apps closed long ago
+    return {"plansAt": plans_changed_at(fid), "reset": reset_at(fid)[0]}
+
+
+def live_status(fid):
+    cut = now_ms() - LIVE_FOR_MS
+    with lock:
+        return {"now": now_ms(), "devices": {d: x for d, x in LIVE.get(fid, {}).items() if x["at"] >= cut}}
 
 
 def clean_event(ev, device, label):
@@ -374,6 +419,16 @@ def clean_counts(raw):
     return out
 
 
+def clean_pet(raw):
+    """The little dinosaur game: how much care it has had and whether it hatched."""
+    if not isinstance(raw, dict):
+        return {}
+    care = raw.get("care")
+    return {"care": int(care) if isinstance(care, (int, float)) and 0 <= care <= 10 ** 6 else 0,
+            "hatched": raw.get("hatched") is True,
+            "last": int(raw["last"]) if isinstance(raw.get("last"), (int, float)) and raw["last"] > 0 else 0}
+
+
 def clean_pos(raw):
     out = {}
     if isinstance(raw, dict):
@@ -395,10 +450,13 @@ def clean_ends(raw):
 
 
 def others(devices, me):
-    total = {"watch": {}, "vwatch": {}, "turnEnds": {}, "pos": {}}
+    total = {"watch": {}, "vwatch": {}, "turnEnds": {}, "pos": {}, "pet": {}}
     for dev, d in devices.items():
         if dev == me:
             continue
+        pet = d.get("pet") or {}
+        if pet.get("care", 0) > total["pet"].get("care", -1):
+            total["pet"] = pet  # one dinosaur for the child: the most looked-after one wins
         for name in ("watch", "vwatch"):
             for day, vals in d.get(name, {}).items():
                 t = total[name].setdefault(day, {})
@@ -421,7 +479,7 @@ def sync(fid, body):
     device, data = body["device"], body.get("data") or {}
     label = body.get("label")
     mine = {"watch": clean_counts(data.get("watch")), "vwatch": clean_counts(data.get("vwatch")),
-            "turnEnds": clean_ends(data.get("turnEnds")), "pos": clean_pos(data.get("pos")),
+            "turnEnds": clean_ends(data.get("turnEnds")), "pos": clean_pos(data.get("pos")), "pet": clean_pet(data.get("pet")),
             "label": label[:40] if isinstance(label, str) else "", "seen": now_ms()}
     reset, reset_day = reset_at(fid)
     plans = read_json(fam_path(fid, "plans.json"), {})
@@ -549,10 +607,20 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(code, result)
         if path == "/api/plan":
             day, turns, minutes = body.get("day"), body.get("turns"), body.get("minutes")
+            extra = body.get("extra", 0)
             if not (isinstance(day, str) and DAY.match(day) and isinstance(turns, int) and 1 <= turns <= 8
-                    and isinstance(minutes, int) and 5 <= minutes <= 60):
+                    and isinstance(minutes, int) and 5 <= minutes <= 60
+                    and isinstance(extra, int) and -86400 <= extra <= 86400):
                 return self.reply(400, {"error": "bad request"})
-            return self.reply(200, {"plans": save_plan(fid, day, turns, minutes)})
+            return self.reply(200, {"plans": save_plan(fid, day, turns, minutes, extra)})
+        if path == "/api/live":
+            if not (isinstance(body.get("device"), str) and KEY.match(body["device"]) and isinstance(body.get("now"), dict)):
+                return self.reply(400, {"error": "bad request"})
+            return self.reply(200, live_set(fid, body["device"], body.get("label"), body["now"]))
+        if path == "/api/live/status":
+            if s["kind"] != "parent":
+                return self.reply(403, {"error": "parents only"})
+            return self.reply(200, live_status(fid))
         if path == "/api/reset":
             day = body.get("day")
             if not (isinstance(day, str) and DAY.match(day)):

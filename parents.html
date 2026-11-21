@@ -72,6 +72,18 @@ tr.quiet td { color: var(--muted); font-size: 13px; }
 .chips button.on { border-color: var(--bar); color: var(--bar); }
 button.go { background: var(--bar); color: #fff; border: 0; }
 button.go:disabled { opacity: .6; cursor: default; }
+/* Now: what each open app shows this moment, and quick changes to today's time. */
+.live { display: grid; gap: 10px; margin: 8px 0 12px; }
+.liverow { display: flex; gap: 12px; align-items: center; }
+.liverow img { width: 112px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; background: var(--line); flex: none; }
+.liverow .ph { width: 112px; aspect-ratio: 16 / 9; border-radius: 10px; background: var(--bg); display: grid; place-items: center; font-size: 28px; flex: none; }
+.liverow div { min-width: 0; display: grid; gap: 2px; }
+.liverow b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.liverow small { color: var(--muted); }
+.quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.quick button { font: inherit; font-weight: 700; border-radius: 12px; padding: 10px 14px; cursor: pointer; border: 0; color: #fff; }
+.quick .more { background: var(--ok); } .quick .turn { background: var(--bar); } .quick .end { background: var(--stop); }
+.quick button:disabled { opacity: .5; cursor: default; }
 .plan-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .plan-row select { font: inherit; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
 .reset { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -106,6 +118,18 @@ button.danger:disabled { opacity: .6; cursor: default; }
       <div class="stat"><b id="sYest"></b><span>دیروز</span></div>
       <div class="stat"><b id="sWeek"></b><span>۷ روز اخیر</span></div>
     </div>
+  </section>
+
+  <section>
+    <h2>الان</h2>
+    <div class="live" id="live"><p class="note">در حال گرفتن…</p></div>
+    <div class="quick">
+      <button class="more" type="button" id="qMore">۱۰ دقیقه به همین نوبت اضافه کن</button>
+      <button class="turn" type="button" id="qTurn">یک نوبت بیشتر</button>
+      <button class="end" type="button" id="qEnd">همین حالا نوبت تمام شود</button>
+    </div>
+    <p class="note" id="qMsg"></p>
+    <p class="note" id="petNow"></p>
   </section>
 
   <section>
@@ -371,25 +395,33 @@ function showPlan(daily, plans) {
   const today = (plans || {})[dayKey(0)];
   const p = today || def;
   const brk = daily.breakMinutes ?? p.minutes * (daily.breakTimes || 4);
-  $("planNow").textContent = `امروز: ${planText(p)}${today ? "" : " (پیش‌فرض)"} · بین نوبت‌ها ${dur(brk * 60)} استراحت. پیش‌فرض هر روز: ${planText(def)}.`;
+  const ex = (today && today.extra) || 0;
+  $("planNow").textContent = `امروز: ${planText(p)}${today ? "" : " (پیش‌فرض)"}${ex ? ` · ${ex > 0 ? "وقت اضافه" : "کم شده"}: ${dur(Math.abs(ex))}` : ""} · بین نوبت‌ها ${dur(brk * 60)} استراحت. پیش‌فرض هر روز: ${planText(def)}.`;
   $("planTurns").value = p.turns; $("planMinutes").value = p.minutes;
   [...$("presets").children].forEach((b) => b.classList.toggle("on", +b.dataset.t === p.turns && +b.dataset.m === p.minutes));
+}
+let plansNow = {}, dailyNow = {};
+const todayPlanNow = () => plansNow[dayKey(0)] || { turns: dailyNow.turns || 4, minutes: dailyNow.turnMinutes || 15, extra: 0 };
+async function postPlan(turns, minutes, extra) {
+  if (!API) throw new Error("local test copy");
+  const r = await fetch(API.replace("/sync", "/plan"), { method: "POST", headers: NT.headers(),
+    body: JSON.stringify({ day: dayKey(0), turns, minutes, extra: Math.round(extra || 0) }) });
+  if (!r.ok) throw new Error();
+  plansNow = (await r.json()).plans || {};
+  showPlan(dailyNow, plansNow);
 }
 async function savePlan(daily, turns, minutes) {
   const btn = $("planBtn");
   btn.disabled = true; $("planMsg").textContent = "صبر کنید…";
   try {
-    if (!API) throw new Error("local test copy");
-    const r = await fetch(API.replace("/sync", "/plan"), { method: "POST", headers: NT.headers(),
-      body: JSON.stringify({ day: dayKey(0), turns, minutes }) });
-    if (!r.ok) throw new Error();
-    showPlan(daily, (await r.json()).plans);
-    $("planMsg").textContent = "ذخیره شد. دستگاه‌ها تا یک دقیقهٔ دیگر عوض می‌شوند.";
+    await postPlan(turns, minutes, todayPlanNow().extra);
+    $("planMsg").textContent = "ذخیره شد. دستگاه‌ها تا چند ثانیهٔ دیگر عوض می‌شوند.";
   } catch (e) {
     $("planMsg").textContent = "به سرور وصل نشد. اینترنت را چک کنید و دوباره بزنید.";
   } finally { btn.disabled = false; }
 }
 function setupPlan(daily, plans) {
+  plansNow = plans || {}; dailyNow = daily;
   for (let n = 1; n <= 8; n++) $("planTurns").insertAdjacentHTML("beforeend", `<option value="${n}">${fa(n)}</option>`);
   for (const m of [10, 15, 20, 25, 30, 45, 60]) $("planMinutes").insertAdjacentHTML("beforeend", `<option value="${m}">${fa(m)}</option>`);
   for (const [t, m] of PRESETS) {
@@ -401,6 +433,62 @@ function setupPlan(daily, plans) {
   $("planBtn").onclick = () => savePlan(daily, +$("planTurns").value, +$("planMinutes").value);
   showPlan(daily, plans);
 }
+/* ---- Now: every 5 seconds, what each open app shows (video, story, game…) ---- */
+let liveDevices = {}, titles = {};
+const GAME_NAMES = { balloons: "بازی بادکنک", colors: "بازی رنگ‌ها", count: "بازی شمردن", feed: "بازی غذا دادن", simon: "بازی تکرار کن", pet: "بازی دایناسور کوچولو" };
+const MODE_TEXT = { watch: "صفحهٔ اصلی (انتخاب ویدیو)", break: "استراحت بین نوبت‌ها", tomorrow: "وقت امروز تمام شده", bedtime: "وقت قصه (شب)" };
+function liveLine(d) {
+  const mmss = (x) => `${fa(Math.floor(x / 60))}:${fa(x % 60).padStart(2, "۰")}`;
+  let pic = `<span class="ph">🏠</span>`, what = "", sub = "";
+  if (d.state === "video" || d.state === "story") {
+    pic = d.v ? `<img alt="" src="https://i.ytimg.com/vi/${d.v}/mqdefault.jpg">` : pic;
+    what = (d.state === "story" ? "قصه: " : "") + (d.title || titles[d.v] || "ویدیو");
+    sub = d.t != null && d.d ? `${mmss(d.t)} از ${mmss(d.d)}` : "";
+    if (d.playing === false) sub += " · متوقف";
+  } else if (d.state === "game") { pic = `<span class="ph">🎈</span>`; what = GAME_NAMES[d.title] || "بازی"; }
+  else if (d.state === "pick") { pic = `<span class="ph">🎈</span>`; what = "صفحهٔ انتخاب بازی"; }
+  else if (d.state === "pair") { what = "منتظر وصل شدن (کد QR)"; }
+  else { what = MODE_TEXT[d.title] || "صفحهٔ اصلی"; pic = `<span class="ph">${d.title === "bedtime" || d.title === "tomorrow" ? "🌙" : d.title === "break" ? "🛝" : "🏠"}</span>`; }
+  if (d.left > 0) sub += (sub ? " · " : "") + `${fa(Math.ceil(d.left / 60))} دقیقه از نوبت مانده`;
+  else if (d.left < 0) sub += (sub ? " · " : "") + `نوبت بعد ${fa(Math.ceil(-d.left / 60))} دقیقهٔ دیگر`;
+  const row = document.createElement("div");
+  row.className = "liverow";
+  row.innerHTML = `${pic}<div><small></small><b dir="auto"></b><small></small></div>`;
+  const [lab, s2] = row.querySelectorAll("small");
+  lab.textContent = d.label || "دستگاه"; row.querySelector("b").textContent = what; s2.textContent = sub;
+  return row;
+}
+async function showLive() {
+  if (!API) { $("live").innerHTML = `<p class="note">این نسخه به سرور وصل نیست.</p>`; return; }
+  const r = await NT.call("/live/status");
+  if (!r.ok || !r.body) return;
+  liveDevices = r.body.devices || {};
+  const list = Object.values(liveDevices).sort((a, b) => b.at - a.at);
+  $("live").innerHTML = "";
+  if (!list.length) $("live").innerHTML = `<p class="note">الان هیچ دستگاهی برنامه را باز ندارد.</p>`;
+  for (const d of list) $("live").appendChild(liveLine(d));
+  const watching = list.find((d) => d.left > 0);
+  $("qEnd").disabled = !watching;
+}
+async function quick(btn, change, done) {
+  btn.disabled = true; $("qMsg").textContent = "صبر کنید…";
+  try {
+    const p = todayPlanNow(), next = change({ turns: p.turns, minutes: p.minutes, extra: p.extra || 0 });
+    await postPlan(next.turns, next.minutes, next.extra);
+    $("qMsg").textContent = done + " دستگاه‌ها تا چند ثانیهٔ دیگر عوض می‌شوند.";
+    setTimeout(showLive, 6000);
+  } catch (e) { $("qMsg").textContent = "به سرور وصل نشد. دوباره بزنید."; }
+  finally { btn.disabled = false; }
+}
+$("qMore").onclick = () => quick($("qMore"), (p) => ({ ...p, extra: p.extra + 600 }), "✔ ۱۰ دقیقه اضافه شد.");
+$("qTurn").onclick = () => quick($("qTurn"), (p) => ({ ...p, turns: Math.min(8, p.turns + 1) }), "✔ یک نوبت اضافه شد.");
+$("qEnd").onclick = () => {
+  const d = Object.values(liveDevices).find((x) => x.left > 0);
+  if (!d) return;
+  quick($("qEnd"), (p) => ({ ...p, extra: p.extra - d.left }), "✔ نوبت تمام شد.");
+};
+gate.then(() => { showLive(); setInterval(() => { if (!document.hidden) showLive(); }, 5000); });
+
 gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), getDevices()]).then(([data, all]) => {
   if (all && all.devices) {
     const list = Object.entries(all.devices);
@@ -420,12 +508,19 @@ gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r
       : "به سرور وصل نشد. فعلاً فقط تماشای همین دستگاه دیده می‌شود.";
     emptyRow($("devices"), 4, "به سرور وصل نشد.");
   }
+  // The little dinosaur game: the most looked-after dinosaur on any device.
+  const pet = Object.values((all && all.devices) || {}).map((d) => d.pet || {}).sort((a, b) => (b.care || 0) - (a.care || 0))[0];
+  if (pet && pet.hatched) {
+    const st = pet.care >= 80 ? "بزرگ" : pet.care >= 25 ? "بچه" : "نوزاد";
+    const next = pet.care >= 80 ? "" : ` · ${fa((pet.care >= 25 ? 80 : 25) - pet.care)} مراقبت دیگر تا مرحلهٔ بعد`;
+    $("petNow").textContent = `🦖 دایناسور کوچولو: ${st} (${fa(pet.care)} بار مراقبت${next})`;
+  } else if (pet && pet.care === 0 && !pet.hatched) $("petNow").textContent = "";
   $("sToday").textContent = dur(sum(watch, null, 0, 0));
   const dly = data.daily || {};
   setupPlan(dly, all && all.plans);
   const todayPlan = ((all && all.plans) || {})[dayKey(0)] || { turns: dly.turns || 4, minutes: dly.turnMinutes || 15 };
   const turns = todayPlan.turns, tm = todayPlan.minutes;
-  const usedTurns = Math.min(turns, Math.floor(sum(watch, null, 0, 0) / (tm * 60)));
+  const usedTurns = Math.min(turns, Math.floor(Math.max(0, sum(watch, null, 0, 0) - (todayPlan.extra || 0)) / (tm * 60)));
   $("sTodayLabel").textContent = `امروز (${fa(usedTurns)} از ${fa(turns)} نوبت ${fa(tm)} دقیقه‌ای تمام شده)`;
   $("sYest").textContent = dur(sum(watch, null, 1, 1));
   $("sWeek").textContent = dur(sum(watch, null, 0, 6));
@@ -473,9 +568,9 @@ gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r
   // Videos, including ones no longer in the list.
   const info = { game: { title: "بازی بادکنک 🎈", show: "بازی" }, "game-colors": { title: "بازی رنگ‌ها را پیدا کن 🎨", show: "بازی" },
     "game-count": { title: "بازی شمردن تا ۴ 🍎", show: "بازی" }, "game-feed": { title: "بازی غذا دادن به حیوان‌ها 🐶", show: "بازی" },
-    "game-simon": { title: "بازی تکرار کن 🎵", show: "بازی" } };
+    "game-simon": { title: "بازی تکرار کن 🎵", show: "بازی" }, "game-pet": { title: "بازی دایناسور کوچولو 🦖", show: "بازی" } };
   const showTitle = {};
-  for (const c of data.categories) { showTitle[c.key] = c.title; for (const v of c.videos) info[v.id] = { title: v.title, show: c.title }; }
+  for (const c of data.categories) { showTitle[c.key] = c.title; for (const v of c.videos) { info[v.id] = { title: v.title, show: c.title }; titles[v.id] = v.title; } }
   for (const tp of data.topics || []) for (const v of tp.videos) info[v.id] = info[v.id] || { title: v.title, show: showTitle[v.show] || "—" };
   const ids = new Set();
   for (const day of Object.values(vwatch)) for (const id of Object.keys(day)) ids.add(id);
