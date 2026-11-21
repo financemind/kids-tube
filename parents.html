@@ -82,8 +82,13 @@ button.go:disabled { opacity: .6; cursor: default; }
 .liverow small { color: var(--muted); }
 .quick { display: flex; flex-wrap: wrap; gap: 8px; }
 .quick button { font: inherit; font-weight: 700; border-radius: 12px; padding: 10px 14px; cursor: pointer; border: 0; color: #fff; }
-.quick .more { background: var(--ok); } .quick .turn { background: var(--bar); } .quick .end { background: var(--stop); }
+.quick .more { background: var(--ok); } .quick .less { background: #e08a2e; } .quick .turn { background: var(--bar); } .quick .end { background: var(--stop); }
 .quick button:disabled { opacity: .5; cursor: default; }
+.themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; margin-top: 10px; }
+.themes button { font: inherit; display: grid; gap: 4px; justify-items: center; padding: 8px 6px 10px; border-radius: 16px; border: 3px solid var(--line); background: var(--bg); cursor: pointer; color: var(--ink); }
+.themes button svg { width: 88px; height: 88px; }
+.themes button b { font-size: 14px; } .themes button small { font-size: 11px; color: var(--muted); line-height: 1.4; text-align: center; }
+.themes button.on { border-color: var(--bar); background: #eaf2fd; }
 .plan-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .plan-row select { font: inherit; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
 .reset { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -125,11 +130,19 @@ button.danger:disabled { opacity: .6; cursor: default; }
     <div class="live" id="live"><p class="note">در حال گرفتن…</p></div>
     <div class="quick">
       <button class="more" type="button" id="qMore">۱۰ دقیقه به همین نوبت اضافه کن</button>
+      <button class="less" type="button" id="qLess">۱۰ دقیقه از همین نوبت کم کن</button>
       <button class="turn" type="button" id="qTurn">یک نوبت بیشتر</button>
       <button class="end" type="button" id="qEnd">همین حالا نوبت تمام شود</button>
     </div>
     <p class="note" id="qMsg"></p>
     <p class="note" id="petNow"></p>
+  </section>
+
+  <section>
+    <h2>شکل ساعت نویان</h2>
+    <p class="note">ساعت بزرگ برنامه را به شکل چیزی که دوست دارد درمی‌آورد. روی همهٔ دستگاه‌ها چند ثانیه بعد عوض می‌شود.</p>
+    <div class="themes" id="themes"></div>
+    <p class="note" id="themeMsg"></p>
   </section>
 
   <section>
@@ -213,6 +226,7 @@ button.danger:disabled { opacity: .6; cursor: default; }
 </div>
 
 <script src="auth.js"></script>
+<script src="clock-themes.js?v=2"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 function read(k) { try { return JSON.parse(localStorage.getItem(k) || "{}") || {}; } catch (e) { return {}; } }
@@ -468,7 +482,7 @@ async function showLive() {
   if (!list.length) $("live").innerHTML = `<p class="note">الان هیچ دستگاهی برنامه را باز ندارد.</p>`;
   for (const d of list) $("live").appendChild(liveLine(d));
   const watching = list.find((d) => d.left > 0);
-  $("qEnd").disabled = !watching;
+  $("qEnd").disabled = !watching; $("qLess").disabled = !watching;
 }
 async function quick(btn, change, done) {
   btn.disabled = true; $("qMsg").textContent = "صبر کنید…";
@@ -482,11 +496,39 @@ async function quick(btn, change, done) {
 }
 $("qMore").onclick = () => quick($("qMore"), (p) => ({ ...p, extra: p.extra + 600 }), "✔ ۱۰ دقیقه اضافه شد.");
 $("qTurn").onclick = () => quick($("qTurn"), (p) => ({ ...p, turns: Math.min(8, p.turns + 1) }), "✔ یک نوبت اضافه شد.");
+// Ten minutes less: never more than what is left, so it can end this turn but not eat into the next one.
+$("qLess").onclick = () => {
+  const d = Object.values(liveDevices).find((x) => x.left > 0);
+  if (!d) return;
+  const cut = Math.min(600, d.left);
+  quick($("qLess"), (p) => ({ ...p, extra: p.extra - cut }), cut < 600 ? "✔ کمتر از ۱۰ دقیقه مانده بود: نوبت تمام شد." : "✔ ۱۰ دقیقه کم شد.");
+};
 $("qEnd").onclick = () => {
   const d = Object.values(liveDevices).find((x) => x.left > 0);
   if (!d) return;
   quick($("qEnd"), (p) => ({ ...p, extra: p.extra - d.left }), "✔ نوبت تمام شد.");
 };
+/* The clock picture: one card per picture, the chosen one framed. */
+let themeNow = "";
+function showThemes() {
+  const box = $("themes");
+  box.innerHTML = "";
+  for (const key of CLOCK_THEMES.ORDER) {
+    const t = CLOCK_THEMES.THEMES[key], b = document.createElement("button");
+    b.type = "button"; b.className = key === (themeNow || "christmas") ? "on" : "";
+    b.innerHTML = `${CLOCK_THEMES.preview(key)}<b></b><small></small>`;
+    b.querySelector("b").textContent = t.name; b.querySelector("small").textContent = t.hint;
+    b.onclick = async () => {
+      $("themeMsg").textContent = "صبر کنید…";
+      const r = await NT.call("/theme", { theme: key });
+      if (r.ok) { themeNow = key; showThemes(); $("themeMsg").textContent = `✔ ساعت «${t.name}» شد. تلویزیون تا چند ثانیهٔ دیگر عوض می‌شود.`; }
+      else $("themeMsg").textContent = r.status === 403 ? "فقط پدر یا مادر می‌تواند عوض کند." : "به سرور وصل نشد. دوباره بزنید.";
+    };
+    box.appendChild(b);
+  }
+}
+showThemes();
+
 gate.then(() => { showLive(); setInterval(() => { if (!document.hidden) showLive(); }, 5000); });
 
 gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json()), getDevices()]).then(([data, all]) => {
@@ -515,6 +557,7 @@ gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r
     const next = pet.care >= 80 ? "" : ` · ${fa((pet.care >= 25 ? 80 : 25) - pet.care)} مراقبت دیگر تا مرحلهٔ بعد`;
     $("petNow").textContent = `🦖 دایناسور کوچولو: ${st} (${fa(pet.care)} بار مراقبت${next})`;
   } else if (pet && pet.care === 0 && !pet.hatched) $("petNow").textContent = "";
+  themeNow = (all && all.theme) || ""; showThemes();
   $("sToday").textContent = dur(sum(watch, null, 0, 0));
   const dly = data.daily || {};
   setupPlan(dly, all && all.plans);

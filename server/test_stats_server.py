@@ -163,6 +163,19 @@ class ServerTest(unittest.TestCase):
         _, r = self.post("/api/sync", {"device": "tv", "resetSeen": 0, "data": {"pet": {"care": 12, "hatched": True}}}, tok)
         self.assertEqual(r["pet"]["care"], 0)  # the tablet sent nonsense: it counts as no care
 
+    def test_clock_theme(self):
+        parent = self.signup()
+        _, p = self.post("/api/pair/new")
+        self.post("/api/pair/approve", {"code": p["code"]}, parent)
+        tv = self.post("/api/pair/wait", {"pair": p["pair"]})[1]["token"]
+        self.assertEqual(self.post("/api/sync", {"device": "tv", "resetSeen": 0, "data": {}}, tv)[1]["theme"], "")
+        self.assertEqual(self.post("/api/theme", {"theme": "pup"}, tv)[0], 403)  # the TV cannot choose
+        self.assertEqual(self.post("/api/theme", {"theme": "no spaces!"}, parent)[0], 400)
+        self.assertEqual(self.post("/api/theme", {"theme": "pup"}, parent)[0], 200)
+        self.assertEqual(self.post("/api/sync", {"device": "tv", "resetSeen": 0, "data": {}}, tv)[1]["theme"], "pup")
+        self.post("/api/pin/set", {"pin": "1234"}, parent)
+        self.assertEqual(self.post("/api/sync", {"device": "tv", "resetSeen": 0, "data": {}}, tv)[1]["theme"], "pup")  # the code keeps it
+
 
 if __name__ == "__main__":
     unittest.main()

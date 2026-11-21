@@ -284,6 +284,18 @@ def pin_set(fid, pin):
         write_json(fam_path(fid, "settings.json"), info)
 
 
+def theme_set(fid, theme):
+    """The clock picture the parents chose for the child (a short name, e.g. "pup")."""
+    with lock:
+        info = pin_info(fid)
+        info["theme"] = theme
+        write_json(fam_path(fid, "settings.json"), info)
+
+
+def family_theme(fid):
+    return pin_info(fid).get("theme", "")
+
+
 # ---------- one family's watch data ----------
 
 def reset_at(fid):
@@ -327,10 +339,14 @@ LIVE_STATES = {"video", "story", "game", "home", "rest", "pick", "pair"}
 
 
 def plans_changed_at(fid):
-    try:
-        return int(os.path.getmtime(fam_path(fid, "plans.json")) * 1000)
-    except OSError:
-        return 0
+    """When today's plan or the family settings (e.g. the clock picture) last changed."""
+    out = 0
+    for name in ("plans.json", "settings.json"):
+        try:
+            out = max(out, int(os.path.getmtime(fam_path(fid, name)) * 1000))
+        except OSError:
+            pass
+    return out
 
 
 def live_set(fid, device, label, now):
@@ -487,7 +503,7 @@ def sync(fid, body):
         result = {"me": None, "devices": read_json(fam_path(fid, "stats.json"), {})}
         if isinstance(body.get("logSince"), (int, float)):
             result["log"] = read_log(fid, body["logSince"])
-        result.update({"reset": 0, "resetDay": reset_day, "plans": plans, "logged": 0})
+        result.update({"reset": 0, "resetDay": reset_day, "plans": plans, "logged": 0, "theme": family_theme(fid)})
         return 200, result
     seen = body.get("resetSeen")
     if reset and (not isinstance(seen, (int, float)) or seen < reset):
@@ -507,7 +523,7 @@ def sync(fid, body):
                 result["log"] = read_log(fid, body["logSince"])
         else:
             result = others(devices, device)
-    result.update({"reset": reset, "resetDay": reset_day, "plans": plans, "logged": len(log[:500])})
+    result.update({"reset": reset, "resetDay": reset_day, "plans": plans, "logged": len(log[:500]), "theme": family_theme(fid)})
     return 200, result
 
 
@@ -617,6 +633,14 @@ class Handler(BaseHTTPRequestHandler):
             if not (isinstance(body.get("device"), str) and KEY.match(body["device"]) and isinstance(body.get("now"), dict)):
                 return self.reply(400, {"error": "bad request"})
             return self.reply(200, live_set(fid, body["device"], body.get("label"), body["now"]))
+        if path == "/api/theme":
+            if s["kind"] != "parent":
+                return self.reply(403, {"error": "parents only"})
+            theme = body.get("theme")
+            if not (isinstance(theme, str) and (theme == "" or KEY.match(theme))):
+                return self.reply(400, {"error": "bad request"})
+            theme_set(fid, theme)
+            return self.reply(200, {"theme": theme})
         if path == "/api/live/status":
             if s["kind"] != "parent":
                 return self.reply(403, {"error": "parents only"})
