@@ -298,6 +298,18 @@ def family_theme(fid):
     return pin_info(fid).get("theme", "")
 
 
+def games_set(fid, enabled, off):
+    """The games part of the app: on or off for the family, and which games are switched off."""
+    with lock:
+        info = pin_info(fid)
+        info["games"] = {"enabled": enabled, "off": off}
+        write_json(fam_path(fid, "settings.json"), info)
+
+
+def family_games(fid):
+    return pin_info(fid).get("games") or {"enabled": True, "off": []}
+
+
 # ---------- one family's watch data ----------
 
 def reset_at(fid):
@@ -320,11 +332,15 @@ def do_reset(fid, day):
     return at
 
 
-def save_plan(fid, day, turns, minutes, extra=0):
-    """extra: seconds given (or, below 0, taken away) on top of the turns, e.g. +10 minutes for this turn."""
+def save_plan(fid, day, turns, minutes, extra=0, bedtime=None):
+    """extra: seconds given (or, below 0, taken away) on top of the turns, e.g. +10 minutes for this turn.
+    bedtime: tonight only, minutes after midnight when only stories are left (e.g. 1350 = 22:30;
+    up to 1560 = 2 at night); None = the usual time."""
     with lock:
         plans = read_json(fam_path(fid, "plans.json"), {})
         plans[day] = {"turns": turns, "minutes": minutes, "extra": extra}
+        if bedtime is not None:
+            plans[day]["bedtime"] = bedtime
         plans = {d: plans[d] for d in sorted(plans, reverse=True)[:7]}
         write_json(fam_path(fid, "plans.json"), plans)
     return plans
@@ -557,7 +573,7 @@ def sync(fid, body):
         result = {"me": None, "devices": read_json(fam_path(fid, "stats.json"), {})}
         if isinstance(body.get("logSince"), (int, float)):
             result["log"] = read_log(fid, body["logSince"])
-        result.update({"reset": 0, "resetDay": reset_day, "plans": plans, "logged": 0, "theme": family_theme(fid)})
+        result.update({"reset": 0, "resetDay": reset_day, "plans": plans, "logged": 0, "theme": family_theme(fid), "games": family_games(fid)})
         return 200, result
     seen = body.get("resetSeen")
     if reset and (not isinstance(seen, (int, float)) or seen < reset):
@@ -577,7 +593,7 @@ def sync(fid, body):
                 result["log"] = read_log(fid, body["logSince"])
         else:
             result = others(devices, device)
-    result.update({"reset": reset, "resetDay": reset_day, "plans": plans, "logged": len(log[:500]), "theme": family_theme(fid)})
+    result.update({"reset": reset, "resetDay": reset_day, "plans": plans, "logged": len(log[:500]), "theme": family_theme(fid), "games": family_games(fid)})
     return 200, result
 
 
@@ -715,12 +731,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(code, result)
         if path == "/api/plan":
             day, turns, minutes = body.get("day"), body.get("turns"), body.get("minutes")
-            extra = body.get("extra", 0)
+            extra, bedtime = body.get("extra", 0), body.get("bedtime")
             if not (isinstance(day, str) and DAY.match(day) and isinstance(turns, int) and 1 <= turns <= 8
                     and isinstance(minutes, int) and 5 <= minutes <= 60
-                    and isinstance(extra, int) and -86400 <= extra <= 86400):
+                    and isinstance(extra, int) and -86400 <= extra <= 86400
+                    and (bedtime is None or (isinstance(bedtime, int) and 1080 <= bedtime <= 1560))):
                 return self.reply(400, {"error": "bad request"})
-            return self.reply(200, {"plans": save_plan(fid, day, turns, minutes, extra)})
+            return self.reply(200, {"plans": save_plan(fid, day, turns, minutes, extra, bedtime)})
         if path == "/api/live":
             if not (isinstance(body.get("device"), str) and KEY.match(body["device"]) and isinstance(body.get("now"), dict)):
                 return self.reply(400, {"error": "bad request"})
@@ -732,6 +749,15 @@ class Handler(BaseHTTPRequestHandler):
             if btn not in PAD_BUTTONS:
                 return self.reply(400, {"error": "bad request"})
             return self.reply(200, {"listeners": pad_send(fid, btn)})
+        if path == "/api/games":
+            if s["kind"] != "parent":
+                return self.reply(403, {"error": "parents only"})
+            enabled, off = body.get("enabled"), body.get("off")
+            if not (isinstance(enabled, bool) and isinstance(off, list) and len(off) <= 30
+                    and all(isinstance(k, str) and KEY.match(k) for k in off)):
+                return self.reply(400, {"error": "bad request"})
+            games_set(fid, enabled, sorted(set(off)))
+            return self.reply(200, {"games": family_games(fid)})
         if path == "/api/theme":
             if s["kind"] != "parent":
                 return self.reply(403, {"error": "parents only"})

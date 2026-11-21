@@ -502,6 +502,12 @@ async function liveNow() {
 }
 function afterRemoteChange() {
   if (!$("home").hidden) return renderGrid();
+  // The parents switched off the games (or this game) while it was open: back home.
+  if (!$("game").hidden) {
+    if (!game) { if (PICK_KINDS.some(gameOn)) showPicker(); else leaveGame(); }
+    else if (!gameOn(game.kind)) leaveGame();
+    return;
+  }
   // The time-up picture is showing but a parent just gave more time: back to the videos.
   if (!$("stage").hidden && locked && $("cover").querySelector(".donescene") && canWatch()) goHome();
 }
@@ -582,8 +588,18 @@ function turnEnds() { // when each finished turn ended today (ms timestamps); th
   return Array.from({ length: Math.max(a.length, b.length) }, (_, i) =>
     a[i] && b[i] ? Math.min(a[i], b[i]) : a[i] || b[i] || null);
 }
-// Bedtime (from bedtimeHour, 9 pm, to wakeHour, 7 am, local time): no videos, only stories.
-function isBedtime() { const h = new Date().getHours(), b = cfg().bedtimeHour ?? 21, w = cfg().wakeHour ?? 7; return h >= b || h < w; }
+/* Bedtime (from bedtimeHour, 9 pm, to wakeHour, 7 am, local time): no videos, only stories.
+   Parents can move tonight's bedtime later in the report (today's plan.bedtime,
+   in minutes after midnight, up to 2 at night). Minutes are counted along the
+   child's day, so 1 at night is 25:00 and still "tonight". */
+function isBedtime() {
+  const d = new Date(), now = d.getHours() * 60 + d.getMinutes(), wake = (cfg().wakeHour ?? 7) * 60;
+  const kidMin = now < wake ? now + 1440 : now;
+  return kidMin >= (plan().bedtime ?? (cfg().bedtimeHour ?? 21) * 60);
+}
+/* Games: parents can switch the games part off, or single games (server, family settings). */
+const gamesCfg = () => (others && others.games) || { enabled: true, off: [] };
+const gameOn = (kind) => gamesCfg().enabled && !(gamesCfg().off || []).includes(kind);
 function timeState() {
   if (isBedtime()) return { mode: "bedtime", turn: turnCount() };
   // extra: a parent's "+10 minutes" (or, below 0, "end this turn now")
@@ -830,8 +846,9 @@ function renderGrid() {
   $("todayTopic").hidden = !tod && !pt;
   if (pt) $("todayTopic").innerHTML = `<b aria-hidden="true">${pt.icon}</b>${pt.title}`;
   else if (tod) $("todayTopic").innerHTML = `<b aria-hidden="true">${tod.icon}</b>موضوع امروز: ${tod.title}`;
-  // The games card, first in the list: opens the games (see games.js).
+  // The games card, first in the list: opens the games (see games.js). Not there when the parents switched the games off.
   const g = document.createElement("button");
+  if (window.PICK_KINDS && PICK_KINDS.some(gameOn)) {
   g.className = "video gamecard"; g.setAttribute("aria-label", "Games");
   // Drawn balloons (not emoji: some TV browsers show emoji without colour).
   g.innerHTML = `<svg aria-hidden="true" viewBox="0 0 120 70" width="62%">${[["#e63946", 22], ["#2a9d4b", 48], ["#f6c90e", 74], ["#2f7fe0", 100]].map(([c, x], i) =>
@@ -840,6 +857,7 @@ function renderGrid() {
      <path d="M-3 13 L3 13 L0 17 Z" fill="${c}"/></g>`).join("")}</svg>`;
   g.onclick = showPicker;
   $("grid").appendChild(g);
+  }
   for (const v of currentList()) {
     const b = document.createElement("button");
     b.className = "video";
@@ -1498,7 +1516,7 @@ else Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json
   renderGrid();
 });
 </script>
-<script src="games.js?v=14"></script><!-- raise v whenever games.js changes, so TVs never keep an old copy -->
+<script src="games.js?v=15"></script><!-- raise v whenever games.js changes, so TVs never keep an old copy -->
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

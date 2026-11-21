@@ -89,6 +89,9 @@ button.go:disabled { opacity: .6; cursor: default; }
 .themes button svg { width: 88px; height: 88px; }
 .themes button b { font-size: 14px; } .themes button small { font-size: 11px; color: var(--muted); line-height: 1.4; text-align: center; }
 .themes button.on { border-color: var(--bar); background: #eaf2fd; }
+.gameswitch { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 17px; }
+.gamelist { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 14px; }
+.gamelist label, .gameswitch { cursor: pointer; } .gamelist input, .gameswitch input { width: 20px; height: 20px; }
 .plan-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .plan-row select { font: inherit; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
 .reset { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -144,6 +147,21 @@ button.danger:disabled { opacity: .6; cursor: default; }
     <p class="note">ساعت بزرگ برنامه را به شکل چیزی که دوست دارد درمی‌آورد. روی همهٔ دستگاه‌ها چند ثانیه بعد عوض می‌شود.</p>
     <div class="themes" id="themes"></div>
     <p class="note" id="themeMsg"></p>
+  </section>
+
+  <section>
+    <h2>امشب</h2>
+    <p class="note" id="tonightNow"></p>
+    <div class="chips" id="tonightBtns"></div>
+    <p class="note">نوبت‌های امروز همان می‌ماند: اگر وقت روزانه تمام شده باشد، ویدیو باز نمی‌شود.</p>
+    <p class="note" id="tonightMsg"></p>
+  </section>
+
+  <section>
+    <h2>بازی‌ها</h2>
+    <label class="gameswitch"><input type="checkbox" id="gamesOn"> <b>بازی‌ها روشن باشد</b></label>
+    <div class="gamelist" id="gameList"></div>
+    <p class="note" id="gamesMsg"></p>
   </section>
 
   <section>
@@ -417,13 +435,62 @@ function showPlan(daily, plans) {
 }
 let plansNow = {}, dailyNow = {};
 const todayPlanNow = () => plansNow[dayKey(0)] || { turns: dailyNow.turns || 4, minutes: dailyNow.turnMinutes || 15, extra: 0 };
-async function postPlan(turns, minutes, extra) {
+// bedtime: tonight's later bedtime (minutes after midnight); left out, it keeps what today already has.
+async function postPlan(turns, minutes, extra, bedtime = todayPlanNow().bedtime) {
   if (!API) throw new Error("local test copy");
-  const r = await fetch(API.replace("/sync", "/plan"), { method: "POST", headers: NT.headers(),
-    body: JSON.stringify({ day: dayKey(0), turns, minutes, extra: Math.round(extra || 0) }) });
+  const body = { day: dayKey(0), turns, minutes, extra: Math.round(extra || 0) };
+  if (bedtime != null) body.bedtime = bedtime;
+  const r = await fetch(API.replace("/sync", "/plan"), { method: "POST", headers: NT.headers(), body: JSON.stringify(body) });
   if (!r.ok) throw new Error();
   plansNow = (await r.json()).plans || {};
   showPlan(dailyNow, plansNow);
+  showTonight();
+}
+/* Tonight: let the evening go on later this once (only stories after that time). */
+const hm = (min) => `${fa(Math.floor(min / 60) % 24)}:${String(min % 60).padStart(2, "0").replace(/\d/g, (d) => fa(+d))}`;
+function showTonight() {
+  const usual = (dailyNow.bedtimeHour ?? 21) * 60, now = todayPlanNow().bedtime ?? usual;
+  $("tonightNow").textContent = now === usual ? `امشب مثل همیشه از ساعت ${hm(usual)} فقط قصه است.` : `امشب تا ساعت ${hm(now)} باز است (معمولاً ${hm(usual)}). فردا دوباره عادی می‌شود.`;
+  const box = $("tonightBtns");
+  box.innerHTML = "";
+  for (const min of [usual, usual + 30, usual + 60, usual + 90, usual + 120, usual + 180].filter((m) => m <= 1560)) {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = min === usual ? `عادی (${hm(usual)})` : `تا ${hm(min)}`;
+    b.className = min === now ? "on" : "";
+    b.onclick = async () => {
+      $("tonightMsg").textContent = "صبر کنید…";
+      try {
+        const p = todayPlanNow();
+        await postPlan(p.turns, p.minutes, p.extra || 0, min === usual ? null : min);
+        $("tonightMsg").textContent = "✔ ذخیره شد. تلویزیون تا چند ثانیهٔ دیگر عوض می‌شود.";
+      } catch (e) { $("tonightMsg").textContent = "به سرور وصل نشد. دوباره بزنید."; }
+    };
+    box.appendChild(b);
+  }
+}
+/* Games: the whole games part on or off, and each game on its own. */
+const GAME_ORDER = ["balloons", "colors", "count", "feed", "pet", "car", "simon"];
+let gamesNow = { enabled: true, off: [] };
+function showGames() {
+  $("gamesOn").checked = gamesNow.enabled;
+  const box = $("gameList");
+  box.innerHTML = "";
+  for (const k of GAME_ORDER) {
+    const l = document.createElement("label");
+    l.innerHTML = `<input type="checkbox"> <span></span>`;
+    const cb = l.querySelector("input");
+    cb.checked = !gamesNow.off.includes(k); cb.disabled = !gamesNow.enabled;
+    l.querySelector("span").textContent = GAME_NAMES[k] || k;
+    cb.onchange = () => saveGames({ enabled: gamesNow.enabled, off: cb.checked ? gamesNow.off.filter((x) => x !== k) : [...gamesNow.off, k] });
+    box.appendChild(l);
+  }
+}
+async function saveGames(next) {
+  $("gamesMsg").textContent = "صبر کنید…";
+  const r = await NT.call("/games", next);
+  if (r.ok && r.body) { gamesNow = r.body.games; $("gamesMsg").textContent = "✔ ذخیره شد. تلویزیون تا چند ثانیهٔ دیگر عوض می‌شود."; }
+  else $("gamesMsg").textContent = r.status === 403 ? "فقط پدر یا مادر می‌تواند عوض کند." : "به سرور وصل نشد. دوباره بزنید.";
+  showGames();
 }
 async function savePlan(daily, turns, minutes) {
   const btn = $("planBtn");
@@ -437,6 +504,7 @@ async function savePlan(daily, turns, minutes) {
 }
 function setupPlan(daily, plans) {
   plansNow = plans || {}; dailyNow = daily;
+  showTonight();
   for (let n = 1; n <= 8; n++) $("planTurns").insertAdjacentHTML("beforeend", `<option value="${n}">${fa(n)}</option>`);
   for (const m of [10, 15, 20, 25, 30, 45, 60]) $("planMinutes").insertAdjacentHTML("beforeend", `<option value="${m}">${fa(m)}</option>`);
   for (const [t, m] of PRESETS) {
@@ -450,7 +518,7 @@ function setupPlan(daily, plans) {
 }
 /* ---- Now: every 5 seconds, what each open app shows (video, story, game…) ---- */
 let liveDevices = {}, titles = {};
-const GAME_NAMES = { balloons: "بازی بادکنک", colors: "بازی رنگ‌ها", count: "بازی شمردن", feed: "بازی غذا دادن", simon: "بازی تکرار کن", pet: "بازی دایناسور کوچولو" };
+const GAME_NAMES = { balloons: "بازی بادکنک", colors: "بازی رنگ‌ها", count: "بازی شمردن", feed: "بازی غذا دادن", simon: "بازی تکرار کن", pet: "بازی دایناسور کوچولو", car: "بازی ماشین" };
 const MODE_TEXT = { watch: "صفحهٔ اصلی (انتخاب ویدیو)", break: "استراحت بین نوبت‌ها", tomorrow: "وقت امروز تمام شده", bedtime: "وقت قصه (شب)" };
 function liveLine(d) {
   const mmss = (x) => `${fa(Math.floor(x / 60))}:${fa(x % 60).padStart(2, "۰")}`;
@@ -559,6 +627,8 @@ gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r
     $("petNow").textContent = `🦖 دایناسور کوچولو: ${st} (${fa(pet.care)} بار مراقبت${next})`;
   } else if (pet && pet.care === 0 && !pet.hatched) $("petNow").textContent = "";
   themeNow = (all && all.theme) || ""; showThemes();
+  gamesNow = (all && all.games) || gamesNow; showGames();
+  $("gamesOn").onchange = () => saveGames({ enabled: $("gamesOn").checked, off: gamesNow.off });
   $("sToday").textContent = dur(sum(watch, null, 0, 0));
   const dly = data.daily || {};
   setupPlan(dly, all && all.plans);

@@ -134,6 +134,7 @@ const PICK = [
     <g transform="translate(100 98) scale(.9)">${carSvg()}</g>${carStar(70, 26, 14)}</svg>`],
   ["simon", `<svg viewBox="0 0 200 100">${["#e63946", "#2a9d4b", "#f6c90e", "#2f7fe0"].map((c, i) => `<circle cx="${30 + i * 47}" cy="50" r="20" fill="${c}" opacity="${i === 1 ? 1 : .4}"/>`).join("")}</svg>`],
 ];
+window.PICK_KINDS = PICK.map(([kind]) => kind);
 const PICK_VID = { balloons: "game", colors: "game-colors", count: "game-count", feed: "game-feed", simon: "game-simon", pet: "game-pet", car: "game-car" };
 function showPicker() {
   if (!canWatch()) return renderGrid();
@@ -141,7 +142,7 @@ function showPicker() {
   $("home").hidden = true; $("game").hidden = false; $("game").className = "game pick";
   const box = document.createElement("div");
   box.className = "picker";
-  for (const [kind, art] of PICK) {
+  for (const [kind, art] of PICK.filter(([k]) => gameOn(k))) { // only the games the parents left on
     const b = document.createElement("button");
     b.setAttribute("aria-label", kind);
     b.innerHTML = art;
