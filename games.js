@@ -628,21 +628,23 @@ const SIDE = [ // things on the grass that pass by
 ];
 document.head.insertAdjacentHTML("beforeend", `<style>
 .carroom { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; overflow: hidden; background: #a8cf8e; }
-.carroom .grassdots { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: radial-gradient(#b8dba0 18%, transparent 20%); background-size: 46px 46px; }
+/* Everything that moves is moved with transform only (no repainting), so a slow TV browser stays smooth:
+   the grass dots, road lines and curbs are strips a little taller than the screen that slide down and jump back. */
+.carroom .grassdots { position: absolute; top: -46px; left: 0; right: 0; bottom: 0; background-image: radial-gradient(#b8dba0 18%, transparent 20%); background-size: 46px 46px; will-change: transform; }
 .carroom .road { position: absolute; top: -10%; bottom: -10%; left: 50%; width: var(--rw); transform: translateX(-50%); background: #5d6675;
   box-shadow: inset 10px 0 0 #4f5866, inset -10px 0 0 #4f5866; }
-.carroom .curb { position: absolute; top: 0; bottom: 0; width: 14px; background-image: repeating-linear-gradient(#e86a5a 0 30px, #fff6ea 30px 60px); }
+.carroom .curb { position: absolute; top: -60px; bottom: 0; width: 14px; background-image: repeating-linear-gradient(#e86a5a 0 30px, #fff6ea 30px 60px); will-change: transform; }
 .carroom .curb.l { left: -14px; } .carroom .curb.r { right: -14px; }
-.carroom .dash { position: absolute; top: 0; bottom: 0; width: 8px; margin-left: -4px; background-image: repeating-linear-gradient(#fff 0 60px, transparent 60px 120px); opacity: .9; }
-.carroom .me { position: absolute; bottom: 9%; width: var(--cw); height: calc(var(--cw) * 1.4); transition: left .22s cubic-bezier(.3, 1.3, .6, 1); }
+.carroom .dash { position: absolute; top: -120px; bottom: 0; width: 8px; margin-left: -4px; background-image: repeating-linear-gradient(#fff 0 60px, transparent 60px 120px); opacity: .9; will-change: transform; }
+.carroom .me { position: absolute; left: 0; bottom: 9%; width: var(--cw); height: calc(var(--cw) * 1.4); transition: transform .12s ease-out; will-change: transform; }
 .carroom .me svg { width: 100%; height: 100%; overflow: visible; }
-.carroom .me.bonk { animation: carbonk .5s ease-in-out; }
+.carroom .me.bonk svg { animation: carbonk .5s ease-in-out; }
 @keyframes carbonk { 25% { transform: rotate(-12deg); } 50% { transform: rotate(10deg); } 75% { transform: rotate(-5deg); } }
 .carroom .me.honk svg { animation: carhonk .3s ease-in-out 2; }
 @keyframes carhonk { 50% { transform: scale(1.08); } }
-.carroom .item { position: absolute; width: var(--iw); height: var(--iw); margin-left: calc(var(--iw) / -2); }
+.carroom .item { position: absolute; top: 0; width: var(--iw); height: var(--iw); margin-left: calc(var(--iw) / -2); will-change: transform; }
 .carroom .item svg { width: 100%; height: 100%; overflow: visible; }
-.carroom .side { position: absolute; }
+.carroom .side { position: absolute; top: 0; will-change: transform; }
 .carroom .note { position: absolute; font: 700 40px/1 Fredoka, sans-serif; color: #fff; text-shadow: 0 3px 0 rgba(0, 0, 0, .2); animation: zz 1s ease-out forwards; pointer-events: none; }
 .carhud { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, .85);
   border-radius: 22px; padding: 6px 16px; font: 700 34px/1 Fredoka, sans-serif; color: #24324f; direction: ltr; z-index: 3; }
@@ -665,6 +667,7 @@ function carStart() {
     <div class="carhud"><svg viewBox="0 0 40 40">${carStar(20, 21, 18)}</svg><span id="starCount">0</span></div>
     <div class="carqr" id="carqr">${window.qrSvg ? qrSvg(location.origin + "/control.html") : ""}<span>با گوشی بازی کنید: این کد را با دوربین گوشی بگیرید</span></div>
   </div>`;
+  game.el = { room: $("carroom"), me: $("me"), road: $("road"), dash1: $("dash1"), dash2: $("dash2"), curbL: $("curbL"), curbR: $("curbR"), grass: $("grassdots") };
   carPlace();
   $("carroom").addEventListener("pointerdown", (e) => carKey(e.clientX < innerWidth / 2 ? "red" : "green"));
   game.raf = requestAnimationFrame(carFrame);
@@ -673,7 +676,7 @@ function carStart() {
 }
 // Lanes: 0 (left), 1 (middle), 2 (right), as x positions on the screen.
 const laneX = (i) => game.W / 2 + (i - 1) * game.rw / 3;
-function carPlace() { const me = $("me"); if (me) me.style.left = laneX(game.lane) - game.cw / 2 + "px"; }
+function carPlace() { const me = $("me"); if (me) me.style.transform = `translate3d(${laneX(game.lane) - game.cw / 2}px, 0, 0)`; }
 function carKey(c) {
   if (c === "red" && game.lane > 0) { game.lane--; carPlace(); tune([440], 0, 0.06); }
   else if (c === "green" && game.lane < 2) { game.lane++; carPlace(); tune([494], 0, 0.06); }
@@ -693,13 +696,14 @@ function carHonk() {
 }
 function carFrame(t) {
   if (!game || game.kind !== "car") return;
-  const dt = Math.min(0.05, (t - (game.last || t)) / 1000); game.last = t;
+  // Real time, even on a slow TV that draws few frames (no slow motion); only a long pause is cut short.
+  const dt = Math.min(0.12, (t - (game.last || t)) / 1000); game.last = t;
   const v = game.speed * dt;
   game.off = (game.off + v) % 120;
-  for (const id of ["dash1", "dash2"]) $(id).style.backgroundPositionY = game.off + "px";
-  for (const id of ["curbL", "curbR"]) $(id).style.backgroundPositionY = (game.off % 60) + "px";
-  $("grassdots").style.backgroundPositionY = (game.off % 46) + "px";
-  const room = $("carroom");
+  const tf = (el, y) => { el.style.transform = `translate3d(0, ${y.toFixed(1)}px, 0)`; };
+  tf(game.el.dash1, game.off); tf(game.el.dash2, game.off);
+  tf(game.el.curbL, game.off % 60); tf(game.el.curbR, game.off % 60); tf(game.el.grass, game.off % 46);
+  const room = game.el.room;
   // New stars and cones from the top (no two cones in a row, never in every lane).
   game.spawnIn -= dt;
   if (game.spawnIn <= 0) {
@@ -710,22 +714,22 @@ function carFrame(t) {
     el.className = "item"; el.innerHTML = cone ? CONE : `<svg viewBox="0 0 40 40">${carStar(20, 21, 18)}</svg>`;
     const lane = Math.floor(Math.random() * 3);
     el.style.left = laneX(lane) + "px";
-    room.insertBefore(el, $("me"));
+    room.insertBefore(el, game.el.me);
     game.items.push({ el, lane, y: -game.cw, cone });
   }
   game.sideIn -= dt;
   if (game.sideIn <= 0) { // trees, bushes and flowers on both sides
-    game.sideIn = 0.5 + Math.random() * 0.6;
+    game.sideIn = 0.8 + Math.random() * 0.8;
     const el = document.createElement("div"), k = game.cw * (1.5 + Math.random() * 0.7);
     el.className = "side"; el.innerHTML = SIDE[Math.floor(Math.random() * SIDE.length)](k);
     const left = Math.random() < 0.5, grass = (game.W - game.rw) / 2 - 20;
     el.style.left = (left ? 10 + Math.random() * Math.max(0, grass - k) : game.W - grass + Math.random() * Math.max(0, grass - k)) + "px";
-    room.insertBefore(el, $("road"));
+    room.insertBefore(el, game.el.road);
     game.sides.push({ el, y: -k });
   }
   const carTop = game.H * 0.91 - game.cw * 1.4, carBottom = game.H * 0.91;
   for (const it of game.items) {
-    it.y += v; it.el.style.top = it.y + "px";
+    it.y += v; tf(it.el, it.y);
     const mid = it.y + game.cw * 0.4;
     if (!it.hit && it.lane === game.lane && mid > carTop && mid < carBottom) {
       it.hit = true; it.el.remove();
@@ -735,7 +739,7 @@ function carFrame(t) {
     if (it.y > game.H + 40) { it.hit = true; it.el.remove(); }
   }
   game.items = game.items.filter((x) => !x.hit);
-  for (const sd of game.sides) { sd.y += v; sd.el.style.top = sd.y + "px"; if (sd.y > game.H + 20) { sd.el.remove(); sd.gone = true; } }
+  for (const sd of game.sides) { sd.y += v; tf(sd.el, sd.y); if (sd.y > game.H + 20) { sd.el.remove(); sd.gone = true; } }
   game.sides = game.sides.filter((x) => !x.gone);
   game.raf = requestAnimationFrame(carFrame);
 }

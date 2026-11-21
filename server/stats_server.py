@@ -41,6 +41,7 @@ import queue
 import re
 import secrets
 import shutil
+import socket
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -583,6 +584,13 @@ def sync(fid, body):
 # ---------- HTTP ----------
 
 class Handler(BaseHTTPRequestHandler):
+    def setup(self):
+        super().setup()
+        try:  # small messages (a controller press) leave at once, not bundled with the next one
+            self.connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        except OSError:
+            pass
+
     def cors(self):
         origin = self.headers.get("Origin", "")
         if origin in ORIGINS:

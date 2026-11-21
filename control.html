@@ -57,6 +57,9 @@ for (const b of document.querySelectorAll(".pad button")) {
   for (const ev of ["pointerup", "pointerleave", "pointercancel"]) b.addEventListener(ev, () => b.classList.remove("down"));
 }
 document.addEventListener("contextmenu", (e) => e.preventDefault());
+// Keep the connection to the server open and warm: a new secure connection costs
+// about three times as long as a press on an open one.
+if (NT.base && NT.token()) { NT.call("/me"); setInterval(() => { if (!document.hidden) NT.call("/me"); }, 20000); }
 // Keep the screen awake while the child plays (where the phone allows it).
 try { if (navigator.wakeLock) navigator.wakeLock.request("screen").catch(() => {}); } catch (e) {}
 </script>
