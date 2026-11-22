@@ -1435,7 +1435,7 @@ function onColor(c) {
 document.addEventListener("keydown", (e) => {
   const color = COLOR_KEYS[e.keyCode] || COLOR_KEYS[e.key];
   if (color) { e.preventDefault(); onColor(color); return; }
-  if (e.key.startsWith("Arrow")) { e.preventDefault(); moveFocus(e.key); return; }
+  if (e.key.startsWith("Arrow")) { e.preventDefault(); if (!$("game").hidden && window.gameArrow && window.gameArrow(e.key)) return; moveFocus(e.key); return; }
   const onStage = !$("stage").hidden;
   if (BACK_KEYS.has(e.key) || BACK_CODES.has(e.keyCode)) {
     if (!$("game").hidden) { e.preventDefault(); leaveGame(); return; }
@@ -1519,7 +1519,7 @@ else Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json
   renderGrid();
 });
 </script>
-<script src="games.js?v=15"></script><!-- raise v whenever games.js changes, so TVs never keep an old copy -->
+<script src="games.js?v=16"></script><!-- raise v whenever games.js changes, so TVs never keep an old copy -->
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

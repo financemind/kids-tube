@@ -4,101 +4,198 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>گزارش تماشا</title>
+<title>پنل مامان و بابا</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap">
 <style>
-/* Layout: one column; summary numbers first, then limited shows, the week, shows, and every video. */
+/* Layout: a short top bar, a jump bar (sticks while scrolling), then groups of cards:
+   now (live + quick buttons), today (turns, tonight, reset), settings (clock, games),
+   report (week, limits, shows, log, videos) and family (devices, logins).
+   On a phone the tables turn into small cards (each cell gets its column name). */
 :root {
-  --bg: #f3f7fb;
+  --bg: #f2f5fa;
   --ink: #1d2b4f;
-  --muted: #5f6b86;
+  --muted: #64708a;
   --card: #ffffff;
-  --line: #dde5ef;
+  --line: #e2e8f1;
+  --soft: #f5f8fc;
   --bar: #4a6fd8;
+  --bar-soft: #eaf0fd;
   --ok: #2f9e63;
+  --warn: #e08a2e;
   --stop: #d9483b;
+  --shadow: 0 1px 2px rgba(29, 43, 79, .05), 0 6px 20px rgba(29, 43, 79, .06);
   --font: "Vazirmatn", system-ui, sans-serif;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--font); }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--font); -webkit-text-size-adjust: 100%; }
+a { color: var(--bar); }
 .wrap {
-  max-width: 860px; margin: 0 auto; display: grid; gap: 18px;
-  padding-block: max(16px, env(safe-area-inset-top)) 48px;
+  max-width: 900px; margin: 0 auto; display: grid; gap: 14px;
+  padding-block: max(14px, env(safe-area-inset-top)) 56px;
   padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right));
 }
-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-h1 { font-size: 24px; margin: 0; }
-h2 { font-size: 18px; margin: 0 0 10px; }
+/* Top bar */
+header.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.brand .logo { width: 46px; height: 46px; border-radius: 14px; background: linear-gradient(135deg, #5b80e6, #3a5cc4); display: grid; place-items: center; font-size: 24px; flex: none; box-shadow: var(--shadow); }
+h1 { font-size: 21px; margin: 0; line-height: 1.3; }
+h2 { font-size: 17px; margin: 0; line-height: 1.4; }
+.links { display: flex; gap: 6px; flex-wrap: wrap; }
+.links a { color: var(--ink); background: var(--card); text-decoration: none; font-weight: 500; font-size: 14px; padding: 7px 12px; border-radius: 99px; border: 1px solid var(--line); white-space: nowrap; }
 a.back { color: var(--bar); font-weight: 700; text-decoration: none; padding: 8px 14px; border: 2px solid var(--bar); border-radius: 12px; }
+/* Jump bar */
+.jump { position: sticky; top: 0; z-index: 10; margin-inline: -16px; padding: 8px 16px; background: rgba(242, 245, 250, .92); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid transparent; }
+.jump::-webkit-scrollbar { display: none; }
+.jump a { flex: none; text-decoration: none; color: var(--ink); font-size: 14px; font-weight: 500; padding: 6px 14px; border-radius: 99px; background: var(--card); border: 1px solid var(--line); }
+.group { display: grid; gap: 12px; scroll-margin-top: 60px; }
+.group > h3 { margin: 10px 4px -2px; font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: .02em; }
 .note { color: var(--muted); font-size: 14px; margin: 0; }
-section { background: var(--card); border-radius: 16px; padding: 16px; border: 1px solid var(--line); min-width: 0; }
+.msg:empty { display: none; }
+.msg { color: var(--ink); font-weight: 500; }
+/* Cards */
+section, details.card { background: var(--card); border-radius: 18px; padding: 16px; border: 1px solid var(--line); box-shadow: var(--shadow); min-width: 0; display: grid; gap: 10px; align-content: start; }
+.head { display: flex; align-items: center; gap: 10px; }
+.head .ic, summary .ic { width: 34px; height: 34px; border-radius: 10px; background: var(--bar-soft); display: grid; place-items: center; font-size: 18px; flex: none; }
+details.card { display: block; }
+details.card > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+details.card > summary::-webkit-details-marker { display: none; }
+details.card > summary::after { content: ""; margin-inline-start: auto; width: 9px; height: 9px; border-left: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform .2s; }
+details.card[open] > summary::after { transform: rotate(135deg); }
+details.card[open] > summary { margin-bottom: 12px; }
+details.card > :not(summary) + :not(summary) { margin-top: 10px; }
+.grid2 { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+.grid2 > * { min-width: 0; }
+/* Summary tiles */
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.stat { display: grid; gap: 2px; }
-.stat b { font-size: 26px; font-variant-numeric: tabular-nums; }
-.stat span { color: var(--muted); font-size: 14px; }
-.limit { display: grid; gap: 6px; padding-block: 10px; border-top: 1px solid var(--line); }
-.limit:first-of-type { border-top: 0; padding-top: 0; }
-.limit-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.pill { font-size: 13px; font-weight: 700; padding: 2px 10px; border-radius: 99px; color: #fff; }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; box-shadow: var(--shadow); display: grid; gap: 2px; align-content: start; min-width: 0; }
+.stat b { font-size: 21px; font-variant-numeric: tabular-nums; line-height: 1.35; }
+.stat span { color: var(--muted); font-size: 13px; }
+.stat.main { background: linear-gradient(135deg, #5b80e6, #3a5cc4); color: #fff; border: 0; }
+.stat.main span { color: rgba(255, 255, 255, .85); }
+/* Limited shows */
+.limit { display: grid; gap: 4px; padding-block: 10px; border-top: 1px solid var(--line); }
+.limit:first-child { border-top: 0; padding-top: 0; }
+.limit-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pill { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 99px; color: #fff; }
 .pill.ok { background: var(--ok); }
 .pill.stop { background: var(--stop); }
 .limit small { color: var(--muted); }
-.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: end; height: 170px; }
-.day { display: grid; grid-template-rows: auto 1fr auto; height: 100%; gap: 4px; text-align: center; font-size: 13px; }
-.day .col { display: flex; align-items: flex-end; justify-content: center; }
-.day .col i { width: 70%; max-width: 40px; background: var(--bar); border-radius: 6px 6px 0 0; min-height: 2px; }
-.day span { color: var(--muted); }
+.limit > div:not(.limit-head) { font-size: 14px; }
+/* The week */
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; align-items: end; height: 170px; }
+.day { display: grid; grid-template-rows: auto 1fr auto; height: 100%; gap: 4px; text-align: center; font-size: 12px; min-width: 0; }
+.day .col { display: flex; align-items: flex-end; justify-content: center; background: var(--soft); border-radius: 8px; }
+.day .col i { width: 100%; background: #a9bdf0; border-radius: 8px; min-height: 3px; }
+.day.today .col i { background: var(--bar); }
+.day span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.day.today span { color: var(--ink); font-weight: 700; }
+/* Tables */
 .table { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 15px; }
-th, td { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: right; vertical-align: top; }
-th { color: var(--muted); font-weight: 500; font-size: 13px; white-space: nowrap; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 9px 6px; border-bottom: 1px solid var(--line); text-align: right; vertical-align: top; }
+tbody tr:last-child td { border-bottom: 0; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; white-space: nowrap; }
 td.n { font-variant-numeric: tabular-nums; white-space: nowrap; }
 td.t { direction: ltr; text-align: left; min-width: 180px; }
 tr.quiet td { color: var(--muted); font-size: 13px; }
 .empty { color: var(--muted); }
+/* Parents' code */
 .pingate { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 20; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 16px; }
-.pinbox { background: var(--card); border-radius: 20px; padding: 22px; width: min(340px, 100%); display: grid; gap: 12px; justify-items: center; border: 1px solid var(--line); }
-.pindots { display: flex; gap: 14px; direction: ltr; }
+.pinbox { background: var(--card); border-radius: 24px; padding: 24px; width: min(340px, 100%); display: grid; gap: 12px; justify-items: center; border: 1px solid var(--line); box-shadow: var(--shadow); text-align: center; }
+.pindots { display: flex; gap: 14px; direction: ltr; margin: 4px 0; }
 .pindots i { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--bar); }
 .pindots i.on { background: var(--bar); }
-.pinpad { display: grid; grid-template-columns: repeat(3, 72px); gap: 10px; direction: ltr; }
-.pinpad button { font: 700 26px/1 var(--font); height: 64px; border-radius: 16px; border: 1px solid var(--line); background: #f3f7fb; color: var(--ink); cursor: pointer; }
+.pinpad { display: grid; grid-template-columns: repeat(3, 76px); gap: 10px; direction: ltr; }
+.pinpad button { font: 700 26px/1 var(--font); height: 64px; border-radius: 18px; border: 1px solid var(--line); background: var(--soft); color: var(--ink); cursor: pointer; }
+.pinpad button:active { background: var(--bar-soft); }
 .pinmsg { color: var(--stop); min-height: 1.2em; }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
-.chips button, button.go { font: inherit; font-weight: 700; border-radius: 12px; padding: 8px 14px; cursor: pointer; }
-.chips button { background: var(--bg); color: var(--ink); border: 2px solid var(--line); }
-.chips button.on { border-color: var(--bar); color: var(--bar); }
-button.go { background: var(--bar); color: #fff; border: 0; }
+/* Buttons */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips button, button.go { font: inherit; font-size: 15px; font-weight: 700; border-radius: 12px; padding: 8px 14px; cursor: pointer; }
+.chips button { background: var(--soft); color: var(--ink); border: 2px solid var(--line); }
+.chips button.on { border-color: var(--bar); color: var(--bar); background: var(--bar-soft); }
+button.go { background: var(--bar); color: #fff; border: 0; padding: 10px 18px; }
 button.go:disabled { opacity: .6; cursor: default; }
-/* Now: what each open app shows this moment, and quick changes to today's time. */
-.live { display: grid; gap: 10px; margin: 8px 0 12px; }
-.liverow { display: flex; gap: 12px; align-items: center; }
-.liverow img { width: 112px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; background: var(--line); flex: none; }
-.liverow .ph { width: 112px; aspect-ratio: 16 / 9; border-radius: 10px; background: var(--bg); display: grid; place-items: center; font-size: 28px; flex: none; }
-.liverow div { min-width: 0; display: grid; gap: 2px; }
-.liverow b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.liverow small { color: var(--muted); }
-.quick { display: flex; flex-wrap: wrap; gap: 8px; }
-.quick button { font: inherit; font-weight: 700; border-radius: 12px; padding: 10px 14px; cursor: pointer; border: 0; color: #fff; }
-.quick .more { background: var(--ok); } .quick .less { background: #e08a2e; } .quick .turn { background: var(--bar); } .quick .end { background: var(--stop); }
-.quick button:disabled { opacity: .5; cursor: default; }
-.themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; margin-top: 10px; }
-.themes button { font: inherit; display: grid; gap: 4px; justify-items: center; padding: 8px 6px 10px; border-radius: 16px; border: 3px solid var(--line); background: var(--bg); cursor: pointer; color: var(--ink); }
-.themes button svg { width: 88px; height: 88px; }
-.themes button b { font-size: 14px; } .themes button small { font-size: 11px; color: var(--muted); line-height: 1.4; text-align: center; }
-.themes button.on { border-color: var(--bar); background: #eaf2fd; }
-.gameswitch { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 17px; }
-.gamelist { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 14px; }
-.gamelist label, .gameswitch { cursor: pointer; } .gamelist input, .gameswitch input { width: 20px; height: 20px; }
-.plan-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.plan-row select { font: inherit; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
-.reset { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-.reset h2 { margin-bottom: 4px; }
-button.danger { font: inherit; font-weight: 700; color: #fff; background: var(--stop); border: 0; border-radius: 12px; padding: 10px 18px; cursor: pointer; }
+button.danger { font: inherit; font-size: 14px; font-weight: 700; color: var(--stop); background: #fdeeee; border: 0; border-radius: 12px; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
 button.danger:disabled { opacity: .6; cursor: default; }
-@media (max-width: 520px) { .stat b { font-size: 21px; } }
+/* Now */
+.hero { border: 2px solid #cfdaf7; }
+.live { display: grid; gap: 10px; }
+.liverow { display: flex; gap: 12px; align-items: center; background: var(--soft); border-radius: 14px; padding: 8px; }
+.liverow img { width: 112px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; background: var(--line); flex: none; }
+.liverow .ph { width: 112px; aspect-ratio: 16 / 9; border-radius: 10px; background: var(--card); display: grid; place-items: center; font-size: 28px; flex: none; }
+.liverow div { min-width: 0; display: grid; gap: 1px; }
+.liverow b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.liverow small { color: var(--muted); font-size: 13px; }
+.quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.quick button { font: inherit; border-radius: 14px; padding: 10px 8px; cursor: pointer; border: 0; color: #fff; display: grid; gap: 0; justify-items: center; line-height: 1.35; }
+.quick button b { font-size: 17px; } .quick button small { font-size: 12px; opacity: .9; }
+.quick .more { background: var(--ok); } .quick .less { background: var(--warn); } .quick .turn { background: var(--bar); } .quick .end { background: var(--stop); }
+.quick button:disabled { opacity: .4; cursor: default; }
+.extras { display: grid; gap: 4px; }
+/* Clock pictures */
+.themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
+.themes button { font: inherit; display: grid; gap: 2px; justify-items: center; align-content: start; padding: 8px 6px 10px; border-radius: 16px; border: 3px solid transparent; background: var(--soft); cursor: pointer; color: var(--ink); }
+.themes button svg { width: 84px; height: 84px; }
+.themes button b { font-size: 14px; } .themes button small { font-size: 11px; color: var(--muted); line-height: 1.4; text-align: center; }
+.themes button.on { border-color: var(--bar); background: var(--bar-soft); }
+/* Games: switches */
+input.sw { appearance: none; -webkit-appearance: none; width: 48px; height: 28px; border-radius: 99px; background: #cdd6e4; position: relative; cursor: pointer; flex: none; margin: 0; transition: background .2s; }
+input.sw::after { content: ""; position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .2); transition: transform .2s; }
+input.sw:checked { background: var(--ok); }
+input.sw:checked::after { transform: translateX(-20px); }
+input.sw:disabled { opacity: .45; cursor: default; }
+.gameswitch { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 14px; background: var(--bar-soft); cursor: pointer; }
+.gamelist { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 10px; }
+.gamelist label { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line); cursor: pointer; font-size: 15px; }
+/* Forms */
+.plan-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.plan-row select, .plan-row input { font: inherit; font-size: 16px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+.plan-row input { flex: 1 1 200px; min-width: 0; }
+.reset { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.reset .danger { background: var(--stop); color: #fff; padding: 10px 18px; }
+
+@media (max-width: 720px) {
+  .grid2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  h1 { font-size: 19px; }
+  .links { width: 100%; }
+  .links a { flex: 1; text-align: center; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .stat.main { grid-column: 1 / -1; }
+  .stat b { font-size: 19px; }
+  .quick { grid-template-columns: 1fr 1fr; }
+  .quick button { padding: 12px 8px; }
+  .liverow img, .liverow .ph { width: 92px; }
+  /* Clock pictures in one row that slides sideways. */
+  .themes { grid-auto-flow: column; grid-template-columns: none; grid-auto-columns: 112px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; margin-inline: -16px; padding-inline: 16px; scrollbar-width: none; }
+  .themes::-webkit-scrollbar { display: none; }
+  .themes button { scroll-snap-align: start; }
+  .gamelist { grid-template-columns: 1fr; }
+  .plan-row button.go { flex: 1 1 100%; }
+  .reset .danger { width: 100%; }
+  /* Tables become small cards: each cell shows its column name. */
+  .table { overflow: visible; }
+  .table table, .table tbody, .table tr, .table td { display: block; width: 100%; }
+  .table thead { display: none; }
+  .table tr { background: var(--soft); border-radius: 12px; padding: 8px 12px; margin-bottom: 8px; }
+  .table td { border: 0; padding: 3px 0; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; text-align: left; min-width: 0; }
+  .table td::before { content: attr(data-label); color: var(--muted); font-size: 12px; flex: none; text-align: right; }
+  .table td:empty { display: none; }
+  .table td.t { display: block; text-align: left; font-weight: 500; }
+  .table td.t::before { display: block; direction: rtl; }
+  .table td:first-child { font-weight: 700; padding-bottom: 4px; }
+  .table td:first-child::before { content: none; }
+  .table td.t:first-child { text-align: left; }
+  .table td.empty { display: block; text-align: right; }
+  .table td.empty::before { content: none; }
+  .table tr.quiet { background: transparent; padding-block: 4px; }
+}
 </style>
 </head>
 <body>
@@ -114,140 +211,165 @@ button.danger:disabled { opacity: .6; cursor: default; }
   </div>
 </div>
 <div class="wrap">
-  <header>
-    <h1>گزارش تماشای نویان</h1>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="back" href="catalog.html">همهٔ ویدیوها</a><a class="back" href="account.html">حساب</a><a class="back" href="./">برگشت</a></div>
+  <header class="top">
+    <div class="brand">
+      <span class="logo">📺</span>
+      <div><h1>پنل مامان و بابا</h1><p class="note" id="note">در حال گرفتن آمار همهٔ دستگاه‌ها…</p></div>
+    </div>
+    <nav class="links"><a href="catalog.html">🎬 همهٔ ویدیوها</a><a href="account.html">👤 حساب</a><a href="./">↩ برگشت</a></nav>
   </header>
-  <p class="note" id="note">در حال گرفتن آمار همهٔ دستگاه‌ها…</p>
 
-  <section>
-    <div class="stats">
-      <div class="stat"><b id="sToday"></b><span id="sTodayLabel">امروز</span></div>
-      <div class="stat"><b id="sYest"></b><span>دیروز</span></div>
-      <div class="stat"><b id="sWeek"></b><span>۷ روز اخیر</span></div>
+  <nav class="jump" aria-label="بخش‌ها">
+    <a href="#gNow">الان</a><a href="#gToday">امروز</a><a href="#gSettings">ساعت و بازی</a><a href="#gReport">گزارش</a><a href="#gFamily">دستگاه‌ها</a>
+  </nav>
+
+  <div class="stats">
+    <div class="stat main"><b id="sToday"></b><span id="sTodayLabel">امروز</span></div>
+    <div class="stat"><b id="sYest"></b><span>دیروز</span></div>
+    <div class="stat"><b id="sWeek"></b><span>۷ روز اخیر</span></div>
+  </div>
+
+  <div class="group" id="gNow">
+    <section class="hero">
+      <div class="head"><span class="ic">🔴</span><h2>الان چه می‌بیند</h2></div>
+      <div class="live" id="live"><p class="note">در حال گرفتن…</p></div>
+      <div class="quick">
+        <button class="more" type="button" id="qMore"><b>۱۰ دقیقه بیشتر</b><small>به همین نوبت</small></button>
+        <button class="less" type="button" id="qLess"><b>۱۰ دقیقه کمتر</b><small>از همین نوبت</small></button>
+        <button class="turn" type="button" id="qTurn"><b>یک نوبت بیشتر</b><small>برای امروز</small></button>
+        <button class="end" type="button" id="qEnd"><b>تمام کن</b><small>همین نوبت، همین حالا</small></button>
+      </div>
+      <p class="note msg" id="qMsg"></p>
+      <div class="extras">
+        <p class="note" id="petNow"></p>
+        <p class="note">🎮 بازی ماشین با گوشی: <a href="control.html">دستهٔ بازی را باز کنید</a> و گوشی را به بچه بدهید.</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="group" id="gToday">
+    <h3>امروز و امشب</h3>
+    <div class="grid2">
+      <section>
+        <div class="head"><span class="ic">⏱️</span><h2>نوبت‌های امروز</h2></div>
+        <p class="note" id="planNow"></p>
+        <div class="chips" id="presets"></div>
+        <div class="plan-row">
+          <label><select id="planTurns"></select> نوبت</label>
+          <span>×</span>
+          <label><select id="planMinutes"></select> دقیقه</label>
+          <button id="planBtn" class="go" type="button">ذخیره برای امروز</button>
+        </div>
+        <p class="note msg" id="planMsg"></p>
+      </section>
+      <section>
+        <div class="head"><span class="ic">🌙</span><h2>امشب</h2></div>
+        <p class="note" id="tonightNow"></p>
+        <div class="chips" id="tonightBtns"></div>
+        <p class="note">نوبت‌های امروز همان می‌ماند: اگر وقت روزانه تمام شده باشد، ویدیو باز نمی‌شود.</p>
+        <p class="note msg" id="tonightMsg"></p>
+      </section>
     </div>
-  </section>
+    <section class="reset">
+      <div>
+        <h2>صفر کردن وقت امروز</h2>
+        <p class="note">وقت امروز روی همهٔ دستگاه‌ها از اول شروع می‌شود. آمار روزهای قبل می‌ماند.</p>
+      </div>
+      <button id="resetBtn" class="danger" type="button">صفر کردن وقت امروز</button>
+    </section>
+  </div>
 
-  <section>
-    <h2>الان</h2>
-    <div class="live" id="live"><p class="note">در حال گرفتن…</p></div>
-    <div class="quick">
-      <button class="more" type="button" id="qMore">۱۰ دقیقه به همین نوبت اضافه کن</button>
-      <button class="less" type="button" id="qLess">۱۰ دقیقه از همین نوبت کم کن</button>
-      <button class="turn" type="button" id="qTurn">یک نوبت بیشتر</button>
-      <button class="end" type="button" id="qEnd">همین حالا نوبت تمام شود</button>
+  <div class="group" id="gSettings">
+    <h3>ساعت و بازی</h3>
+    <section>
+      <div class="head"><span class="ic">🕰️</span><h2>شکل ساعت نویان</h2></div>
+      <p class="note">ساعت بزرگ برنامه را به شکل چیزی که دوست دارد درمی‌آورد. روی همهٔ دستگاه‌ها چند ثانیه بعد عوض می‌شود.</p>
+      <div class="themes" id="themes"></div>
+      <p class="note msg" id="themeMsg"></p>
+    </section>
+    <section>
+      <div class="head"><span class="ic">🎈</span><h2>بازی‌ها</h2></div>
+      <label class="gameswitch"><b>بازی‌ها روشن باشد</b><input type="checkbox" class="sw" id="gamesOn"></label>
+      <div class="gamelist" id="gameList"></div>
+      <p class="note msg" id="gamesMsg"></p>
+    </section>
+  </div>
+
+  <div class="group" id="gReport">
+    <h3>گزارش</h3>
+    <div class="grid2">
+      <section>
+        <div class="head"><span class="ic">📊</span><h2>هر روز این هفته</h2></div>
+        <p class="note">دقیقه‌های تماشا در هر روز.</p>
+        <div class="week" id="week"></div>
+      </section>
+      <section>
+        <div class="head"><span class="ic">🚦</span><h2>برنامه‌های محدود</h2></div>
+        <div id="limits"></div>
+      </section>
     </div>
-    <p class="note" id="qMsg"></p>
-    <p class="note" id="petNow"></p>
-    <p class="note">🎮 برای بازی ماشین با گوشی: <a href="control.html">دستهٔ بازی را باز کنید</a> و گوشی را به بچه بدهید.</p>
-  </section>
+    <details class="card" open>
+      <summary><span class="ic head-ic">📺</span><h2>هر برنامه</h2></summary>
+      <div class="table"><table>
+        <thead><tr><th>برنامه</th><th>امروز</th><th>۷ روز</th><th>۳۰ روز</th></tr></thead>
+        <tbody id="shows"></tbody>
+      </table></div>
+    </details>
+    <details class="card">
+      <summary><span class="ic head-ic">📝</span><h2>کارهای امروز</h2></summary>
+      <p class="note">هر کاری که امروز در برنامه شد، تازه‌ترین بالا. «دیده» یعنی از وقتی آن ویدیو باز شد چقدر پخش شد؛ «جای فیلم» یعنی کجای ویدیو بود (دقیقه:ثانیه).</p>
+      <div class="table"><table>
+        <thead><tr><th>ساعت</th><th>کار</th><th>ویدیو</th><th>دیده</th><th>جای فیلم</th><th>دستگاه</th></tr></thead>
+        <tbody id="log"></tbody>
+      </table></div>
+    </details>
+    <details class="card">
+      <summary><span class="ic head-ic">🎬</span><h2>هر ویدیو</h2></summary>
+      <div class="table"><table>
+        <thead><tr><th>ویدیو</th><th>برنامه</th><th>امروز</th><th>۷ روز</th><th>۳۰ روز</th></tr></thead>
+        <tbody id="videos"></tbody>
+      </table></div>
+    </details>
+  </div>
 
-  <section>
-    <h2>شکل ساعت نویان</h2>
-    <p class="note">ساعت بزرگ برنامه را به شکل چیزی که دوست دارد درمی‌آورد. روی همهٔ دستگاه‌ها چند ثانیه بعد عوض می‌شود.</p>
-    <div class="themes" id="themes"></div>
-    <p class="note" id="themeMsg"></p>
-  </section>
-
-  <section>
-    <h2>امشب</h2>
-    <p class="note" id="tonightNow"></p>
-    <div class="chips" id="tonightBtns"></div>
-    <p class="note">نوبت‌های امروز همان می‌ماند: اگر وقت روزانه تمام شده باشد، ویدیو باز نمی‌شود.</p>
-    <p class="note" id="tonightMsg"></p>
-  </section>
-
-  <section>
-    <h2>بازی‌ها</h2>
-    <label class="gameswitch"><input type="checkbox" id="gamesOn"> <b>بازی‌ها روشن باشد</b></label>
-    <div class="gamelist" id="gameList"></div>
-    <p class="note" id="gamesMsg"></p>
-  </section>
-
-  <section>
-    <h2>نوبت‌های امروز</h2>
-    <p class="note" id="planNow"></p>
-    <div class="chips" id="presets"></div>
-    <div class="plan-row">
-      <label><select id="planTurns"></select> نوبت</label>
-      <span>×</span>
-      <label><select id="planMinutes"></select> دقیقه</label>
-      <button id="planBtn" class="go" type="button">برای امروز ذخیره کن</button>
-    </div>
-    <p class="note" id="planMsg"></p>
-  </section>
-
-  <section class="reset">
-    <div>
-      <h2>وقت امروز</h2>
-      <p class="note">وقت امروز روی همهٔ دستگاه‌ها از اول شروع می‌شود. آمار روزهای قبل می‌ماند.</p>
-    </div>
-    <button id="resetBtn" class="danger" type="button">صفر کردن وقت امروز</button>
-  </section>
-
-  <section>
-    <h2>هر دستگاه</h2>
-    <div class="table"><table>
-      <thead><tr><th>دستگاه</th><th>امروز</th><th>۷ روز</th><th>آخرین بار</th></tr></thead>
-      <tbody id="devices"></tbody>
-    </table></div>
-  </section>
-
-  <section>
-    <h2>ورودهای این خانواده</h2>
-    <p class="note" id="famLine"></p>
-    <div class="table"><table>
-      <thead><tr><th>چه کسی / کدام دستگاه</th><th>از کی</th><th>آخرین بار</th><th></th></tr></thead>
-      <tbody id="logins"></tbody>
-    </table></div>
-    <form id="addParent" class="plan-row" autocomplete="off">
-      <input type="email" id="apEmail" placeholder="ایمیل پدر یا مادر دیگر" dir="ltr" required>
-      <input type="password" id="apPass" placeholder="رمز (۸ حرف یا بیشتر)" dir="ltr" minlength="8" required>
-      <button class="go" type="submit">اضافه کن</button>
-    </form>
-    <p class="note" id="apMsg"></p>
-  </section>
-
-  <section>
-    <h2>برنامه‌های محدود</h2>
-    <div id="limits"></div>
-  </section>
-
-  <section>
-    <h2>هر روز این هفته</h2>
-    <div class="week" id="week"></div>
-  </section>
-
-  <section>
-    <h2>هر برنامه</h2>
-    <div class="table"><table>
-      <thead><tr><th>برنامه</th><th>امروز</th><th>۷ روز</th><th>۳۰ روز</th></tr></thead>
-      <tbody id="shows"></tbody>
-    </table></div>
-  </section>
-
-  <section>
-    <h2>کارهای امروز</h2>
-    <p class="note">هر کاری که امروز در برنامه شد، تازه‌ترین بالا. «دیده» یعنی از وقتی آن ویدیو باز شد چقدر پخش شد؛ «جای فیلم» یعنی کجای ویدیو بود (دقیقه:ثانیه).</p>
-    <div class="table"><table>
-      <thead><tr><th>ساعت</th><th>کار</th><th>ویدیو</th><th>دیده</th><th>جای فیلم</th><th>دستگاه</th></tr></thead>
-      <tbody id="log"></tbody>
-    </table></div>
-  </section>
-
-  <section>
-    <h2>هر ویدیو</h2>
-    <div class="table"><table>
-      <thead><tr><th>ویدیو</th><th>برنامه</th><th>امروز</th><th>۷ روز</th><th>۳۰ روز</th></tr></thead>
-      <tbody id="videos"></tbody>
-    </table></div>
-  </section>
+  <div class="group" id="gFamily">
+    <h3>دستگاه‌ها و خانواده</h3>
+    <details class="card" open>
+      <summary><span class="ic head-ic">📱</span><h2>هر دستگاه</h2></summary>
+      <div class="table"><table>
+        <thead><tr><th>دستگاه</th><th>امروز</th><th>۷ روز</th><th>آخرین بار</th></tr></thead>
+        <tbody id="devices"></tbody>
+      </table></div>
+    </details>
+    <details class="card">
+      <summary><span class="ic head-ic">👥</span><h2>ورودهای این خانواده</h2></summary>
+      <p class="note" id="famLine"></p>
+      <div class="table"><table>
+        <thead><tr><th>چه کسی / کدام دستگاه</th><th>از کی</th><th>آخرین بار</th><th></th></tr></thead>
+        <tbody id="logins"></tbody>
+      </table></div>
+      <h2 style="font-size:15px">اضافه کردن پدر یا مادر دیگر</h2>
+      <form id="addParent" class="plan-row" autocomplete="off">
+        <input type="email" id="apEmail" placeholder="ایمیل پدر یا مادر دیگر" dir="ltr" required>
+        <input type="password" id="apPass" placeholder="رمز (۸ حرف یا بیشتر)" dir="ltr" minlength="8" required>
+        <button class="go" type="submit">اضافه کن</button>
+      </form>
+      <p class="note msg" id="apMsg"></p>
+    </details>
+  </div>
 </div>
 
 <script src="auth.js"></script>
 <script src="clock-themes.js?v=3"></script>
 <script>
 const $ = (id) => document.getElementById(id);
+// On a phone the tables show as small cards: each cell carries its column name.
+for (const tb of document.querySelectorAll(".table tbody")) {
+  const heads = [...tb.closest("table").querySelectorAll("thead th")].map((th) => th.textContent);
+  new MutationObserver(() => {
+    for (const tr of tb.rows) [...tr.cells].forEach((td, i) => { if (td.colSpan === 1 && !td.dataset.label) td.dataset.label = heads[i] || ""; });
+  }).observe(tb, { childList: true });
+}
 function read(k) { try { return JSON.parse(localStorage.getItem(k) || "{}") || {}; } catch (e) { return {}; } }
 let watch = read("watch"), vwatch = read("vwatch");
 // Server and family login: see auth.js. Without a login the report sends you to the account page.
@@ -469,7 +591,7 @@ function showTonight() {
   }
 }
 /* Games: the whole games part on or off, and each game on its own. */
-const GAME_ORDER = ["balloons", "colors", "count", "feed", "pet", "car", "simon"];
+const GAME_ORDER = ["balloons", "colors", "count", "feed", "pet", "car", "maze", "puzzle", "simon"];
 let gamesNow = { enabled: true, off: [] };
 function showGames() {
   $("gamesOn").checked = gamesNow.enabled;
@@ -477,7 +599,7 @@ function showGames() {
   box.innerHTML = "";
   for (const k of GAME_ORDER) {
     const l = document.createElement("label");
-    l.innerHTML = `<input type="checkbox"> <span></span>`;
+    l.innerHTML = `<span></span><input type="checkbox" class="sw">`;
     const cb = l.querySelector("input");
     cb.checked = !gamesNow.off.includes(k); cb.disabled = !gamesNow.enabled;
     l.querySelector("span").textContent = GAME_NAMES[k] || k;
@@ -518,7 +640,7 @@ function setupPlan(daily, plans) {
 }
 /* ---- Now: every 5 seconds, what each open app shows (video, story, game…) ---- */
 let liveDevices = {}, titles = {};
-const GAME_NAMES = { balloons: "بازی بادکنک", colors: "بازی رنگ‌ها", count: "بازی شمردن", feed: "بازی غذا دادن", simon: "بازی تکرار کن", pet: "بازی دایناسور کوچولو", car: "بازی ماشین" };
+const GAME_NAMES = { balloons: "بازی بادکنک", colors: "بازی رنگ‌ها", count: "بازی شمردن", feed: "بازی غذا دادن", simon: "بازی تکرار کن", pet: "بازی دایناسور کوچولو", car: "بازی ماشین", maze: "بازی هزارتو", puzzle: "بازی پازل" };
 const MODE_TEXT = { watch: "صفحهٔ اصلی (انتخاب ویدیو)", break: "استراحت بین نوبت‌ها", tomorrow: "وقت امروز تمام شده", bedtime: "وقت قصه (شب)" };
 function liveLine(d) {
   const mmss = (x) => `${fa(Math.floor(x / 60))}:${fa(x % 60).padStart(2, "۰")}`;
@@ -664,7 +786,7 @@ gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r
   totals.forEach((t, i) => {
     const d = kidNow(); d.setDate(d.getDate() - (6 - i));
     const el = document.createElement("div");
-    el.className = "day";
+    el.className = i === 6 ? "day today" : "day";
     el.innerHTML = `<span>${fa(Math.round(t / 60))}</span><div class="col"><i style="height:${(100 * t / max).toFixed(1)}%"></i></div><span>${i === 6 ? "امروز" : names[d.getDay()]}</span>`;
     $("week").appendChild(el);
   });
@@ -682,7 +804,8 @@ gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r
   // Videos, including ones no longer in the list.
   const info = { game: { title: "بازی بادکنک 🎈", show: "بازی" }, "game-colors": { title: "بازی رنگ‌ها را پیدا کن 🎨", show: "بازی" },
     "game-count": { title: "بازی شمردن تا ۴ 🍎", show: "بازی" }, "game-feed": { title: "بازی غذا دادن به حیوان‌ها 🐶", show: "بازی" },
-    "game-simon": { title: "بازی تکرار کن 🎵", show: "بازی" }, "game-pet": { title: "بازی دایناسور کوچولو 🦖", show: "بازی" } };
+    "game-simon": { title: "بازی تکرار کن 🎵", show: "بازی" }, "game-pet": { title: "بازی دایناسور کوچولو 🦖", show: "بازی" },
+    "game-car": { title: "بازی ماشین 🚗", show: "بازی" }, "game-maze": { title: "بازی هزارتو 🌳", show: "بازی" }, "game-puzzle": { title: "بازی پازل 🧩", show: "بازی" } };
   const showTitle = {};
   for (const c of data.categories) { showTitle[c.key] = c.title; for (const v of c.videos) { info[v.id] = { title: v.title, show: c.title }; titles[v.id] = v.title; } }
   for (const tp of data.topics || []) for (const v of tp.videos) info[v.id] = info[v.id] || { title: v.title, show: showTitle[v.show] || "—" };

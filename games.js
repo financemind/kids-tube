@@ -11,6 +11,9 @@
                parent's phone as a controller (control.html): red/left and
                green/right change lane, yellow honks; stars to catch, cones
                just make it wobble (no crash, no losing);
+   - maze:     the little dinosaur walks through a hedge maze to an apple
+               (arrow keys, or the colour keys with arrows on them);
+   - puzzle:   a picture in four pieces: press the colour of each piece's place;
    - pet:      a little dinosaur of his own to look after: red feeds it,
                green plays ball, yellow cleans up, blue puts it to sleep.
    The picker shows the five games: red/green move, yellow opens. Every
@@ -132,10 +135,12 @@ const PICK = [
     <g fill="#fff">${[10, 50, 90, 130].map((y) => `<rect x="97" y="${y}" width="6" height="22" rx="3"/>`).join("")}</g>
     <rect x="0" y="0" width="55" height="150" fill="#a8cf8e"/><rect x="145" y="0" width="55" height="150" fill="#a8cf8e"/>
     <g transform="translate(100 98) scale(.9)">${carSvg()}</g>${carStar(70, 26, 14)}</svg>`],
+  ["maze", mazePickArt()],
+  ["puzzle", puzzlePickArt()],
   ["simon", `<svg viewBox="0 0 200 100">${["#e63946", "#2a9d4b", "#f6c90e", "#2f7fe0"].map((c, i) => `<circle cx="${30 + i * 47}" cy="50" r="20" fill="${c}" opacity="${i === 1 ? 1 : .4}"/>`).join("")}</svg>`],
 ];
 window.PICK_KINDS = PICK.map(([kind]) => kind);
-const PICK_VID = { balloons: "game", colors: "game-colors", count: "game-count", feed: "game-feed", simon: "game-simon", pet: "game-pet", car: "game-car" };
+const PICK_VID = { balloons: "game", colors: "game-colors", count: "game-count", feed: "game-feed", simon: "game-simon", pet: "game-pet", car: "game-car", maze: "game-maze", puzzle: "game-puzzle" };
 function showPicker() {
   if (!canWatch()) return renderGrid();
   playingId = null; playingCat = null;
@@ -157,7 +162,7 @@ function playGame(kind) {
   document.querySelectorAll(".keys .k").forEach((k) => { k.innerHTML = ""; }); // the dots belong to the counting game only
   if (kind === "balloons") return startGame();
   if (!beginGame(kind, PICK_VID[kind])) return;
-  ({ colors: colorsRound, count: countRound, feed: feedRound, simon: simonStart, pet: petStart, car: carStart })[kind]();
+  ({ colors: colorsRound, count: countRound, feed: feedRound, simon: simonStart, pet: petStart, car: carStart, maze: mazeStart, puzzle: puzzleStart })[kind]();
 }
 const later = (fn, ms) => { if (game) game.timers.push(setTimeout(() => { if (game) fn(); }, ms)); };
 const pickOther = (n, last) => { let x; do x = Math.floor(Math.random() * n); while (x === last && n > 1); return x; };
@@ -176,7 +181,7 @@ function gameColor(c) {
   }
   if (game.kind === "balloons") return popColor(c);
   if (game.busy) return;
-  ({ colors: colorsKey, count: countKey, feed: feedKey, simon: simonKey, pet: petKey, car: carKey })[game.kind](c);
+  ({ colors: colorsKey, count: countKey, feed: feedKey, simon: simonKey, pet: petKey, car: carKey, maze: mazeKey, puzzle: puzzleKey })[game.kind](c);
 }
 
 /* ---- Find the colour ---- */
@@ -772,4 +777,192 @@ async function carListen() {
     es.close();
     if (game && game.kind === "car") later(carListen, 3000);
   };
+}
+
+/* ---- Maze ----
+   The little dinosaur walks through a garden of hedges to an apple. The arrow
+   keys of the remote move it, and so do the colour keys (each shows its arrow:
+   red left, green right, yellow up, blue down), or a tap on the path (one
+   step that way). A hedge in the way: a soft bump, nothing else. The mazes
+   grow a little each round. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.maze { background: #a8cf8e; }
+.mazebox { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; display: flex; align-items: center; justify-content: center; padding: 70px 20px 10px; }
+.mazebox svg.mz { max-width: 100%; max-height: 100%; width: auto; height: 100%; overflow: visible; touch-action: none; }
+#mzMe { transition: transform .22s ease-out; }
+#mzMe .bod { transform-box: fill-box; transform-origin: 50% 90%; }
+.mzfoot { animation: grow .3s ease-out; }
+.mzapple.eat { animation: pop .4s ease-out forwards; transform-box: fill-box; transform-origin: center; }
+.game.maze .k { position: relative; }
+.game.maze .k svg { position: absolute; left: 14%; top: 14%; width: 72%; height: 72%; fill: #fff; }
+</style>`);
+const MAZE_SIZES = [[3, 3], [4, 3], [4, 4], [5, 4], [6, 4], [6, 5]];
+const MAZE_STEP = { red: [-1, 0], green: [1, 0], yellow: [0, -1], blue: [0, 1] };
+const MAZE_KEYS = { ArrowLeft: "red", ArrowRight: "green", ArrowUp: "yellow", ArrowDown: "blue" };
+function mazePickArt() {
+  return `<svg viewBox="0 0 200 150"><rect width="200" height="150" rx="14" fill="#f3e2b3"/>
+    <g stroke="#3f8f4e" stroke-width="12" stroke-linecap="round" fill="none"><path d="M10 10 H190 V140 H10 Z M60 10 V95 M110 55 V140 M150 10 V95"/></g>
+    <circle cx="35" cy="120" r="5" fill="#c9a15a"/><circle cx="35" cy="95" r="5" fill="#c9a15a"/>
+    <svg x="5" y="20" width="60" height="45" viewBox="0 0 200 150">${dinoSvg({ stage: 1 })}</svg>
+    <g transform="translate(160 105) scale(.32)">${THINGS.apple[1]}</g></svg>`;
+}
+function mazeMake(w, h) { // a new maze: a winding path from the top-left corner that reaches every square
+  const open = new Set(), seen = new Set(["0,0"]), stack = [[0, 0]];
+  while (stack.length) {
+    const [x, y] = stack[stack.length - 1];
+    const next = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [x + dx, y + dy])
+      .filter(([a, b]) => a >= 0 && b >= 0 && a < w && b < h && !seen.has(a + "," + b));
+    if (!next.length) { stack.pop(); continue; }
+    const [a, b] = next[Math.floor(Math.random() * next.length)];
+    seen.add(a + "," + b); open.add(mazeEdge(x, y, a, b)); stack.push([a, b]);
+  }
+  return open;
+}
+const mazeEdge = (x, y, a, b) => (x < a || y < b ? [x, y, a, b] : [a, b, x, y]).join(",");
+function mazeStart() {
+  document.querySelectorAll(".keys .k").forEach((k, i) => {
+    k.innerHTML = `<svg viewBox="0 0 24 24"><path d="M15.5 4 7 12l8.5 8 2-2-6.4-6 6.4-6z" transform="rotate(${[0, 180, 90, -90][i]} 12 12)"/></svg>`;
+  });
+  window.gameArrow = (key) => { if (!game || game.kind !== "maze") return false; if (!game.busy) mazeKey(MAZE_KEYS[key]); return true; };
+  game.stop = () => { window.gameArrow = null; };
+  mazeRound();
+}
+function mazeRound() {
+  const [w, h] = MAZE_SIZES[Math.min(game.rounds, MAZE_SIZES.length - 1)], C = 100;
+  Object.assign(game, { w, h, x: 0, y: 0, open: mazeMake(w, h) });
+  const walls = [];
+  for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) {
+    if (x < w - 1 && !game.open.has(mazeEdge(x, y, x + 1, y))) walls.push(`M${(x + 1) * C} ${y * C} V${(y + 1) * C}`);
+    if (y < h - 1 && !game.open.has(mazeEdge(x, y, x, y + 1))) walls.push(`M${x * C} ${(y + 1) * C} H${(x + 1) * C}`);
+  }
+  const hedge = `M0 0 H${w * C} V${h * C} H0 Z ${walls.join(" ")}`;
+  const bushes = Array.from({ length: w + h }, (_, i) => { // little flowers on the hedges
+    const t = i / (w + h), px = t < .5 ? t * 2 * w * C : w * C, py = t < .5 ? 0 : (t - .5) * 2 * h * C;
+    return `<circle cx="${px}" cy="${py}" r="5" fill="${["#f28482", "#ffd166", "#ffffff"][i % 3]}"/>`;
+  }).join("");
+  $("sky").innerHTML = `<div class="mazebox"><svg class="mz" id="mz" viewBox="-30 -30 ${w * C + 60} ${h * C + 60}">
+    <rect x="-24" y="-24" width="${w * C + 48}" height="${h * C + 48}" rx="30" fill="#8fbf74"/>
+    <rect x="0" y="0" width="${w * C}" height="${h * C}" rx="14" fill="#f3e2b3"/>
+    <g id="mzFeet"></g>
+    <path d="${hedge}" stroke="#2f7a3e" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <path d="${hedge}" stroke="#4fa35c" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    ${bushes}
+    <g class="mzapple" id="mzApple" transform="translate(${(w - 1) * C + 18} ${(h - 1) * C + 16}) scale(.64)">${THINGS.apple[1]}</g>
+    <g id="mzMe"><g class="bod newone"><svg x="6" y="12" width="88" height="66" viewBox="0 0 200 150">${dinoSvg({ stage: 1 })}</svg></g></g>
+  </svg></div>`;
+  mazePlace();
+  $("mz").addEventListener("pointerdown", (e) => { // a tap: one step towards it
+    if (game.busy) return;
+    const p = $("mz").createSVGPoint(); p.x = e.clientX; p.y = e.clientY;
+    const q = p.matrixTransform($("mz").getScreenCTM().inverse());
+    const dx = q.x / C - (game.x + .5), dy = q.y / C - (game.y + .5);
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < .5) return;
+    mazeKey(Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? "red" : "green") : (dy < 0 ? "yellow" : "blue"));
+  });
+}
+function mazePlace() { $("mzMe").style.transform = `translate(${game.x * 100}px, ${game.y * 100}px)`; }
+function mazeKey(c) {
+  const step = MAZE_STEP[c];
+  if (!step) return;
+  const a = game.x + step[0], b = game.y + step[1], bod = document.querySelector("#mzMe .bod");
+  if (a < 0 || b < 0 || a >= game.w || b >= game.h || !game.open.has(mazeEdge(game.x, game.y, a, b))) {
+    bod.classList.remove("nope", "newone"); void bod.getBoundingClientRect(); bod.classList.add("nope"); softNo(); return;
+  }
+  $("mzFeet").insertAdjacentHTML("beforeend", `<circle class="mzfoot" cx="${game.x * 100 + 50}" cy="${game.y * 100 + 58}" r="7" fill="#d4b06a"/>`);
+  game.x = a; game.y = b; mazePlace();
+  tune([[392, 440, 494, 523][(game.x + game.y) % 4]], 0, 0.07);
+  if (game.x !== game.w - 1 || game.y !== game.h - 1) return;
+  // The apple: it eats, dances, and a new garden comes.
+  game.busy = true;
+  later(() => { $("mzApple").classList.add("eat"); bod.classList.remove("nope", "newone"); void bod.getBoundingClientRect(); bod.classList.add("dance"); happy(); }, 250);
+  later(() => { game.busy = false; }, 1700);
+  if (++game.rounds >= 5) later(() => endGame(true), 1800); else later(mazeRound, 1800);
+}
+
+/* ---- Puzzle ----
+   A picture in four pieces. The board shows the picture faintly, each quarter
+   framed in a key colour (red, green on top; yellow, blue below, the same
+   order as on the remote). One piece waits beside it: press the colour of
+   its place (or tap the place). The last piece makes the picture come alive.
+   Four pictures, then the cheer. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.puzzle { background: #fdf3df; }
+.pzroom { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; display: flex; align-items: center; justify-content: center; gap: clamp(20px, 5vw, 70px); padding: 70px 20px 10px; direction: ltr; }
+.pzboard { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: min(62vw, 92vh); padding: 8px; border-radius: 22px; background: #fff; box-shadow: 0 8px 0 rgba(29, 43, 79, .12); transition: gap .5s, padding .5s; }
+.pzslot { position: relative; aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; outline: 6px solid var(--c); outline-offset: -6px; cursor: pointer; background: #f4f6fa; }
+.pzslot svg { display: block; width: 100%; height: 100%; }
+.pzslot .ghost { position: absolute; inset: 0; opacity: var(--ghost, .3); filter: grayscale(.7); }
+.pzslot .dot { position: absolute; right: 8px; bottom: 8px; width: 26px; height: 26px; border-radius: 50%; background: var(--c); border: 3px solid #fff; }
+.pzslot.placed { outline-color: transparent; }
+.pzslot.placed .dot, .pzslot.placed .ghost { display: none; }
+.pzslot .piece { position: absolute; inset: 0; animation: grow .4s cubic-bezier(.3, 1.6, .5, 1); }
+.pzboard.whole { gap: 0; padding: 0; overflow: hidden; }
+.pzboard.whole .pzslot { border-radius: 0; }
+.pztray { width: min(26vw, 40vh); aspect-ratio: 4 / 3; border-radius: 16px; overflow: hidden; background: #fff; box-shadow: 0 10px 0 rgba(29, 43, 79, .15), 0 0 0 6px #fff; animation: pzbob 1.6s ease-in-out infinite; }
+.pztray svg { display: block; width: 100%; height: 100%; }
+.pztray.gone { visibility: hidden; }
+@keyframes pzbob { 50% { transform: translateY(-10px) rotate(-2deg); } }
+.pzboard.whole.dance { transform-origin: 50% 50%; }
+</style>`);
+function puzzlePictures() { // drawn on a 400 × 300 page
+  // No gradients: a piece hidden on the board would take its gradient with it.
+  const sky = (c1, c2) => `<rect width="400" height="300" fill="${c1}"/>${[.25, .5, .75, 1].map((o, i) => `<rect y="${60 + i * 60}" width="400" height="${240 - i * 60}" fill="${c2}" opacity="${o * .5}"/>`).join("")}`;
+  const flower = (x, y, c) => `<g transform="translate(${x} ${y})">${[0, 72, 144, 216, 288].map((a) => `<ellipse rx="6" ry="9" cy="-8" transform="rotate(${a})" fill="${c}"/>`).join("")}<circle r="5" fill="#f7d774"/></g>`;
+  return [
+    `${sky("#b9dbe0", "#e5f0e6")}<g transform="translate(300 10) scale(.85)">${THINGS.sun[1]}</g><rect y="210" width="400" height="90" fill="#9cc97f"/>
+     ${flower(40, 250, "#f28482")}${flower(350, 262, "#ffffff")}${flower(80, 280, "#ffd166")}
+     <svg x="70" y="60" width="260" height="195" viewBox="0 0 200 150">${dinoSvg({ stage: 2 })}</svg>`,
+    `<rect width="400" height="300" fill="#a8cf8e"/><rect y="95" width="400" height="120" fill="#5d6675"/>
+     <g fill="#fff">${[20, 110, 200, 290, 380].map((x) => `<rect x="${x - 20}" y="151" width="44" height="8" rx="4"/>`).join("")}</g>
+     <g transform="translate(200 155) rotate(90) scale(1.25)">${carSvg()}</g>${carStar(60, 50, 26)}${carStar(340, 255, 22)}
+     <g transform="translate(300 222) scale(.7)">${THINGS.tree[1]}</g>`,
+    `${sky("#7cc6f2", "#2f7fe0")}<rect y="250" width="400" height="50" fill="#f3d9a4"/>
+     ${[[60, 80, 10], [90, 50, 7], [330, 120, 9], [300, 70, 6], [200, 40, 8]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="#fff" stroke-width="3" opacity=".8"/>`).join("")}
+     <g transform="translate(50 110) scale(1.5)">${THINGS.fish[1]}</g><g transform="translate(330 190) scale(-.9 .9)">${THINGS.fish[1]}</g>
+     <path d="M30 300 Q20 260 40 230 Q50 260 40 300 Z M360 300 Q370 250 350 220 Q345 260 350 300 Z" fill="#3aa655"/>`,
+    `${sky("#ffd6a5", "#fff1d6")}<rect y="230" width="400" height="70" fill="#9cc97f"/>
+     <g transform="translate(110 20) scale(2.1)">${THINGS.tree[1]}</g>
+     <g transform="translate(40 225) scale(.5)">${THINGS.apple[1]}</g><g transform="translate(300 230) scale(.45)">${THINGS.apple[1]}</g>
+     <g transform="translate(320 30) scale(.6)">${THINGS.heart[1]}</g>`,
+  ];
+}
+// The four quarters of the 400 × 300 page (functions, so the picker can use them before this line runs).
+function pzView(i) { return ["0 0 200 150", "200 0 200 150", "0 150 200 150", "200 150 200 150"][i]; }
+function pzSvg(pic, i) { return `<svg viewBox="${pzView(i)}" preserveAspectRatio="none">${pic}</svg>`; }
+function puzzlePickArt() {
+  const pic = puzzlePictures()[0];
+  return `<svg viewBox="0 0 200 150"><svg x="4" y="4" width="94" height="70" viewBox="${pzView(0)}">${pic}</svg>
+    <svg x="102" y="4" width="94" height="70" viewBox="${pzView(1)}">${pic}</svg><svg x="4" y="78" width="94" height="70" viewBox="${pzView(2)}">${pic}</svg>
+    <g transform="translate(118 84) rotate(8)"><rect x="-4" y="-4" width="86" height="66" rx="6" fill="#fff"/><svg width="78" height="58" viewBox="${pzView(3)}">${pic}</svg></g></svg>`;
+}
+function puzzleStart() {
+  game.pics = puzzlePictures().sort(() => Math.random() - .5);
+  puzzleRound();
+}
+function puzzleRound() {
+  const pic = game.pics[game.rounds % game.pics.length];
+  game.pic = pic; game.left = [0, 1, 2, 3].sort(() => Math.random() - .5);
+  $("sky").innerHTML = `<div class="pzroom"><div class="pzboard" style="--ghost:${game.rounds < 2 ? .35 : .2}">
+    ${KEY_COLORS.map((c, i) => `<div class="pzslot" data-c="${c}" style="--c:${BALLOON[c]}"><div class="ghost">${pzSvg(pic, i)}</div><i class="dot"></i></div>`).join("")}
+  </div><div class="pztray newone" id="pzTray"></div></div>`;
+  document.querySelectorAll(".pzslot").forEach((s) => s.onclick = () => gameColor(s.dataset.c));
+  puzzleNext();
+}
+function puzzleNext() { $("pzTray").className = "pztray newone"; $("pzTray").innerHTML = pzSvg(game.pic, game.left[0]); }
+function puzzleKey(c) {
+  const want = game.left[0], i = KEY_COLORS.indexOf(c), tray = $("pzTray");
+  if (!tray || i < 0) return;
+  if (i !== want) { tray.classList.remove("nope", "newone"); void tray.offsetWidth; tray.classList.add("nope"); softNo(); return; }
+  const slot = document.querySelectorAll(".pzslot")[i];
+  slot.classList.add("placed"); slot.insertAdjacentHTML("beforeend", `<div class="piece">${pzSvg(game.pic, i)}</div>`);
+  tune([[523, 659, 784, 1047][4 - game.left.length]], 0, 0.18);
+  game.left.shift();
+  if (game.left.length) { tray.className = "pztray gone"; game.busy = true; later(() => { game.busy = false; puzzleNext(); }, 450); return; }
+  // The whole picture: the frames go, it bounces, and a new one comes.
+  tray.className = "pztray gone"; game.busy = true;
+  const board = document.querySelector(".pzboard");
+  later(() => { board.classList.add("whole"); }, 300);
+  later(() => { board.classList.add("dance"); happy(); }, 800);
+  later(() => { game.busy = false; }, 2600);
+  if (++game.rounds >= 4) later(() => endGame(true), 2700); else later(puzzleRound, 2700);
 }
