@@ -14,6 +14,22 @@
    - maze:     the little dinosaur walks through a hedge maze to an apple
                (arrow keys, or the colour keys with arrows on them);
    - puzzle:   a picture in four pieces: press the colour of each piece's place;
+   - pairs:    four cards face down: turn two, find the two the same;
+   - sizes:    four of a thing in four sizes: put them on the shelf, smallest first;
+   - catch:    apples fall from a tree: move the basket left and right (phone too);
+   - paint:    a drawing in parts: the blinking part takes the colour you press;
+   - story:    three pictures of a little story: press them in order;
+   - dress:    dress the dinosaur up: hat, glasses, scarf, and where it is;
+   - cook:     make a sandwich layer by layer and feed it to the dinosaur;
+   - photo:    an animal peeks from a bush: press its colour to take its photo;
+   - climb:    climb a wall by picking the hold with the shape it wants;
+   - music:    a xylophone: four bars, free play;
+   - sounds:   a sound plays: press the animal that makes it;
+   - bubbles:  slow bubbles: a colour pops the lowest bubble of that colour;
+   - hide:     the dinosaur hides (tail peeking out): find it;
+   - tower:    a block per key, and the dinosaur knocks the tall tower down;
+   - train:    load each thing into the wagon of its colour, then toot toot;
+   - album:    the stickers won by finishing games (not a game, a book);
    - pet:      a little dinosaur of his own to look after: red feeds it,
                green plays ball, yellow cleans up, blue puts it to sleep.
    The picker shows the five games: red/green move, yellow opens. Every
@@ -75,9 +91,9 @@ window.CHEER_SVG = CHEER;
 
 /* ---- Styles ---- */
 document.head.insertAdjacentHTML("beforeend", `<style>
-.picker { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-wrap: wrap; align-content: center; justify-content: center;
-  gap: clamp(14px, 3vw, 34px); padding: 80px 24px 24px; direction: ltr; }
-.picker button { width: clamp(150px, 27vw, 300px); aspect-ratio: 4 / 3; border-radius: 26px; border: 6px solid #fff; background: #fff; cursor: pointer;
+.picker { position: absolute; top: 0; right: 0; bottom: 0; left: 0; overflow-y: auto; display: flex; flex-wrap: wrap; align-content: safe center; justify-content: center;
+  gap: clamp(10px, 1.8vw, 24px); padding: 76px 24px 24px; direction: ltr; }
+.picker button { width: clamp(96px, 11.6vw, 210px); aspect-ratio: 4 / 3; border-radius: 26px; border: 6px solid #fff; background: #fff; cursor: pointer;
   box-shadow: 0 8px 0 rgba(29, 43, 79, .18); position: relative; padding: 0; }
 .picker button svg { position: absolute; left: 8%; top: 8%; width: 84%; height: 84%; }
 .picker button:focus, .picker button:hover { outline: 7px solid #2f7fe0; outline-offset: 3px; transform: scale(1.05); }
@@ -137,10 +153,19 @@ const PICK = [
     <g transform="translate(100 98) scale(.9)">${carSvg()}</g>${carStar(70, 26, 14)}</svg>`],
   ["maze", mazePickArt()],
   ["puzzle", puzzlePickArt()],
+  ["pairs", pairsPickArt()],
+  ["sizes", sizesPickArt()],
+  ["catch", catchPickArt], ["paint", paintPickArt], ["story", storyPickArt], ["dress", dressPickArt],
+  ["cook", cookPickArt], ["photo", photoPickArt], ["climb", climbPickArt],
   ["simon", `<svg viewBox="0 0 200 100">${["#e63946", "#2a9d4b", "#f6c90e", "#2f7fe0"].map((c, i) => `<circle cx="${30 + i * 47}" cy="50" r="20" fill="${c}" opacity="${i === 1 ? 1 : .4}"/>`).join("")}</svg>`],
+  ["music", musicPickArt], ["sounds", soundsPickArt], ["bubbles", bubblesPickArt], ["hide", hidePickArt],
+  ["tower", towerPickArt], ["train", trainPickArt],
+  ["album", albumPickArt],
 ];
 window.PICK_KINDS = PICK.map(([kind]) => kind);
-const PICK_VID = { balloons: "game", colors: "game-colors", count: "game-count", feed: "game-feed", simon: "game-simon", pet: "game-pet", car: "game-car", maze: "game-maze", puzzle: "game-puzzle" };
+const PICK_VID = { balloons: "game", colors: "game-colors", count: "game-count", feed: "game-feed", simon: "game-simon", pet: "game-pet", car: "game-car", maze: "game-maze", puzzle: "game-puzzle", pairs: "game-pairs", sizes: "game-sizes",
+  catch: "game-catch", paint: "game-paint", story: "game-story", dress: "game-dress", cook: "game-cook", photo: "game-photo", climb: "game-climb",
+  music: "game-music", sounds: "game-sounds", bubbles: "game-bubbles", hide: "game-hide", tower: "game-tower", train: "game-train", album: "game-album" };
 function showPicker() {
   if (!canWatch()) return renderGrid();
   playingId = null; playingCat = null;
@@ -150,7 +175,7 @@ function showPicker() {
   for (const [kind, art] of PICK.filter(([k]) => gameOn(k))) { // only the games the parents left on
     const b = document.createElement("button");
     b.setAttribute("aria-label", kind);
-    b.innerHTML = art;
+    b.innerHTML = typeof art === "function" ? art() : art; // a function: drawn when the picker opens (it may use pictures defined further down)
     b.onclick = () => playGame(kind);
     box.appendChild(b);
   }
@@ -162,7 +187,9 @@ function playGame(kind) {
   document.querySelectorAll(".keys .k").forEach((k) => { k.innerHTML = ""; }); // the dots belong to the counting game only
   if (kind === "balloons") return startGame();
   if (!beginGame(kind, PICK_VID[kind])) return;
-  ({ colors: colorsRound, count: countRound, feed: feedRound, simon: simonStart, pet: petStart, car: carStart, maze: mazeStart, puzzle: puzzleStart })[kind]();
+  ({ colors: colorsRound, count: countRound, feed: feedRound, simon: simonStart, pet: petStart, car: carStart, maze: mazeStart, puzzle: puzzleStart, pairs: pairsStart, sizes: sizesStart,
+    catch: catchStart, paint: paintStart, story: storyStart, dress: dressStart, cook: cookStart, photo: photoStart, climb: climbStart,
+    music: musicStart, sounds: soundsStart, bubbles: bubblesStart, hide: hideStart, tower: towerStart, train: trainStart, album: albumStart })[kind]();
 }
 const later = (fn, ms) => { if (game) game.timers.push(setTimeout(() => { if (game) fn(); }, ms)); };
 const pickOther = (n, last) => { let x; do x = Math.floor(Math.random() * n); while (x === last && n > 1); return x; };
@@ -181,7 +208,9 @@ function gameColor(c) {
   }
   if (game.kind === "balloons") return popColor(c);
   if (game.busy) return;
-  ({ colors: colorsKey, count: countKey, feed: feedKey, simon: simonKey, pet: petKey, car: carKey, maze: mazeKey, puzzle: puzzleKey })[game.kind](c);
+  ({ colors: colorsKey, count: countKey, feed: feedKey, simon: simonKey, pet: petKey, car: carKey, maze: mazeKey, puzzle: puzzleKey, pairs: pairsKey, sizes: sizesKey,
+    catch: catchKey, paint: paintKey, story: storyKey, dress: dressKey, cook: cookKey, photo: photoKey, climb: climbKey,
+    music: musicKey, sounds: soundsKey, bubbles: bubblesKey, hide: hideKey, tower: towerKey, train: trainKey, album: albumKey })[game.kind](c);
 }
 
 /* ---- Find the colour ---- */
@@ -759,24 +788,31 @@ function carSparkle() {
     room.appendChild(b); setTimeout(() => b.remove(), 900);
   }
 }
-// The phone controller: a one-time ticket, then a stream of presses.
-async function carListen() {
+// The phone controller: a one-time ticket, then a stream of presses (left, right, honk).
+// Any game can listen: padListen(its kind, what to do with each button).
+async function padListen(kind, onBtn) {
   if (typeof API === "undefined" || !API || !NT.token()) return;
   const r = await NT.call("/pad/ticket");
-  if (!game || game.kind !== "car" || !r.ok) return;
+  if (!game || game.kind !== kind || !r.ok) return;
   const es = new EventSource(NT.base + "/pad/listen?t=" + encodeURIComponent(r.body.ticket));
   game.stop = () => es.close();
   es.onmessage = (e) => {
-    if (!game || game.kind !== "car") return es.close();
+    if (!game || game.kind !== kind) return es.close();
     let m = null;
     try { m = JSON.parse(e.data); } catch (err) { return; }
-    if (!game.padSeen) { game.padSeen = true; const q = $("carqr"); if (q) q.classList.add("gone"); }
-    carKey({ left: "red", right: "green", honk: "yellow" }[m.btn] || "");
+    game.padSeen = true;
+    onBtn(m.btn);
   };
   es.onerror = () => { // the stream broke (e.g. the server restarted): a new ticket in a moment
     es.close();
-    if (game && game.kind === "car") later(carListen, 3000);
+    if (game && game.kind === kind) later(() => padListen(kind, onBtn), 3000);
   };
+}
+function carListen() {
+  padListen("car", (btn) => {
+    const q = $("carqr"); if (q) q.classList.add("gone");
+    carKey({ left: "red", right: "green", honk: "yellow" }[btn] || "");
+  });
 }
 
 /* ---- Maze ----
@@ -799,6 +835,15 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 const MAZE_SIZES = [[3, 3], [4, 3], [4, 4], [5, 4], [6, 4], [6, 5]];
 const MAZE_STEP = { red: [-1, 0], green: [1, 0], yellow: [0, -1], blue: [0, 1] };
 const MAZE_KEYS = { ArrowLeft: "red", ArrowRight: "green", ArrowUp: "yellow", ArrowDown: "blue" };
+// The remote's arrow keys in a game (index.html asks here first): the maze walks,
+// the car and the basket go left and right. Other games leave the arrows alone.
+window.gameArrow = (key) => {
+  if (!game) return false;
+  const c = MAZE_KEYS[key];
+  if (game.kind === "maze") { if (!game.busy) mazeKey(c); return true; }
+  if (["car", "catch"].includes(game.kind)) { if (c === "red" || c === "green") gameColor(c); return true; }
+  return false;
+};
 function mazePickArt() {
   return `<svg viewBox="0 0 200 150"><rect width="200" height="150" rx="14" fill="#f3e2b3"/>
     <g stroke="#3f8f4e" stroke-width="12" stroke-linecap="round" fill="none"><path d="M10 10 H190 V140 H10 Z M60 10 V95 M110 55 V140 M150 10 V95"/></g>
@@ -823,8 +868,6 @@ function mazeStart() {
   document.querySelectorAll(".keys .k").forEach((k, i) => {
     k.innerHTML = `<svg viewBox="0 0 24 24"><path d="M15.5 4 7 12l8.5 8 2-2-6.4-6 6.4-6z" transform="rotate(${[0, 180, 90, -90][i]} 12 12)"/></svg>`;
   });
-  window.gameArrow = (key) => { if (!game || game.kind !== "maze") return false; if (!game.busy) mazeKey(MAZE_KEYS[key]); return true; };
-  game.stop = () => { window.gameArrow = null; };
   mazeRound();
 }
 function mazeRound() {
@@ -965,4 +1008,933 @@ function puzzleKey(c) {
   later(() => { board.classList.add("dance"); happy(); }, 800);
   later(() => { game.busy = false; }, 2600);
   if (++game.rounds >= 4) later(() => endGame(true), 2700); else later(puzzleRound, 2700);
+}
+
+/* ---- Pairs (memory) ----
+   Four cards face down, each framed in a key colour. Press a colour (or tap
+   a card) to turn it over. Two the same: they stay up and dance. Two
+   different: they look a moment and turn back over. Nothing is lost. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.pairs { background: #e8f1fb; }
+.mmrow { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; display: flex; align-items: center; justify-content: center; gap: clamp(12px, 3vw, 40px); padding: 70px 20px 10px; direction: ltr; }
+.mmcard { width: min(20vw, 34vh); aspect-ratio: 3 / 4; perspective: 900px; cursor: pointer; }
+.mmin { position: relative; width: 100%; height: 100%; transition: transform .45s; transform-style: preserve-3d; }
+.mmcard.mmup .mmin { transform: rotateY(180deg); }
+.mmside { position: absolute; inset: 0; border-radius: 20px; backface-visibility: hidden; -webkit-backface-visibility: hidden; display: grid; place-items: center; box-shadow: 0 8px 0 rgba(29, 43, 79, .15); }
+.mmbackside { background: var(--c); border: 6px solid #fff;
+  background-image: radial-gradient(circle at 25% 25%, rgba(255,255,255,.35) 0 9%, transparent 10%), radial-gradient(circle at 75% 70%, rgba(255,255,255,.35) 0 9%, transparent 10%), radial-gradient(circle at 70% 25%, rgba(255,255,255,.2) 0 6%, transparent 7%), radial-gradient(circle at 30% 75%, rgba(255,255,255,.2) 0 6%, transparent 7%); }
+.mmfront { background: #fff; border: 6px solid var(--c); transform: rotateY(180deg); }
+.mmfront svg { width: 82%; height: auto; overflow: visible; }
+.mmcard.mmgot .mmfront { border-color: #f6c90e; }
+.mmcard.mmgot .mmfront svg { animation: dance .9s ease-in-out; transform-origin: 50% 90%; }
+</style>`);
+function pairsPickArt() {
+  const card = (x, r, inner, c) => `<g transform="translate(${x} 75) rotate(${r})"><rect x="-30" y="-40" width="60" height="80" rx="10" fill="${inner ? "#fff" : c}" stroke="${inner ? c : "#fff"}" stroke-width="5"/>${inner ? `<g transform="translate(-24 -24) scale(.48)">${inner}</g>` : ""}</g>`;
+  return `<svg viewBox="0 0 200 150">${card(32, -6, THINGS.apple[1], "#e63946")}${card(80, 2, "", "#2a9d4b")}${card(124, -3, "", "#f6c90e")}${card(170, 6, THINGS.apple[1], "#2f7fe0")}</svg>`;
+}
+function pairsArt(name) { return name === "dino" ? `<svg viewBox="0 0 200 150">${dinoSvg({ stage: 1 })}</svg>` : `<svg viewBox="0 0 100 100">${THINGS[name][1]}</svg>`; }
+function pairsStart() { game.used = []; pairsRound(); }
+function pairsRound() {
+  const all = ["apple", "sun", "fish", "star", "heart", "leaf", "tree", "dino"].filter((n) => !game.used.includes(n));
+  const two = all.sort(() => Math.random() - .5).slice(0, 2);
+  game.used.push(...two); if (game.used.length > 6) game.used = [];
+  game.cards = [two[0], two[0], two[1], two[1]].sort(() => Math.random() - .5);
+  game.up = []; game.got = new Set();
+  $("sky").innerHTML = `<div class="mmrow">${KEY_COLORS.map((c, i) => `<div class="mmcard newone" data-c="${c}" style="--c:${BALLOON[c]}">
+    <div class="mmin"><div class="mmside mmbackside"></div><div class="mmside mmfront">${pairsArt(game.cards[i])}</div></div></div>`).join("")}</div>`;
+  document.querySelectorAll(".mmcard").forEach((d) => d.onclick = () => gameColor(d.dataset.c));
+}
+function pairsKey(c) {
+  const i = KEY_COLORS.indexOf(c), cards = [...document.querySelectorAll(".mmcard")];
+  if (i < 0 || !cards.length) return;
+  if (game.got.has(i) || game.up.includes(i)) { const el = cards[i]; el.classList.remove("nope", "newone"); void el.offsetWidth; el.classList.add("nope"); return; }
+  cards[i].classList.remove("newone"); cards[i].classList.add("mmup"); game.up.push(i);
+  tune([NOTES[c]], 0, 0.12);
+  if (game.up.length < 2) return;
+  const [a, b] = game.up; game.up = []; game.busy = true;
+  if (game.cards[a] === game.cards[b]) { // the same: they stay up and dance
+    later(() => { cards[a].classList.add("mmgot"); cards[b].classList.add("mmgot"); happy(); }, 450);
+    game.got.add(a); game.got.add(b);
+    if (game.got.size < 4) { later(() => { game.busy = false; }, 1100); return; }
+    if (++game.rounds >= 5) later(() => endGame(true), 2000); else later(() => { game.busy = false; pairsRound(); }, 2000);
+    return;
+  }
+  later(() => { softNo(); }, 700); // different: a look, then back over
+  later(() => { cards[a].classList.remove("mmup"); cards[b].classList.remove("mmup"); }, 1300);
+  later(() => { game.busy = false; }, 1750);
+}
+
+/* ---- Smallest to biggest ----
+   Four of the same thing in four sizes, mixed up, each standing on a key
+   colour. Press the smallest one's colour: it walks down to the shelf. Then
+   the next smallest… until the shelf is a staircase, and they all dance. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.sizes { background: #fdf3df; }
+.szroom { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; display: grid; grid-template-rows: 1fr auto; padding: 70px 20px 10px; direction: ltr; }
+.szrow { display: flex; align-items: flex-end; justify-content: center; gap: clamp(12px, 3vw, 44px); }
+.szspot { display: flex; flex-direction: column; align-items: center; gap: 6px; width: min(19vw, 30vh); cursor: pointer; }
+.szspot .szmat { width: 80%; height: 16px; border-radius: 8px; background: var(--c); }
+.szspot.szgone .szmat { opacity: .25; }
+.szthing { width: calc(min(19vw, 30vh) * var(--s)); }
+.szthing svg { display: block; width: 100%; height: auto; overflow: visible; }
+.szshelf { display: flex; align-items: flex-end; justify-content: center; gap: clamp(8px, 2vw, 26px); min-height: calc(min(13vw, 20vh) * 1.05 + 22px); padding: 0 24px 10px; border-bottom: 14px solid #c99a5b; border-radius: 0 0 6px 6px; width: fit-content; min-width: 50%; margin: 10px auto 0; }
+.szshelf .szthing { width: calc(min(13vw, 20vh) * var(--s)); }
+.szshelf.dance { transform-origin: 50% 100%; }
+</style>`);
+function sizesPickArt() {
+  return `<svg viewBox="0 0 200 150"><rect x="10" y="128" width="180" height="10" rx="4" fill="#c99a5b"/>
+    ${[[.3, 22], [.45, 52], [.62, 92], [.8, 142]].map(([k, x]) => `<g transform="translate(${x} ${126 - 100 * k}) scale(${k})">${THINGS.apple[1]}</g>`).join("")}</svg>`;
+}
+const SZ_SCALES = [0.42, 0.6, 0.8, 1];
+function sizesStart() { game.kinds = ["apple", "dino", "star", "fish", "tree"].sort(() => Math.random() - .5); sizesRound(); }
+function sizesRound() {
+  const kind = game.kinds[game.rounds % game.kinds.length];
+  game.order = [0, 1, 2, 3].sort(() => Math.random() - .5); // order[spot] = size index
+  game.next = 0;
+  const art = kind === "dino" ? `<svg viewBox="0 0 200 150">${dinoSvg({ stage: 1 })}</svg>` : `<svg viewBox="0 0 100 100">${THINGS[kind][1]}</svg>`;
+  $("sky").innerHTML = `<div class="szroom"><div class="szrow">${KEY_COLORS.map((c, i) => `<div class="szspot" data-c="${c}" style="--c:${BALLOON[c]}">
+    <div class="szthing newone" style="--s:${SZ_SCALES[game.order[i]]}">${art}</div><i class="szmat"></i></div>`).join("")}</div>
+    <div class="szshelf" id="szShelf"></div></div>`;
+  document.querySelectorAll(".szspot").forEach((d) => d.onclick = () => gameColor(d.dataset.c));
+}
+function sizesKey(c) {
+  const i = KEY_COLORS.indexOf(c), spot = document.querySelectorAll(".szspot")[i];
+  if (!spot) return;
+  const thing = spot.querySelector(".szthing");
+  if (!thing) return; // already on the shelf
+  if (game.order[i] !== game.next) { thing.classList.remove("nope", "newone"); void thing.offsetWidth; thing.classList.add("nope"); softNo(); return; }
+  thing.classList.remove("nope", "newone"); thing.classList.add("newone");
+  $("szShelf").appendChild(thing); spot.classList.add("szgone");
+  tune([[523, 659, 784, 1047][game.next]], 0, 0.18);
+  if (++game.next < 4) return;
+  game.busy = true;
+  later(() => { $("szShelf").classList.add("dance"); happy(); }, 450);
+  later(() => { game.busy = false; }, 1900);
+  if (++game.rounds >= 5) later(() => endGame(true), 2000); else later(sizesRound, 2000);
+}
+
+/* ---- Catch the apples ----
+   Apples fall from a big tree in three lanes; a basket at the bottom moves
+   left and right (red and green, the arrows, a tap on either side, or the
+   parent's phone controller). An apple that misses just rolls away. Fifteen
+   apples in the basket, then the cheer. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.catch { background: linear-gradient(#bfe3f2, #e9f5e6 70%, #a8cf8e 70%); }
+.ctroom { position: absolute; top: 0; right: 0; bottom: 0; left: 0; overflow: hidden; touch-action: none; }
+.cttree { position: absolute; left: -5%; top: -8px; width: 110%; height: 130px; }
+.ctapple, .ctbasket { position: absolute; left: 0; top: 0; will-change: transform; }
+.ctapple { width: var(--aw); height: var(--aw); }
+.ctapple.miss { transition: transform 1s ease-in, opacity 1s; opacity: 0; }
+.ctbasket { width: var(--bw); transition: transform .16s ease-out; }
+.ctbasket svg, .ctapple svg { display: block; width: 100%; height: auto; overflow: visible; }
+.ctbasket .in { transform-origin: 50% 100%; }
+.ctbasket .in.hop { animation: hop .3s ease-out; }
+.game.catch .keys .k.yellow, .game.catch .keys .k.blue { visibility: hidden; }
+</style>`);
+function catchPickArt() {
+  return `<svg viewBox="0 0 200 150"><path d="M0 0 H200 V30 Q180 50 160 32 Q140 52 118 34 Q96 54 76 34 Q54 52 34 32 Q16 48 0 30 Z" fill="#3aa655"/>
+    <g transform="translate(40 52) scale(.26)">${THINGS.apple[1]}</g><g transform="translate(118 78) scale(.26)">${THINGS.apple[1]}</g>
+    <g transform="translate(70 104)">${catchBasket()}</g></svg>`;
+}
+function catchBasket() { // 60 wide, 40 high
+  return `<path d="M2 8 H58 L52 40 H8 Z" fill="#c98b48"/><path d="M2 8 H58 L56 16 H4 Z" fill="#a8703a"/>
+    <g stroke="#a8703a" stroke-width="2.2" fill="none"><path d="M6 24 H54 M8 32 H52"/><path d="M18 16 L20 40 M30 16 V40 M42 16 L40 40"/></g>
+    <path d="M10 8 Q30 -14 50 8" stroke="#a8703a" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+}
+function catchStart() {
+  const W = innerWidth, H = innerHeight;
+  const rw = Math.min(W * 0.7, H * 1.1), bw = Math.min(rw / 3 * 0.85, 200), aw = bw * 0.45;
+  Object.assign(game, { lane: 1, got: 0, apples: [], W, H, rw, bw, aw, spawnIn: 0.6, floor: H - 150 - bw * 0.9, last: 0 });
+  const canopy = Array.from({ length: 9 }, (_, i) => `<circle cx="${i * 50 + 10}" cy="${i % 2 ? 40 : 55}" r="${i % 2 ? 48 : 40}" fill="${i % 3 ? "#3aa655" : "#2f8f4a"}"/>`).join("");
+  $("sky").innerHTML = `<div class="ctroom" id="ctroom" style="--bw:${bw}px;--aw:${aw}px">
+    <svg class="cttree" viewBox="0 0 400 120" preserveAspectRatio="none"><rect width="400" height="40" fill="#2f8f4a"/>${canopy}</svg>
+    <div class="ctbasket" id="ctBasket"><div class="in"><svg viewBox="0 -14 60 54">${catchBasket()}</svg></div></div>
+    <div class="carhud"><svg viewBox="0 0 100 100">${THINGS.apple[1]}</svg><span id="ctCount">0</span></div></div>`;
+  catchPlace();
+  $("ctroom").addEventListener("pointerdown", (e) => gameColor(e.clientX < innerWidth / 2 ? "red" : "green"));
+  game.raf = requestAnimationFrame(catchFrame);
+  padListen("catch", (btn) => { if (btn === "left") gameColor("red"); else if (btn === "right") gameColor("green"); else catchHop(); });
+}
+const catchX = (i) => game.W / 2 + (i - 1) * game.rw / 3;
+function catchPlace() { $("ctBasket").style.transform = `translate3d(${catchX(game.lane) - game.bw / 2}px, ${game.floor}px, 0)`; }
+function catchHop() { const b = document.querySelector(".ctbasket .in"); if (b) { b.classList.remove("hop"); void b.offsetWidth; b.classList.add("hop"); } }
+function catchKey(c) {
+  if (c === "red" && game.lane > 0) { game.lane--; catchPlace(); tune([440], 0, 0.05); }
+  else if (c === "green" && game.lane < 2) { game.lane++; catchPlace(); tune([494], 0, 0.05); }
+}
+function catchFrame(t) {
+  if (!game || game.kind !== "catch") return;
+  const dt = game.last ? Math.min(0.25, (t - game.last) / 1000) : 0; game.last = t; // real time, even on a slow TV
+  game.spawnIn -= dt;
+  if (game.spawnIn <= 0 && game.apples.length < 2) {
+    game.spawnIn = 1.5 + Math.random() * 0.8;
+    const lane = Math.floor(Math.random() * 3), el = document.createElement("div");
+    el.className = "ctapple"; el.innerHTML = `<svg viewBox="0 0 100 100">${THINGS.apple[1]}</svg>`;
+    $("ctroom").appendChild(el);
+    game.apples.push({ el, lane, y: 60, v: game.H / 4.2 });
+  }
+  const catchY = game.floor - game.aw * 0.3;
+  for (const a of game.apples) {
+    a.y += a.v * dt;
+    a.el.style.transform = `translate3d(${catchX(a.lane) - game.aw / 2}px, ${a.y}px, 0)`;
+    if (a.y >= catchY && !a.done) {
+      a.done = true;
+      if (a.lane === game.lane) { // in the basket
+        a.el.remove(); a.gone = true; game.got++;
+        $("ctCount").textContent = game.got; catchHop();
+        tune([[523, 659, 784][game.got % 3]], 0, 0.16);
+        if (game.got >= 15) { happy(); later(() => endGame(true), 900); game.busy = true; }
+      } else { // it rolls away, nothing more
+        const dx = (a.lane < game.lane ? -1 : 1) * game.W * 0.3;
+        a.el.classList.add("miss"); a.el.style.transform = `translate3d(${catchX(a.lane) - game.aw / 2 + dx}px, ${game.floor + game.aw}px, 0) rotate(${dx > 0 ? 360 : -360}deg)`;
+        a.gone = true; setTimeout(() => a.el.remove(), 1000);
+      }
+    }
+  }
+  game.apples = game.apples.filter((a) => !a.gone);
+  game.raf = requestAnimationFrame(catchFrame);
+}
+
+/* ---- Colouring ----
+   A drawing in a few parts. The part to colour now gently blinks; any colour
+   key (or tap on a key) fills it with that colour, and the next part blinks.
+   There is no wrong colour. When it is all coloured, it dances. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.paint { background: #fdf3df; }
+.ptroom { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; display: flex; align-items: center; justify-content: center; padding: 70px 20px 10px; }
+.ptroom svg { height: 100%; max-width: 100%; background: #fff; border-radius: 24px; box-shadow: 0 8px 0 rgba(29, 43, 79, .12); }
+.ptroom .pr { transition: fill .35s; }
+.ptroom .pr.now { animation: prblink 1.1s ease-in-out infinite; }
+@keyframes prblink { 50% { fill: #fff1a8; } }
+.ptroom svg.dance { transform-origin: 50% 80%; }
+</style>`);
+const PAINT_PICS = [ // each: parts to colour (drawn outline only), then lines and faces on top
+  { parts: [`<rect x="6" y="6" width="188" height="138" rx="14"/>`, `<path d="M146 75 L190 42 L190 108 Z"/>`, `<ellipse cx="92" cy="75" rx="62" ry="40"/>`, `<path d="M74 39 Q98 6 122 38 Z"/>`],
+    top: `<circle cx="58" cy="66" r="9" fill="#fff" stroke="#1d2b4f" stroke-width="3"/><circle cx="56" cy="66" r="4.5" fill="#1d2b4f"/>
+      <path d="M44 88 Q52 95 60 88" stroke="#1d2b4f" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path d="M100 52 Q114 75 100 98 M120 56 Q132 75 120 94" stroke="#1d2b4f" stroke-width="3" fill="none" opacity=".5"/>
+      <circle cx="30" cy="30" r="6" fill="none" stroke="#1d2b4f" stroke-width="2.5"/><circle cx="44" cy="18" r="4" fill="none" stroke="#1d2b4f" stroke-width="2.5"/>` },
+  { parts: [`<rect x="6" y="6" width="188" height="104" rx="14"/>`, `<rect x="6" y="104" width="188" height="40" rx="10"/>`, `<rect x="54" y="62" width="92" height="66"/>`,
+      `<path d="M42 64 L100 22 L158 64 Z"/>`, `<rect x="88" y="90" width="24" height="38" rx="4"/>`, `<circle cx="168" cy="30" r="15"/>`],
+    top: `<rect x="62" y="74" width="20" height="18" fill="#fff" stroke="#1d2b4f" stroke-width="3"/><rect x="118" y="74" width="20" height="18" fill="#fff" stroke="#1d2b4f" stroke-width="3"/>
+      <circle cx="106" cy="110" r="2.5" fill="#1d2b4f"/>${face(168, 32, .7)}` },
+  { parts: [`<rect x="6" y="6" width="188" height="138" rx="14"/>`, `<path d="M20 96 Q22 74 46 72 L66 50 H124 L148 72 Q178 74 180 96 V108 H20 Z"/>`,
+      `<path d="M74 56 H118 L134 72 H62 Z"/>`, `<g><circle cx="58" cy="110" r="16"/><circle cx="144" cy="110" r="16"/></g>`],
+    top: `<circle cx="58" cy="110" r="6" fill="#fff" stroke="#1d2b4f" stroke-width="3"/><circle cx="144" cy="110" r="6" fill="#fff" stroke="#1d2b4f" stroke-width="3"/>
+      ${face(160, 86, .6)}<path d="M97 56 V72" stroke="#1d2b4f" stroke-width="3"/><path d="M6 128 H194" stroke="#1d2b4f" stroke-width="3" stroke-dasharray="14 10"/>` },
+  { parts: [`<rect x="6" y="6" width="188" height="138" rx="14"/>`, `<path d="M70 110 H130 L122 144 H78 Z"/>`, `<g><path d="M100 110 V70"/><path d="M100 96 Q80 92 74 78 Q92 78 100 92 Z"/><path d="M100 88 Q120 84 126 70 Q108 70 100 84 Z"/></g>`,
+      `<g>${[0, 72, 144, 216, 288].map((a) => `<ellipse cx="100" cy="30" rx="11" ry="17" transform="rotate(${a} 100 50)"/>`).join("")}</g>`, `<circle cx="100" cy="50" r="13"/>`],
+    top: `${face(100, 52, .55)}` },
+];
+function paintPickArt() {
+  const p = PAINT_PICS[3], cols = ["#a8d8ff", "#f28482", "#57c84d", "#ffd23f", "#f4a261"];
+  return `<svg viewBox="0 0 200 150">${p.parts.map((d, i) => `<g fill="${i < 4 ? cols[i] : "#fff"}" stroke="#1d2b4f" stroke-width="4" stroke-linejoin="round">${d}</g>`).join("")}${p.top}</svg>`;
+}
+function paintStart() { game.order = [0, 1, 2, 3].sort(() => Math.random() - .5); paintRound(); }
+function paintRound() {
+  const p = PAINT_PICS[game.order[game.rounds % 4]];
+  game.part = 0; game.parts = p.parts.length;
+  $("sky").innerHTML = `<div class="ptroom"><svg viewBox="0 0 200 150" id="ptPic">${p.parts.map((d, i) => `<g class="pr${i === 0 ? " now" : ""}" fill="#fff" stroke="#1d2b4f" stroke-width="4" stroke-linejoin="round">${d}</g>`).join("")}${p.top}</svg></div>`;
+}
+function paintKey(c) {
+  const parts = document.querySelectorAll("#ptPic .pr");
+  if (!parts.length || game.part >= game.parts) return;
+  const el = parts[game.part];
+  el.classList.remove("now"); el.setAttribute("fill", BALLOON[c]); el.style.fill = BALLOON[c];
+  tune([NOTES[c]], 0, 0.14);
+  if (++game.part < game.parts) { parts[game.part].classList.add("now"); return; }
+  game.busy = true;
+  later(() => { $("ptPic").classList.add("dance"); happy(); }, 400);
+  later(() => { game.busy = false; }, 1900);
+  if (++game.rounds >= 4) later(() => endGame(true), 2100); else later(paintRound, 2100);
+}
+
+/* ---- What comes first? (story order) ----
+   Three pictures of a little story, mixed up, on the red, green and yellow
+   mats: an egg, a cracked egg, a baby dinosaur… Press the one that comes
+   first: it goes into the first frame of the strip below, then the next. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.story { background: #eef6ea; }
+.stroom { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; display: grid; grid-template-rows: 1fr auto; padding: 70px 20px 10px; direction: ltr; gap: 10px; }
+.strow { display: flex; align-items: center; justify-content: center; gap: clamp(14px, 3vw, 44px); }
+.stspot { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
+.stspot { width: min(22vw, 30vh); } .stspot.szgone::before { content: ""; display: block; width: 100%; aspect-ratio: 4 / 3; }
+.stcard { width: min(22vw, 30vh); aspect-ratio: 4 / 3; background: #fff; border-radius: 18px; box-shadow: 0 6px 0 rgba(29, 43, 79, .12); overflow: hidden; }
+.stcard svg { display: block; width: 100%; height: 100%; }
+.stspot .szmat { width: 70%; height: 16px; border-radius: 8px; background: var(--c); }
+.stspot.szgone .szmat { opacity: .25; }
+.ststrip { display: flex; justify-content: center; gap: 12px; }
+.stframe { width: min(15vw, 20vh); aspect-ratio: 4 / 3; border-radius: 14px; border: 4px dashed #b9c9b0; display: grid; place-items: center; position: relative; }
+.stframe .stcard { width: 100%; box-shadow: none; }
+.stframe .num { position: absolute; display: flex; gap: 5px; }
+.stframe .num b { width: 10px; height: 10px; border-radius: 50%; background: #b9c9b0; }
+.stframe.full { border-style: solid; border-color: #f6c90e; }
+.ststrip.dance { transform-origin: 50% 50%; }
+.game.story .keys .k.blue { visibility: hidden; }
+</style>`);
+function storySets() { // three steps each, drawn on 200 × 150
+  const ground = `<rect y="118" width="200" height="32" fill="#a8cf8e"/>`;
+  const soil = `<rect y="118" width="200" height="32" fill="#a8cf8e"/><ellipse cx="100" cy="122" rx="54" ry="14" fill="#9a6b45"/>`;
+  const sun = `<g transform="translate(14 8) scale(.5)">${THINGS.sun[1]}</g>`;
+  const cloud = (x, y, k = 1, c = "#fff") => `<g transform="translate(${x} ${y}) scale(${k})" fill="${c}"><circle cx="0" cy="10" r="16"/><circle cx="20" cy="0" r="20"/><circle cx="42" cy="10" r="16"/><rect x="0" y="10" width="42" height="16"/></g>`;
+  const apple = THINGS.apple[1];
+  return [
+    [`${ground}<g transform="translate(0 -6)">${EGG}</g>`, `${ground}<g transform="translate(0 -6)">${EGG}${CRACK}</g>`, `${ground}<g transform="translate(0 -4)">${dinoSvg({ stage: 0 })}</g>`],
+    [`${soil}<ellipse cx="100" cy="114" rx="8" ry="5" fill="#6b4423"/>`,
+      `${soil}<path d="M100 118 V92" stroke="#3aa655" stroke-width="5"/><path d="M100 100 Q84 96 80 84 Q94 84 100 96 Z M100 96 Q116 90 120 78 Q106 78 100 92 Z" fill="#57c84d"/>`,
+      `${soil}<path d="M100 118 V66" stroke="#3aa655" stroke-width="5"/><path d="M100 100 Q84 96 80 84 Q94 84 100 96 Z" fill="#57c84d"/>
+       <g transform="translate(100 50)">${[0, 72, 144, 216, 288].map((a) => `<ellipse rx="10" ry="16" cy="-16" transform="rotate(${a})" fill="#f28482"/>`).join("")}<circle r="12" fill="#ffd23f"/>${face(0, 2, .5)}</g>`],
+    [`<g transform="translate(50 25)">${apple}</g>`,
+      `<g transform="translate(50 25)">${apple}</g><circle cx="148" cy="66" r="14" fill="#fff"/><circle cx="144" cy="84" r="12" fill="#fff"/><circle cx="148" cy="100" r="10" fill="#fff"/>`,
+      `<g transform="translate(50 25)"><path d="M50 30 Q52 15 60 8" stroke="#6b4423" stroke-width="5" fill="none" stroke-linecap="round"/>
+       <path d="M36 30 Q50 26 64 30 Q52 58 64 86 Q50 92 36 86 Q48 58 36 30 Z" fill="#fbe7c6" stroke="#e63946" stroke-width="5"/>
+       <ellipse cx="47" cy="58" rx="2.5" ry="4" fill="#3b2412"/><ellipse cx="53" cy="62" rx="2.5" ry="4" fill="#3b2412"/></g>`],
+    [`<rect width="200" height="150" fill="#cfe9f7"/>${ground}${sun}${cloud(110, 20)}`,
+      `<rect width="200" height="150" fill="#b3c3cf"/>${ground}${cloud(50, 14, 1.2, "#8a9bab")}${cloud(120, 24, 1, "#8a9bab")}
+       ${[[60, 70], [80, 84], [100, 66], [120, 82], [140, 70], [160, 86], [72, 100], [130, 102]].map(([x, y]) => `<path d="M${x} ${y} q-4 8 0 10 q4 -2 0 -10 Z" fill="#2f7fe0"/>`).join("")}`,
+      `<rect width="200" height="150" fill="#cfe9f7"/>${ground}${["#e63946", "#f6a23a", "#f6c90e", "#57c84d", "#2f7fe0"].map((c, i) => `<path d="M${20 + i * 8} 118 A${80 - i * 8} ${80 - i * 8} 0 0 1 ${180 - i * 8} 118" stroke="${c}" stroke-width="8" fill="none"/>`).join("")}
+       <ellipse cx="100" cy="132" rx="34" ry="7" fill="#7cc6f2"/>${sun}`],
+  ];
+}
+function storyPickArt() {
+  const s = storySets()[0];
+  return `<svg viewBox="0 0 200 150"><rect width="200" height="150" rx="14" fill="#eef6ea"/>${s.map((p, i) => `<g transform="translate(${4 + i * 66} 44)"><rect width="60" height="45" rx="6" fill="#fff" stroke="#dfe7d8" stroke-width="2"/><svg width="60" height="45" viewBox="0 0 200 150">${p}</svg></g>`).join("")}
+    <path d="M66 112 h8 M132 112 h8" stroke="#5b6b86" stroke-width="3" stroke-linecap="round"/></svg>`;
+}
+function storyStart() { game.sets = storySets().map((s, i) => i).sort(() => Math.random() - .5); storyRound(); }
+function storyRound() {
+  const set = storySets()[game.sets[game.rounds % 4]];
+  game.order = [0, 1, 2].sort(() => Math.random() - .5); game.next = 0;
+  $("sky").innerHTML = `<div class="stroom"><div class="strow">${KEY_COLORS.slice(0, 3).map((c, i) => `<div class="stspot" data-c="${c}" style="--c:${BALLOON[c]}">
+      <div class="stcard newone"><svg viewBox="0 0 200 150">${set[game.order[i]]}</svg></div><i class="szmat"></i></div>`).join("")}</div>
+    <div class="ststrip" id="stStrip">${[1, 2, 3].map((n) => `<div class="stframe"><span class="num">${"<b></b>".repeat(n)}</span></div>`).join("")}</div></div>`;
+  document.querySelectorAll(".stspot").forEach((d) => d.onclick = () => gameColor(d.dataset.c));
+}
+function storyKey(c) {
+  const i = KEY_COLORS.indexOf(c), spot = document.querySelectorAll(".stspot")[i];
+  if (!spot) return;
+  const card = spot.querySelector(".stcard");
+  if (!card) return;
+  if (game.order[i] !== game.next) { card.classList.remove("nope", "newone"); void card.offsetWidth; card.classList.add("nope"); softNo(); return; }
+  const frame = document.querySelectorAll(".stframe")[game.next];
+  card.classList.remove("nope", "newone"); card.classList.add("newone");
+  frame.innerHTML = ""; frame.appendChild(card); frame.classList.add("full"); spot.classList.add("szgone");
+  tune([[523, 659, 784][game.next]], 0, 0.18);
+  if (++game.next < 3) return;
+  game.busy = true;
+  later(() => { $("stStrip").classList.add("dance"); happy(); }, 450);
+  later(() => { game.busy = false; }, 1900);
+  if (++game.rounds >= 4) later(() => endGame(true), 2100); else later(storyRound, 2100);
+}
+
+/* Little pictures on the colour keys, for games where each key does its own thing. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.keys .k { position: relative; }
+.keys .k > svg { position: absolute; left: 12%; top: 12%; width: 76%; height: 76%; overflow: visible; }
+</style>`);
+function keyIcons(icons) { document.querySelectorAll(".keys .k").forEach((k, i) => { k.innerHTML = icons[i] ? `<svg viewBox="0 0 40 40">${icons[i]}</svg>` : ""; }); }
+const starPath = (cx, cy, r) => Array.from({ length: 10 }, (_, i) => { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * .45 : r; return `${i ? "L" : "M"}${(cx + Math.cos(a) * rr).toFixed(1)} ${(cy + Math.sin(a) * rr).toFixed(1)}`; }).join(" ") + " Z";
+
+/* ---- Dress up the dinosaur ----
+   Each key changes one thing: red the hat, green the glasses, yellow what
+   it wears round its neck, blue where it is (garden, beach, snow, party).
+   Every few changes it shows off with a little dance. No right answer. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.drroom { position: absolute; top: 0; right: 0; bottom: 0; left: 0; overflow: hidden; }
+.drplace { position: absolute; inset: 0; width: 100%; height: 100%; }
+.drdino { position: absolute; left: 50%; bottom: 120px; width: min(70vh, 62vw); transform: translateX(-50%); }
+.drdino svg { display: block; width: 100%; height: auto; overflow: visible; }
+.drdino .bod { transform-box: fill-box; transform-origin: 50% 100%; }
+.drdino .acc { animation: grow .35s cubic-bezier(.3, 1.6, .5, 1); transform-box: fill-box; transform-origin: center; }
+</style>`);
+const DRESS = {
+  hat: [``,
+    `<path d="M124 26 L141 -22 L158 26 Z" fill="#f28482"/><path d="M131 10 L151 10 M136 -4 L147 -4" stroke="#fff" stroke-width="4"/><circle cx="141" cy="-24" r="7" fill="#ffd23f"/>`,
+    `<path d="M118 28 L120 2 L130 14 L140 -6 L150 14 L160 2 L162 28 Z" fill="#f6c90e" stroke="#e0a800" stroke-width="3" stroke-linejoin="round"/><circle cx="140" cy="18" r="4.5" fill="#e63946"/><circle cx="124" cy="22" r="3" fill="#2f7fe0"/><circle cx="156" cy="22" r="3" fill="#2f7fe0"/>`,
+    `<path d="M116 30 Q118 2 142 0 Q166 2 168 30 Z" fill="#2f7fe0"/><path d="M162 27 Q184 24 194 31 Q180 36 162 33 Z" fill="#1b5fb8"/><circle cx="142" cy="0" r="4" fill="#fff"/><path d="M142 4 V28" stroke="#1b5fb8" stroke-width="2"/>`,
+    `<g transform="translate(124 20)">${[0, 60, 120, 180, 240, 300].map((a) => `<ellipse rx="6" ry="10" cy="-10" transform="rotate(${a})" fill="#f28482"/>`).join("")}<circle r="6" fill="#ffd23f"/></g>`],
+  eyes: [``,
+    `<g fill="rgba(255,255,255,.25)" stroke="#e63946" stroke-width="4"><circle cx="136" cy="44" r="15"/><circle cx="162" cy="44" r="15"/></g><path d="M121 42 L110 37" stroke="#e63946" stroke-width="4" stroke-linecap="round"/>`,
+    `<path d="M118 34 H151 V44 Q149 58 135 58 Q120 58 118 44 Z M147 34 H180 V44 Q178 58 164 58 Q149 58 147 44 Z" fill="#1d2b4f"/><path d="M124 39 L132 39 M153 39 L161 39" stroke="#fff" stroke-width="3" opacity=".6" stroke-linecap="round"/><path d="M118 38 L108 34" stroke="#1d2b4f" stroke-width="4" stroke-linecap="round"/>`,
+    `<g fill="rgba(255,210,63,.25)" stroke="#f6c90e" stroke-width="4" stroke-linejoin="round"><path d="${starPath(136, 45, 19)}"/><path d="${starPath(162, 45, 19)}"/></g>`],
+  neck: [``,
+    `<path d="M112 84 Q128 98 146 88 L148 98 Q128 110 110 94 Z" fill="#e63946"/><path d="M134 100 L128 126 L140 124 L144 98 Z" fill="#e63946"/><path d="M118 92 L122 88 M126 98 L130 93 M136 99 L139 94 M131 112 L140 111" stroke="#fff" stroke-width="3"/>`,
+    `<path d="M114 92 L128 100 L114 108 Z M142 92 L128 100 L142 108 Z" fill="#2f7fe0"/><circle cx="128" cy="100" r="5" fill="#1b5fb8"/>`,
+    `${[[114, 86], [119, 92], [125, 96], [131, 98], [137, 97], [143, 94], [147, 89]].map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="4.5" fill="${["#f28482", "#ffd23f", "#57c84d", "#2f7fe0"][i % 4]}" stroke="#fff" stroke-width="1.5"/>`).join("")}`],
+};
+function dressPlace(i) {
+  const sky = (c) => `<rect width="1600" height="900" fill="${c}"/>`;
+  if (i === 0) return gardenSvg();
+  const W = `viewBox="0 0 1600 900" preserveAspectRatio="xMidYMax slice" class="drplace"`;
+  if (i === 1) return `<svg ${W}>${sky("#9fd8f5")}<rect y="520" width="1600" height="160" fill="#2f9fe0"/><path d="M0 540 Q100 520 200 540 T400 540 T600 540 T800 540 T1000 540 T1200 540 T1400 540 T1600 540" stroke="#fff" stroke-width="8" fill="none" opacity=".7"/>
+    <rect y="660" width="1600" height="240" fill="#f3d9a4"/><g transform="translate(1300 60) scale(2.4)">${THINGS.sun[1]}</g>
+    <g transform="translate(260 560)"><path d="M0 120 L40 0 L80 120 Z" fill="#e63946"/><path d="M40 0 L40 160" stroke="#8a5a3b" stroke-width="8"/></g>
+    <g transform="translate(1180 760) scale(.9)">${BALL}</g></svg>`;
+  if (i === 2) return `<svg ${W}>${sky("#cfe4f2")}<path d="M0 640 Q400 560 800 640 T1600 620 V900 H0 Z" fill="#fff"/>
+    ${Array.from({ length: 40 }, (_, k) => `<circle cx="${(k * 397) % 1600}" cy="${(k * 211) % 600}" r="${6 + (k % 3) * 3}" fill="#fff"/>`).join("")}
+    <g transform="translate(1250 520)"><circle cx="0" cy="120" r="70" fill="#fff" stroke="#dbe7f0" stroke-width="6"/><circle cx="0" cy="20" r="48" fill="#fff" stroke="#dbe7f0" stroke-width="6"/>
+    ${face(0, 22, 2.2)}<path d="M0 30 L34 40 L0 44 Z" fill="#f4a261"/></g></svg>`;
+  return `<svg ${W}>${sky("#ffe8f0")}<rect y="680" width="1600" height="220" fill="#e0c3f2"/>
+    <path d="M0 60 Q400 160 800 60 T1600 60" stroke="#5b6b86" stroke-width="4" fill="none"/>
+    ${Array.from({ length: 16 }, (_, k) => `<path d="M${k * 100 + 20} ${60 + Math.sin(k / 16 * Math.PI * 2) * 50 + 20} l30 0 l-15 50 Z" fill="${["#e63946", "#2a9d4b", "#f6c90e", "#2f7fe0"][k % 4]}"/>`).join("")}
+    ${[["#e63946", 180, 260], ["#2f7fe0", 300, 300], ["#f6c90e", 1300, 250], ["#2a9d4b", 1420, 310]].map(([c, x, y]) => `<ellipse cx="${x}" cy="${y}" rx="60" ry="74" fill="${c}"/><path d="M${x} ${y + 74} q-10 80 10 160" stroke="#5b6b86" stroke-width="3" fill="none"/>`).join("")}</svg>`;
+}
+function dressPickArt() {
+  return `<svg viewBox="0 -30 200 180">${dinoSvg({ stage: 2 })}${DRESS.hat[1]}${DRESS.eyes[2]}${DRESS.neck[2]}</svg>`;
+}
+function dressStart() {
+  Object.assign(game, { hat: 0, eyes: 0, neck: 0, place: 0, changes: 0 });
+  keyIcons([`<path d="M8 32 L20 4 L32 32 Z" fill="#fff"/>`, `<g fill="none" stroke="#fff" stroke-width="4"><circle cx="11" cy="22" r="8"/><circle cx="29" cy="22" r="8"/><path d="M19 21 H21"/></g>`,
+    `<path d="M10 14 L20 20 L10 26 Z M30 14 L20 20 L30 26 Z" fill="#fff"/>`, `<rect x="5" y="9" width="30" height="22" rx="3" fill="none" stroke="#fff" stroke-width="3.5"/><path d="M8 28 L17 18 L23 24 L27 20 L33 28" fill="#fff"/>`]);
+  $("sky").innerHTML = `<div class="drroom"><div id="drPlace"></div><div class="drdino"><svg viewBox="0 -30 200 180"><g class="bod" id="drBod"></g></svg></div></div>`;
+  dressDraw();
+}
+function dressDraw(changed) {
+  $("drPlace").innerHTML = dressPlace(game.place).replace('class="garden"', 'class="garden drplace"');
+  const acc = (k, v) => DRESS[k][v] ? `<g class="${changed === k ? "acc" : ""}">${DRESS[k][v]}</g>` : "";
+  $("drBod").innerHTML = dinoSvg({ stage: 2, mouth: changed ? "open" : "smile" }) + acc("neck", game.neck) + acc("eyes", game.eyes) + acc("hat", game.hat);
+}
+function dressKey(c) {
+  const k = { red: "hat", green: "eyes", yellow: "neck", blue: "place" }[c];
+  if (!k) return;
+  game[k] = (game[k] + 1) % (k === "place" ? 4 : DRESS[k].length);
+  dressDraw(k);
+  tune([NOTES[c], NOTES[c] * 1.25], 0.08, 0.12);
+  later(() => { if (game) $("drBod").innerHTML = $("drBod").innerHTML.replace(/class="acc"/g, ""); }, 400);
+  if (++game.changes % 5 === 0) {
+    game.busy = true;
+    later(() => { const b = $("drBod"); b.classList.remove("dance"); void b.getBoundingClientRect(); b.classList.add("dance"); happy(); }, 300);
+    later(() => { game.busy = false; }, 1300);
+  }
+  if (game.changes >= 30) { game.busy = true; later(() => endGame(true), 1400); }
+}
+
+/* ---- Make a sandwich ----
+   Bread on the plate; red adds tomato, green lettuce, yellow cheese, blue
+   puts the top on. Then the sandwich goes to the dinosaur, who eats it
+   happily. Any filling is fine. Four sandwiches. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.cook { background: linear-gradient(#fdf3df 62%, #e9c99a 62%); }
+.ckroom { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; display: flex; align-items: flex-end; justify-content: center; gap: clamp(20px, 6vw, 90px); padding: 70px 20px 30px; direction: ltr; }
+.ckplate { position: relative; width: min(34vw, 46vh); display: flex; flex-direction: column-reverse; align-items: center; padding-bottom: 4%; }
+.ckplate::after { content: ""; position: absolute; left: -8%; right: -8%; bottom: 0; height: 22%; border-radius: 50%; background: #fff; box-shadow: inset 0 -6px 0 #dfe7f0, 0 6px 0 rgba(0,0,0,.08); z-index: -1; }
+.ckstack { display: flex; flex-direction: column-reverse; align-items: center; width: 100%; transition: transform .7s ease-in, opacity .7s; position: relative; z-index: 1; }
+.ckstack svg { display: block; width: 92%; height: auto; margin-top: -11%; overflow: visible; }
+.ckstack svg.newl { animation: ckdrop .35s cubic-bezier(.3, 1.4, .5, 1); }
+@keyframes ckdrop { from { transform: translateY(-120px); opacity: 0; } }
+.ckdino { width: min(34vw, 50vh); }
+.ckdino svg { display: block; width: 100%; height: auto; overflow: visible; }
+</style>`);
+const CK_LAYERS = {
+  bottom: `<rect x="4" y="6" width="112" height="20" rx="8" fill="#d99a52"/><rect x="8" y="6" width="104" height="11" rx="5" fill="#f3d39a"/>`,
+  red: `<rect x="10" y="10" width="100" height="11" rx="5" fill="#e63946"/>${[24, 46, 70, 94].map((x) => `<ellipse cx="${x}" cy="15.5" rx="3" ry="2" fill="#ffd0c8"/>`).join("")}`,
+  green: `<path d="M2 18 Q10 6 18 16 Q26 6 34 16 Q42 6 50 16 Q58 6 66 16 Q74 6 82 16 Q90 6 98 16 Q106 6 118 18 Q110 26 60 25 Q10 26 2 18 Z" fill="#57c84d"/>`,
+  yellow: `<path d="M8 8 H112 V18 H86 L76 30 L68 18 H8 Z" fill="#f6c90e"/><circle cx="30" cy="13" r="3" fill="#e0a800"/><circle cx="56" cy="12" r="2.5" fill="#e0a800"/><circle cx="96" cy="13" r="3" fill="#e0a800"/>`,
+  blue: `<path d="M4 28 Q4 2 60 2 Q116 2 116 28 Z" fill="#d99a52"/><path d="M10 24 Q12 8 60 7 Q108 8 110 24" fill="#e9b26a"/>${[[34, 12], [52, 9], [72, 10], [90, 14], [44, 18], [80, 19]].map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="3" ry="1.8" fill="#fff6dc"/>`).join("")}`,
+};
+const ckSvg = (k, cls = "") => `<svg class="${cls}" viewBox="0 0 120 32">${CK_LAYERS[k]}</svg>`;
+function cookPickArt() {
+  return `<svg viewBox="0 0 200 150"><ellipse cx="100" cy="128" rx="80" ry="16" fill="#fff" stroke="#dfe7f0" stroke-width="3"/>
+    ${["bottom", "green", "red", "yellow", "blue"].map((k, i) => `<svg x="40" y="${100 - i * 18}" width="120" height="32" viewBox="0 0 120 32">${CK_LAYERS[k]}</svg>`).join("")}</svg>`;
+}
+function cookStart() {
+  keyIcons([`<circle cx="20" cy="20" r="14" fill="#fff"/>`, `<path d="M6 24 Q10 10 14 20 Q18 10 22 20 Q26 10 30 20 Q34 12 34 24 Z" fill="#fff"/>`,
+    `<path d="M6 12 H34 V24 H26 L22 32 L18 24 H6 Z" fill="#fff"/>`, `<path d="M4 28 Q4 8 20 8 Q36 8 36 28 Z" fill="#fff"/>`]);
+  cookRound();
+}
+function cookRound() {
+  game.layers = 0;
+  $("sky").innerHTML = `<div class="ckroom"><div class="ckplate"><div class="ckstack" id="ckStack">${ckSvg("bottom", "newl")}</div></div>
+    <div class="ckdino" id="ckDino"><svg viewBox="0 0 200 150">${dinoSvg({ stage: 1, mouth: "open" })}</svg></div></div>`;
+}
+function cookKey(c) {
+  if (!CK_LAYERS[c]) return;
+  $("ckStack").insertAdjacentHTML("beforeend", ckSvg(c, "newl"));
+  tune([NOTES[c]], 0, 0.12);
+  if (c !== "blue" && ++game.layers < 6) return;
+  if (c !== "blue") $("ckStack").insertAdjacentHTML("beforeend", ckSvg("blue", "newl"));
+  // The top is on: off it goes to the dinosaur, who munches it up.
+  game.busy = true;
+  later(() => {
+    const st = $("ckStack"), d = $("ckDino").getBoundingClientRect(), r = st.getBoundingClientRect();
+    st.style.transform = `translate(${d.left + d.width * .75 - (r.left + r.width / 2)}px, ${d.top + d.height * .45 - (r.top + r.height / 2)}px) scale(.35)`;
+  }, 500);
+  later(() => { $("ckStack").style.opacity = 0; $("ckDino").innerHTML = `<svg viewBox="0 0 200 150">${dinoSvg({ stage: 1, mouth: "chew" })}</svg>`; tune([392, 523, 392, 523], 0.13, 0.14); }, 1200);
+  later(() => { $("ckDino").innerHTML = `<svg viewBox="0 0 200 150" class="dance">${dinoSvg({ stage: 1, mood: "love" })}</svg>`; happy(); }, 1900);
+  later(() => { game.busy = false; }, 3000);
+  if (++game.rounds >= 4) later(() => endGame(true), 3100); else later(cookRound, 3100);
+}
+
+/* ---- Animal photos ----
+   Four bushes on the four key colours. An animal peeks out of one: press
+   that colour to take its photo (a flash, a click, and the photo goes on the
+   line at the top). If it is not taken, it just hides and peeks out
+   somewhere else. Eight photos. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.photo { background: linear-gradient(#cfeaf7, #eaf6e4 60%, #a8cf8e 60%); }
+.phroom { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; display: grid; grid-template-rows: auto 1fr; padding: 70px 20px 10px; direction: ltr; }
+.phline { display: flex; justify-content: center; gap: 10px; min-height: min(12vh, 9vw); border-top: 3px solid #8a6a4a; padding-top: 6px; margin: 0 8%; }
+.phline .pic { width: min(10vh, 8vw); aspect-ratio: 1; background: #fff; padding: 4px 4px 12px; box-shadow: 0 3px 6px rgba(0,0,0,.15); transform: rotate(var(--r)); animation: grow .4s cubic-bezier(.3, 1.6, .5, 1); }
+.phline .pic svg { width: 100%; height: 100%; background: #e9f5e6; display: block; }
+.phrow { display: flex; align-items: flex-end; justify-content: center; gap: clamp(10px, 3vw, 40px); }
+.phspot { position: relative; width: min(20vw, 30vh); display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
+.phwho { position: absolute; left: 12%; width: 76%; bottom: 30%; transform: translateY(50%); opacity: 0; transition: transform .35s cubic-bezier(.3, 1.4, .5, 1), opacity .2s; }
+.phspot.peek .phwho { transform: translateY(-38%); opacity: 1; }
+.phwho svg { display: block; width: 100%; height: auto; overflow: visible; }
+.phbush { position: relative; width: 100%; }
+.phbush svg { display: block; width: 100%; height: auto; }
+.phspot .szmat { width: 70%; height: 16px; border-radius: 8px; background: var(--c); }
+.phflash { position: fixed; inset: 0; background: #fff; animation: phflash .45s ease-out forwards; pointer-events: none; z-index: 9; }
+@keyframes phflash { from { opacity: .95; } to { opacity: 0; } }
+</style>`);
+const PH_WHO = ["cat", "frog", "chick", "dino"];
+const phArt = (w) => w === "dino" ? `<svg viewBox="28 46 130 104">${dinoSvg({ stage: 0 })}</svg>` : `<svg viewBox="0 0 100 100">${animal(w, false)}</svg>`;
+const PH_BUSH = `<svg viewBox="0 0 120 70"><g fill="#3aa655"><circle cx="24" cy="44" r="24"/><circle cx="60" cy="34" r="32"/><circle cx="96" cy="44" r="24"/><rect x="10" y="44" width="100" height="26" rx="10"/></g>
+  <g fill="#2f8f4a"><circle cx="40" cy="52" r="10"/><circle cx="82" cy="50" r="12"/></g><circle cx="52" cy="22" r="3" fill="#f28482"/><circle cx="90" cy="34" r="3" fill="#fff"/></svg>`;
+function photoPickArt() {
+  return `<svg viewBox="0 0 200 150"><rect x="30" y="40" width="140" height="92" rx="14" fill="#1d2b4f"/><rect x="70" y="26" width="44" height="20" rx="6" fill="#1d2b4f"/>
+    <circle cx="100" cy="86" r="34" fill="#fff"/><circle cx="100" cy="86" r="26" fill="#2f7fe0"/><circle cx="92" cy="78" r="7" fill="#fff" opacity=".7"/><circle cx="150" cy="56" r="6" fill="#f6c90e"/></svg>`;
+}
+function photoStart() {
+  game.taken = 0; game.at = -1;
+  $("sky").innerHTML = `<div class="phroom"><div class="phline" id="phLine"></div><div class="phrow">${KEY_COLORS.map((c) => `<div class="phspot" data-c="${c}" style="--c:${BALLOON[c]}">
+    <div class="phwho"></div><div class="phbush">${PH_BUSH}</div><i class="szmat"></i></div>`).join("")}</div></div>`;
+  document.querySelectorAll(".phspot").forEach((d) => d.onclick = () => gameColor(d.dataset.c));
+  later(photoPeek, 800);
+}
+function photoPeek() {
+  const spots = document.querySelectorAll(".phspot");
+  spots.forEach((s) => s.classList.remove("peek"));
+  game.at = pickOther(4, game.at); game.who = PH_WHO[Math.floor(Math.random() * PH_WHO.length)];
+  spots[game.at].querySelector(".phwho").innerHTML = phArt(game.who);
+  spots[game.at].classList.add("peek"); tune([660], 0, 0.06);
+  clearTimeout(game.peekTimer);
+  game.peekTimer = setTimeout(() => { if (game && game.kind === "photo" && !game.busy) photoPeek(); }, 5000); // not taken: it hides and peeks elsewhere
+  game.timers.push(game.peekTimer);
+}
+function photoKey(c) {
+  const i = KEY_COLORS.indexOf(c), spots = document.querySelectorAll(".phspot");
+  if (i < 0 || !spots.length) return;
+  if (i !== game.at) { const b = spots[i].querySelector(".phbush"); b.classList.remove("nope"); void b.offsetWidth; b.classList.add("nope"); return; }
+  game.busy = true; clearTimeout(game.peekTimer);
+  document.body.insertAdjacentHTML("beforeend", `<i class="phflash"></i>`); setTimeout(() => { const f = document.querySelector(".phflash"); if (f) f.remove(); }, 500);
+  tune([1568, 1175], 0.05, 0.1);
+  $("phLine").insertAdjacentHTML("beforeend", `<div class="pic" style="--r:${(Math.random() * 10 - 5).toFixed(1)}deg">${phArt(game.who)}</div>`);
+  later(() => { spots[i].classList.remove("peek"); }, 500);
+  if (++game.taken >= 8) { later(happy, 600); later(() => endGame(true), 1600); return; }
+  later(() => { game.busy = false; photoPeek(); }, 1200);
+}
+
+/* ---- Climb and collect shapes ----
+   The dinosaur climbs a wall. A bubble shows the shape it wants next; four
+   holds above it have four shapes, each in a key colour. Press the colour of
+   the hold with that shape: it climbs up and collects it. Eight shapes and
+   it reaches the flag at the top. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.climb { background: #8fb3c9; background-image: radial-gradient(circle, rgba(255,255,255,.25) 0 3px, transparent 4px); background-size: 46px 46px; }
+.clroom { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; padding: 70px 20px 10px; direction: ltr; }
+.clholds { position: absolute; left: 10%; right: 10%; top: 16%; display: flex; justify-content: space-around; }
+.clhold { width: min(15vw, 22vh); cursor: pointer; transition: transform .3s; }
+.clhold:nth-child(2) { transform: translateY(30%); } .clhold:nth-child(3) { transform: translateY(-10%); } .clhold:nth-child(4) { transform: translateY(20%); }
+.clhold svg { display: block; width: 100%; height: auto; overflow: visible; }
+.clhold.got svg { animation: pop .4s ease-out forwards; }
+.clme { position: absolute; left: 50%; bottom: 0; width: min(22vw, 30vh); transform: translate(-50%, 0); transition: transform .6s cubic-bezier(.4, 1.3, .5, 1); }
+.clme svg { display: block; width: 100%; height: auto; overflow: visible; }
+.clwant { position: absolute; left: calc(50% + min(10vw, 14vh)); bottom: min(18vw, 24vh); width: min(10vw, 14vh); aspect-ratio: 1; background: #fff; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 4px 0 rgba(0,0,0,.12); }
+.clwant svg { width: 70%; height: 70%; }
+.clrope { position: absolute; right: 26px; top: 80px; bottom: 140px; width: 10px; border-radius: 5px; background: #e9d8b4; display: flex; flex-direction: column-reverse; justify-content: space-between; align-items: center; padding: 6px 0; }
+.clrope b { width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 3px solid #e9d8b4; }
+.clrope b.on { background: #f6c90e; border-color: #fff; }
+.clrope .flag { position: absolute; top: -46px; left: -6px; width: 44px; }
+</style>`);
+const CL_SHAPES = {
+  circle: (f, s) => `<circle cx="50" cy="50" r="38" fill="${f}" stroke="${s}" stroke-width="7"/>`,
+  square: (f, s) => `<rect x="14" y="14" width="72" height="72" rx="10" fill="${f}" stroke="${s}" stroke-width="7"/>`,
+  triangle: (f, s) => `<path d="M50 10 L90 86 H10 Z" fill="${f}" stroke="${s}" stroke-width="7" stroke-linejoin="round"/>`,
+  star: (f, s) => `<path d="${starPath(50, 54, 44)}" fill="${f}" stroke="${s}" stroke-width="7" stroke-linejoin="round"/>`,
+};
+function climbPickArt() {
+  return `<svg viewBox="0 0 200 150"><rect width="200" height="150" rx="14" fill="#8fb3c9"/>
+    ${["circle", "star", "triangle", "square"].map((k, i) => `<g transform="translate(${16 + i * 46} ${18 + (i % 2) * 18}) scale(.34)">${CL_SHAPES[k](BALLOON[KEY_COLORS[i]], "#fff")}</g>`).join("")}
+    <svg x="60" y="74" width="90" height="68" viewBox="0 0 200 150">${dinoSvg({ stage: 1 })}</svg></svg>`;
+}
+function climbStart() { game.got = 0; climbRound(); }
+function climbRound() {
+  const kinds = Object.keys(CL_SHAPES).sort(() => Math.random() - .5);
+  game.kinds = kinds; game.want = kinds[Math.floor(Math.random() * 4)];
+  $("sky").innerHTML = `<div class="clroom" id="clRoom">
+    <div class="clholds">${KEY_COLORS.map((c, i) => `<div class="clhold newone" data-c="${c}"><svg viewBox="0 0 100 100">${CL_SHAPES[kinds[i]](BALLOON[c], "#fff")}</svg></div>`).join("")}</div>
+    <div class="clme" id="clMe"><svg viewBox="0 0 200 150">${dinoSvg({ stage: 1 })}</svg></div>
+    <div class="clwant newone"><svg viewBox="0 0 100 100">${CL_SHAPES[game.want]("#fff", "#1d2b4f")}</svg></div>
+    <div class="clrope"><svg class="flag" viewBox="0 0 40 40"><path d="M6 4 V38" stroke="#5b6b86" stroke-width="3"/><path d="M8 4 L36 12 L8 20 Z" fill="#e63946"/></svg>${Array.from({ length: 8 }, (_, i) => `<b class="${i < game.got ? "on" : ""}"></b>`).join("")}</div></div>`;
+  document.querySelectorAll(".clhold").forEach((d) => d.onclick = () => gameColor(d.dataset.c));
+}
+function climbKey(c) {
+  const i = KEY_COLORS.indexOf(c), holds = document.querySelectorAll(".clhold");
+  if (i < 0 || !holds.length) return;
+  if (game.kinds[i] !== game.want) { const h = holds[i]; h.classList.remove("nope", "newone"); void h.offsetWidth; h.classList.add("nope"); softNo(); return; }
+  game.busy = true;
+  const me = $("clMe"), r = holds[i].getBoundingClientRect(), m = me.getBoundingClientRect();
+  me.style.transform = `translate(calc(-50% + ${r.left + r.width / 2 - (m.left + m.width / 2)}px), ${r.bottom - m.top - m.height * .25}px)`;
+  tune([392, 494, 587], 0.1, 0.12);
+  later(() => { holds[i].classList.add("got"); game.got++; document.querySelectorAll(".clrope b")[game.got - 1].classList.add("on"); tune([784, 1047], 0.08, 0.16); }, 650);
+  if (game.got + 1 >= 8) { later(happy, 1000); later(() => endGame(true), 2000); return; }
+  later(() => { game.busy = false; climbRound(); }, 1500);
+}
+
+/* ---- Sticker album ----
+   Every game played to the end gives a sticker (a new one while there are
+   new ones), shown on the cheer screen. The album shows them all; ones not
+   found yet are grey shadows. Kept on this device. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.album { background: #fff7e6; }
+.alroom { position: absolute; top: 0; right: 0; bottom: 30px; left: 0; padding: 80px 24px 10px; display: grid; grid-template-columns: repeat(6, 1fr); gap: clamp(8px, 2vw, 22px); align-content: center; direction: ltr; overflow-y: auto; }
+.alslot { aspect-ratio: 1; border-radius: 20px; background: #fff; box-shadow: 0 5px 0 rgba(29,43,79,.1); display: grid; place-items: center; position: relative; }
+.alslot svg { width: 78%; height: 78%; overflow: visible; }
+.alslot.none svg { filter: brightness(0); opacity: .08; }
+.alslot.new { outline: 5px solid #f6c90e; animation: dance .9s ease-in-out 2; }
+.alslot b { position: absolute; right: 6px; bottom: 4px; font: 700 18px/1 Fredoka, sans-serif; color: #e0a800; }
+.game.album .keys { display: none; }
+.stwin { position: absolute; left: calc(50% + min(31vh, 36vw)); top: calc(50% - min(13vh, 13vw)); width: min(26vh, 26vw); aspect-ratio: 1; background: #fff; border-radius: 28px; box-shadow: 0 8px 0 rgba(0,0,0,.12); display: grid; place-items: center; animation: stwin .8s cubic-bezier(.3, 1.6, .5, 1) .5s both; }
+.stwin svg { width: 78%; height: 78%; overflow: visible; }
+@keyframes stwin { from { transform: scale(0) rotate(-30deg); } }
+</style>`);
+function stickerList() {
+  const t = (n) => `<svg viewBox="0 0 100 100">${THINGS[n][1]}</svg>`;
+  return [["apple", t("apple")], ["sun", t("sun")], ["star", t("star")], ["fish", t("fish")], ["heart", t("heart")], ["leaf", t("leaf")], ["tree", t("tree")], ["drop", t("drop")],
+    ["cat", `<svg viewBox="0 0 100 100">${animal("cat", false)}</svg>`], ["frog", `<svg viewBox="0 0 100 100">${animal("frog", true)}</svg>`], ["chick", `<svg viewBox="0 0 100 100">${animal("chick", false)}</svg>`],
+    ["dino", `<svg viewBox="0 0 200 150">${dinoSvg({ stage: 2 })}</svg>`], ["baby", `<svg viewBox="28 46 130 104">${dinoSvg({ stage: 0, mood: "love" })}</svg>`], ["egg", `<svg viewBox="0 30 200 120">${EGG}</svg>`],
+    ["car", `<svg viewBox="-40 -56 80 104">${carSvg()}</svg>`], ["ball", `<svg viewBox="0 0 100 100">${BALL}</svg>`], ["crown", `<svg viewBox="110 -14 60 50">${DRESS.hat[2]}</svg>`],
+    ["sandwich", `<svg viewBox="0 0 120 100">${["bottom", "green", "red", "yellow", "blue"].map((k, i) => `<svg y="${66 - i * 14}" width="120" height="32" viewBox="0 0 120 32">${CK_LAYERS[k]}</svg>`).join("")}</svg>`]];
+}
+function stickersHave() { try { return JSON.parse(load("stickers") || "[]"); } catch (e) { return []; } }
+window.stickerWon = () => { // called by endGame in index.html on the cheer screen
+  const list = stickerList(), have = stickersHave(), names = have.map((h) => h.k);
+  const fresh = list.filter(([k]) => !names.includes(k));
+  const pick = (fresh.length ? fresh : list)[Math.floor(Math.random() * (fresh.length || list.length))];
+  have.push({ k: pick[0], at: Date.now() }); save("stickers", JSON.stringify(have));
+  const done = document.querySelector("#sky .done");
+  if (done) done.insertAdjacentHTML("beforeend", `<div class="stwin">${pick[1]}</div>`);
+};
+function albumPickArt() {
+  return `<svg viewBox="0 0 200 150"><rect x="30" y="14" width="140" height="122" rx="12" fill="#f4a261"/><rect x="40" y="22" width="120" height="106" rx="8" fill="#fff7e6"/>
+    <g transform="translate(48 30) scale(.4)">${THINGS.star[1]}</g><g transform="translate(108 30) scale(.4)">${THINGS.heart[1]}</g>
+    <g transform="translate(48 80) scale(.4)">${THINGS.sun[1]}</g><g transform="translate(108 80) scale(.4)" opacity=".12">${THINGS.fish[1]}</g></svg>`;
+}
+function albumStart() {
+  const have = stickersHave(), count = {}, last = have.length ? have[have.length - 1].k : "";
+  for (const h of have) count[h.k] = (count[h.k] || 0) + 1;
+  $("sky").innerHTML = `<div class="alroom">${stickerList().map(([k, art]) => `<div class="alslot${count[k] ? "" : " none"}${k === last ? " new" : ""}">${art}${count[k] > 1 ? `<b>${count[k]}</b>` : ""}</div>`).join("")}</div>`;
+}
+function albumKey() { // any key: the stickers he has dance one by one
+  const got = [...document.querySelectorAll(".alslot:not(.none)")];
+  got.forEach((s, i) => later(() => { s.classList.remove("dance"); void s.offsetWidth; s.classList.add("dance"); tune([[523, 659, 784, 1047][i % 4]], 0, 0.08); }, i * 120));
+}
+
+/* ---- Xylophone ----
+   Four big bars, one per key colour, each a note (do, mi, sol, high do). He
+   plays whatever he likes: the bar bounces and a little note floats up.
+   Every eight notes a tiny tune answers him. Free play, no right or wrong. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.music { background: #fff4e0; }
+.murow { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; display: flex; align-items: center; justify-content: center; gap: clamp(10px, 2.4vw, 34px); padding: 70px 20px 10px; direction: ltr; }
+.mubar { position: relative; width: min(16vw, 24vh); border-radius: 22px; background: var(--c); box-shadow: inset 0 -12px 0 rgba(0,0,0,.15), 0 8px 0 rgba(29,43,79,.15); cursor: pointer; transform-origin: 50% 50%; }
+.mubar::before, .mubar::after { content: ""; position: absolute; left: 50%; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; background: #e7ddc8; }
+.mubar::before { top: 14px; } .mubar::after { bottom: 22px; }
+.mubar.hit { animation: muhit .3s ease-out; }
+@keyframes muhit { 30% { transform: scale(1.06, .94) translateY(6px); } }
+.munote { position: absolute; font: 700 54px/1 Fredoka, sans-serif; color: var(--c); text-shadow: 0 3px 0 #fff; animation: munote 1.4s ease-out forwards; pointer-events: none; }
+@keyframes munote { to { transform: translate(var(--dx), -220px) rotate(var(--r)); opacity: 0; } }
+</style>`);
+function musicPickArt() {
+  return `<svg viewBox="0 0 200 150">${KEY_COLORS.map((c, i) => `<rect x="${20 + i * 44}" y="${14 + i * 10}" width="34" height="${118 - i * 20}" rx="10" fill="${BALLOON[c]}"/>`).join("")}
+    <path d="M150 20 V48 a8 7 0 1 1 -4 -6 V24 L170 18 V42 a8 7 0 1 1 -4 -6 V22 Z" fill="#1d2b4f"/></svg>`;
+}
+function musicStart() {
+  game.notes = 0;
+  $("sky").innerHTML = `<div class="murow">${KEY_COLORS.map((c, i) => `<div class="mubar newone" data-c="${c}" style="--c:${BALLOON[c]};height:min(${56 - i * 8}vh, ${42 - i * 6}vw)"></div>`).join("")}</div>`;
+  document.querySelectorAll(".mubar").forEach((b) => b.onclick = () => gameColor(b.dataset.c));
+}
+function musicKey(c) {
+  const i = KEY_COLORS.indexOf(c), bar = document.querySelectorAll(".mubar")[i];
+  if (!bar) return;
+  const a = audioCtx(); if (a) bell(a, [523, 659, 784, 1047][i], a.currentTime + 0.01, 1.2, 0.22);
+  bar.classList.remove("hit", "newone"); void bar.offsetWidth; bar.classList.add("hit");
+  const n = document.createElement("i"), r = bar.getBoundingClientRect();
+  n.className = "munote"; n.textContent = ["♪", "♫", "♩", "♬"][game.notes % 4];
+  n.style.cssText = `left:${r.left + r.width / 2 - 20}px;top:${r.top - 30}px;--c:${BALLOON[c]};--dx:${Math.random() * 80 - 40}px;--r:${Math.random() * 60 - 30}deg`;
+  $("sky").appendChild(n); setTimeout(() => n.remove(), 1500);
+  if (++game.notes % 8 === 0) { game.busy = true; later(() => tune([523, 659, 784, 659, 523, 784, 1047], 0.16, 0.14), 500); later(() => { game.busy = false; }, 1700); }
+  if (game.notes >= 48) { game.busy = true; later(() => endGame(true), 1900); }
+}
+
+/* ---- Who says that? (animal sounds) ----
+   A sound plays (a cat's meow, a frog's ribbit, a chick's cheep, a little
+   dinosaur's roar), made in the browser. Press the animal that makes it. A
+   wrong one just makes its own sound, so he hears the difference. The
+   speaker button (or the same animal) plays it again. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.sounds { background: #eaf6e4; }
+.sdroom { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; display: grid; grid-template-rows: auto 1fr; justify-items: center; padding: 70px 20px 10px; direction: ltr; }
+.sdspeak { width: min(16vh, 13vw); aspect-ratio: 1; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 6px 0 rgba(29,43,79,.15); cursor: pointer; display: grid; place-items: center; }
+.sdspeak svg { width: 60%; height: 60%; }
+.sdspeak.on { animation: hop .4s ease-out 2; }
+</style>`);
+const SD_WHO = ["cat", "frog", "chick", "dino"];
+function sdNoise(a, len) { const b = a.createBuffer(1, a.sampleRate * len, a.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; const s = a.createBufferSource(); s.buffer = b; return s; }
+function sdSay(who) {
+  const a = audioCtx(); if (!a) return;
+  const t = a.currentTime + 0.02, out = a.createGain(); out.gain.value = 0.9; out.connect(a.destination);
+  const voice = (type, f0, f1, at, len, vol, filt) => { // one sliding tone
+    const o = a.createOscillator(), g = a.createGain(); o.type = type;
+    o.frequency.setValueAtTime(f0, at); o.frequency.exponentialRampToValueAtTime(f1, at + len);
+    g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(vol, at + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+    let node = o; if (filt) { const f = a.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = filt; o.connect(f); node = f; }
+    node.connect(g); g.connect(out); o.start(at); o.stop(at + len + 0.05);
+  };
+  if (who === "cat") { voice("sawtooth", 520, 900, t, 0.25, 0.12, 2200); voice("sawtooth", 900, 480, t + 0.25, 0.45, 0.12, 1800); }
+  else if (who === "frog") { for (const d of [0, 0.32]) for (let k = 0; k < 4; k++) voice("square", 180, 140, t + d + k * 0.045, 0.04, 0.12, 900); }
+  else if (who === "chick") { for (let k = 0; k < 3; k++) voice("sine", 2400, 3400, t + k * 0.2, 0.12, 0.14); }
+  else { // a small, friendly roar
+    voice("sawtooth", 110, 70, t, 0.9, 0.18, 500);
+    const n = sdNoise(a, 0.9), f = a.createBiquadFilter(), g = a.createGain();
+    f.type = "lowpass"; f.frequency.value = 600; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.15, t + 0.1); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    n.connect(f); f.connect(g); g.connect(out); n.start(t); n.stop(t + 0.95);
+  }
+}
+const sdArt = (w, open) => w === "dino" ? `<svg viewBox="28 46 130 104">${dinoSvg({ stage: 0, mouth: open ? "open" : "smile" })}</svg>` : `<svg viewBox="0 0 100 100">${animal(w, open)}</svg>`;
+const SD_SPEAKER = `<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z" fill="#1d2b4f"/></svg>`;
+function soundsPickArt() {
+  return `<svg viewBox="0 0 200 150"><g transform="translate(10 40) scale(.8)">${animal("cat", true)}</g><g transform="translate(110 40) scale(.8)">${animal("chick", false)}</g>
+    <g transform="translate(80 4) scale(1.6)"><path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z" fill="#1d2b4f"/></g></svg>`;
+}
+function soundsStart() { game.who = -1; soundsRound(); }
+function soundsRound() {
+  game.order = SD_WHO.slice().sort(() => Math.random() - .5);
+  game.who = pickOther(4, game.who); game.want = game.order[game.who];
+  $("sky").innerHTML = `<div class="sdroom"><button class="sdspeak" id="sdSpeak" type="button">${SD_SPEAKER}</button>
+    <div class="feedrow">${game.order.map((w, i) => `<div class="pet" data-c="${KEY_COLORS[i]}">${sdArt(w, false)}<i class="mat" style="background:${BALLOON[KEY_COLORS[i]]}"></i></div>`).join("")}</div></div>`;
+  document.querySelectorAll(".sdroom .pet").forEach((d) => d.onclick = () => gameColor(d.dataset.c));
+  $("sdSpeak").onclick = soundsPlay;
+  later(soundsPlay, 700);
+}
+function soundsPlay() { const s = $("sdSpeak"); if (s) { s.classList.remove("on"); void s.offsetWidth; s.classList.add("on"); } sdSay(game.want); }
+function soundsKey(c) {
+  const i = KEY_COLORS.indexOf(c), pets = document.querySelectorAll(".sdroom .pet");
+  if (i < 0 || !pets.length) return;
+  const p = pets[i], who = game.order[i];
+  p.innerHTML = sdArt(who, true) + p.innerHTML.slice(p.innerHTML.indexOf("<i class"));
+  sdSay(who);
+  later(() => { if (p.isConnected) p.innerHTML = sdArt(who, false) + p.innerHTML.slice(p.innerHTML.indexOf("<i class")); }, 900);
+  if (who !== game.want) { p.classList.remove("nope"); void p.offsetWidth; p.classList.add("nope"); game.busy = true; later(() => { game.busy = false; soundsPlay(); }, 1300); return; }
+  game.busy = true;
+  later(() => { p.classList.add("dance"); happy(); }, 900);
+  later(() => { game.busy = false; }, 2300);
+  if (++game.rounds >= 8) later(() => endGame(true), 2400); else later(soundsRound, 2400);
+}
+
+/* ---- Bubbles ----
+   Soft bubbles drift slowly up in the four colours. A colour key pops the
+   lowest bubble of that colour (a tap pops any). Calm, no hurry: missed
+   bubbles float away. Twenty pops. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.bubbles { background: linear-gradient(#bfe6f5, #e7f6fb); }
+.bbroom { position: absolute; inset: 0; overflow: hidden; }
+.bub { position: absolute; left: 0; top: 0; width: var(--s); height: var(--s); border-radius: 50%; will-change: transform; cursor: pointer;
+  background: radial-gradient(circle at 32% 30%, rgba(255,255,255,.95) 0 9%, rgba(255,255,255,0) 10%), radial-gradient(circle, rgba(255,255,255,.05) 55%, var(--c) 100%);
+  border: 3px solid var(--c); box-shadow: inset 0 0 18px rgba(255,255,255,.6); }
+.bub.pop { animation: pop .3s ease-out forwards; }
+</style>`);
+function bubblesPickArt() {
+  return `<svg viewBox="0 0 200 150">${[[50, 100, 30, 0], [120, 60, 36, 1], [160, 120, 20, 2], [80, 34, 22, 3]].map(([x, y, r, i]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" fill-opacity=".4" stroke="${BALLOON[KEY_COLORS[i]]}" stroke-width="4"/><circle cx="${x - r * .35}" cy="${y - r * .35}" r="${r * .15}" fill="#fff"/>`).join("")}</svg>`;
+}
+function bubblesStart() {
+  Object.assign(game, { list: [], popped: 0, spawnIn: 0, last: 0 });
+  $("sky").innerHTML = `<div class="bbroom" id="bbRoom"></div>`;
+  game.raf = requestAnimationFrame(bubblesFrame);
+}
+function bubblesFrame(t) {
+  if (!game || game.kind !== "bubbles") return;
+  const dt = game.last ? Math.min(0.25, (t - game.last) / 1000) : 0; game.last = t;
+  game.spawnIn -= dt;
+  if (game.spawnIn <= 0 && game.list.length < 7) {
+    game.spawnIn = 0.9 + Math.random() * 0.8;
+    const c = KEY_COLORS[Math.floor(Math.random() * 4)], s = Math.min(innerWidth, innerHeight) * (0.12 + Math.random() * 0.08), el = document.createElement("div");
+    el.className = "bub"; el.style.setProperty("--c", BALLOON[c]); el.style.setProperty("--s", s + "px");
+    const b = { el, c, s, x: Math.random() * (innerWidth - s), y: innerHeight, v: innerHeight / (9 + Math.random() * 4), ph: Math.random() * 6 };
+    el.onpointerdown = (e) => { e.stopPropagation(); bubblesPop(b); };
+    $("bbRoom").appendChild(el); game.list.push(b);
+  }
+  for (const b of game.list) {
+    b.y -= b.v * dt; b.ph += dt;
+    b.el.style.transform = `translate3d(${b.x + Math.sin(b.ph * 1.3) * 18}px, ${b.y}px, 0)`;
+    if (b.y < -b.s) { b.el.remove(); b.gone = true; }
+  }
+  game.list = game.list.filter((b) => !b.gone);
+  game.raf = requestAnimationFrame(bubblesFrame);
+}
+function bubblesPop(b) {
+  if (!game || b.gone || game.busy) return;
+  b.gone = true; b.el.classList.add("pop"); setTimeout(() => b.el.remove(), 320);
+  const a = audioCtx(); if (a) bell(a, NOTES[b.c] * 1.5, a.currentTime + 0.01, 0.4, 0.12);
+  if (++game.popped >= 20) { game.busy = true; later(happy, 300); later(() => endGame(true), 1200); }
+}
+function bubblesKey(c) {
+  const b = game.list.filter((x) => x.c === c && !x.gone).sort((p, q) => q.y - p.y)[0];
+  if (b) bubblesPop(b);
+}
+
+/* ---- Hide and seek ----
+   The little dinosaur hides behind one of four things (a tree, a box, a
+   bush, a curtain), with its tail peeking out as a clue. Press the colour of
+   the right one: out it jumps! The wrong one lifts a little to show nobody
+   is there. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.hide { background: linear-gradient(#d7ecf7 60%, #a8cf8e 60%); }
+.hdroom { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; display: flex; align-items: flex-end; justify-content: center; gap: clamp(10px, 3vw, 44px); padding: 70px 20px 10px; direction: ltr; }
+.hdspot { position: relative; width: min(20vw, 30vh); display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
+.hdthing { position: relative; z-index: 2; width: 100%; transition: transform .35s; }
+.hdthing svg { display: block; width: 100%; height: auto; overflow: visible; }
+.hdspot.empty .hdthing { transform: translateY(-16%) rotate(-4deg); }
+.hddino { position: absolute; z-index: 1; left: 10%; width: 80%; bottom: 22%; transition: transform .45s cubic-bezier(.3, 1.5, .5, 1); }
+.hddino svg { display: block; width: 100%; height: auto; overflow: visible; }
+.hdtail { position: absolute; z-index: 3; right: -12%; bottom: 26%; width: 30%; }
+.hdspot.found .hddino { z-index: 3; transform: translateY(-75%) scale(1.15); }
+.hdspot.found .hdtail { display: none; }
+.hdspot .szmat { width: 70%; height: 16px; border-radius: 8px; background: var(--c); }
+.hdcount { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(29,43,79,.55); color: #fff; font: 700 min(30vh, 22vw)/1 Fredoka, sans-serif; z-index: 5; }
+</style>`);
+const HD_THINGS = [
+  `<svg viewBox="0 0 120 120"><rect x="50" y="70" width="20" height="50" rx="5" fill="#8a5a3b"/><circle cx="60" cy="48" r="44" fill="#3aa655"/><circle cx="34" cy="64" r="22" fill="#2f8f4a"/><circle cx="86" cy="60" r="24" fill="#2f8f4a"/><circle cx="48" cy="34" r="5" fill="#e63946"/><circle cx="76" cy="44" r="5" fill="#e63946"/></svg>`,
+  `<svg viewBox="0 0 120 120"><rect x="8" y="40" width="104" height="80" rx="6" fill="#d39a5b"/><path d="M8 40 L22 22 H98 L112 40 Z" fill="#e7b57a"/><path d="M60 40 V120 M8 64 H112" stroke="#b07a40" stroke-width="5"/></svg>`,
+  `<svg viewBox="0 0 120 120">${PH_BUSH.replace('viewBox="0 0 120 70"', 'x="0" y="40" width="120" height="80" viewBox="0 0 120 70"')}</svg>`,
+  `<svg viewBox="0 0 120 120"><rect x="4" y="4" width="112" height="10" rx="5" fill="#8a5a3b"/><path d="M10 14 Q20 70 12 120 H60 Q50 70 58 14 Z" fill="#c45bb0"/><path d="M62 14 Q70 70 60 120 H108 Q100 70 110 14 Z" fill="#d779c4"/>
+    <path d="M24 20 Q30 70 26 116 M86 20 Q92 70 88 116" stroke="#a84595" stroke-width="3" fill="none" opacity=".6"/></svg>`,
+];
+const HD_TAIL = `<svg viewBox="0 0 60 40"><path d="M0 30 C20 34 44 26 58 6 C50 24 30 36 0 38 Z" fill="#7cc08f"/><path d="M0 38 C30 36 50 24 58 6 L56 14 C44 30 24 38 0 40 Z" fill="#63a777"/></svg>`;
+function hidePickArt() {
+  return `<svg viewBox="0 0 200 150"><g transform="translate(20 20)">${HD_THINGS[0].replace("<svg ", '<svg width="110" height="110" ')}</g><g transform="translate(118 72) scale(1.1)">${HD_TAIL.replace("<svg ", '<svg width="60" height="40" ')}</g></svg>`;
+}
+function hideStart() { game.at = -1; hideRound(); }
+function hideRound() {
+  game.at = pickOther(4, game.at);
+  const things = HD_THINGS.slice().sort(() => Math.random() - .5);
+  $("sky").innerHTML = `<div class="hdroom">${KEY_COLORS.map((c, i) => `<div class="hdspot" data-c="${c}" style="--c:${BALLOON[c]}">
+    ${i === game.at ? `<div class="hddino"><svg viewBox="40 0 160 150">${dinoSvg({ stage: 1 })}</svg></div><div class="hdtail">${HD_TAIL}</div>` : ""}
+    <div class="hdthing">${things[i]}</div><i class="szmat"></i></div>`).join("")}<div class="hdcount" id="hdCount">۳</div></div>`;
+  document.querySelectorAll(".hdspot").forEach((d) => d.onclick = () => gameColor(d.dataset.c));
+  game.busy = true; // eyes closed, counting: three, two, one
+  [["۲", 700], ["۱", 1400]].forEach(([n, ms]) => later(() => { $("hdCount").textContent = n; tune([392 + ms / 4], 0, 0.1); }, ms));
+  tune([392], 0, 0.1);
+  later(() => { $("hdCount").remove(); game.busy = false; tune([523, 784], 0.1, 0.12); }, 2100);
+}
+function hideKey(c) {
+  const i = KEY_COLORS.indexOf(c), spots = document.querySelectorAll(".hdspot");
+  if (i < 0 || !spots.length) return;
+  if (i !== game.at) { spots[i].classList.add("empty"); softNo(); later(() => spots[i].classList.remove("empty"), 900); return; }
+  game.busy = true; spots[i].classList.add("found"); happy();
+  later(() => { game.busy = false; }, 1800);
+  if (++game.rounds >= 6) later(() => endGame(true), 1900); else later(hideRound, 1900);
+}
+
+/* ---- Tower ----
+   Each key puts a block of its colour on top of the tower. When it is tall
+   (eight blocks), the dinosaur comes and — boom — knocks it over, and they
+   laugh. Three towers. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.tower { background: linear-gradient(#fdf3df 78%, #d8c2a0 78%); }
+.twroom { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; display: flex; align-items: flex-end; justify-content: center; gap: 6vw; padding: 70px 20px 4px; direction: ltr; }
+.twstack { display: flex; flex-direction: column-reverse; align-items: center; }
+.twblock { width: min(14vw, 10vh * 1.6); height: min(8.4vw, 6vh); border-radius: 10px; background: var(--c); box-shadow: inset 0 -7px 0 rgba(0,0,0,.15), inset 0 4px 0 rgba(255,255,255,.3); margin-top: 4px; transform: translateX(var(--off)); animation: ckdrop .35s cubic-bezier(.3, 1.4, .5, 1); }
+.twblock.fly { transition: transform 1s cubic-bezier(.2, .6, .4, 1), opacity 1s; opacity: 0; }
+.twdino { width: min(28vw, 34vh); transition: transform .8s ease-in-out; transform: translateX(60vw); }
+.twdino svg { display: block; width: 100%; height: auto; overflow: visible; }
+</style>`);
+function towerPickArt() {
+  return `<svg viewBox="0 0 200 150">${[0, 1, 2, 3, 4, 5].map((i) => `<rect x="${70 + (i % 2 ? 6 : -4)}" y="${120 - i * 20}" width="60" height="18" rx="5" fill="${BALLOON[KEY_COLORS[i % 4]]}"/>`).join("")}</svg>`;
+}
+function towerStart() { towerRound(); }
+function towerRound() {
+  game.blocks = 0;
+  $("sky").innerHTML = `<div class="twroom"><div class="twstack" id="twStack"></div><div class="twdino" id="twDino"><svg viewBox="0 0 200 150">${dinoSvg({ stage: 2 })}</svg></div></div>`;
+}
+function towerKey(c) {
+  const st = $("twStack"); if (!st) return;
+  st.insertAdjacentHTML("beforeend", `<i class="twblock" style="--c:${BALLOON[c]};--off:${(Math.random() * 16 - 8).toFixed(0)}px"></i>`);
+  tune([[392, 440, 494, 523, 587, 659, 698, 784][game.blocks]], 0, 0.14);
+  if (++game.blocks < 8) return;
+  game.busy = true;
+  later(() => { $("twDino").style.transform = "translateX(-4vw)"; }, 400);
+  later(() => { // boom
+    [...st.children].forEach((b, i) => { b.classList.add("fly"); b.style.transform = `translate(${-80 - Math.random() * 260}px, ${-120 + Math.random() * 300}px) rotate(${Math.random() * 540 - 270}deg)`; });
+    const a = audioCtx(); if (a) { const n = sdNoise(a, 0.5), g = a.createGain(); g.gain.setValueAtTime(0.25, a.currentTime); g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + 0.5); n.connect(g); g.connect(a.destination); n.start(); }
+    $("twDino").innerHTML = `<svg viewBox="0 0 200 150" class="dance">${dinoSvg({ stage: 2, mouth: "open" })}</svg>`;
+  }, 1300);
+  later(() => tune([784, 659, 784, 659, 1047], 0.1, 0.12), 1700);
+  later(() => { game.busy = false; }, 2900);
+  if (++game.rounds >= 3) later(() => endGame(true), 3000); else later(towerRound, 3000);
+}
+
+/* ---- Train ----
+   A little train with four wagons, one in each key colour. Things come one
+   by one (an apple, a leaf, the sun, a fish…): press the colour of the wagon
+   it goes in. When every wagon has something, toot toot, off it goes. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.train { background: linear-gradient(#cfeaf7 70%, #a8cf8e 70%); }
+.trroom { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; display: grid; grid-template-rows: 1fr auto; justify-items: center; padding: 70px 20px 10px; direction: ltr; overflow: hidden; }
+.trload { width: min(26vh, 20vw); align-self: center; }
+.trload svg { display: block; width: 100%; height: auto; }
+.trtrain { display: flex; align-items: flex-end; gap: 6px; transition: transform 2s ease-in; border-bottom: 8px solid #6b4a32; padding: 0 30px; }
+.trtrain.go { transform: translateX(110vw); }
+.trwagon { position: relative; width: min(15vw, 22vh); aspect-ratio: 1.3; cursor: pointer; }
+.trwagon .body { position: absolute; left: 0; right: 0; bottom: 14%; height: 52%; border-radius: 10px; background: var(--c); box-shadow: inset 0 -8px 0 rgba(0,0,0,.15); }
+.trwagon .wheels { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-around; }
+.trwagon .wheels b { width: 26%; aspect-ratio: 1; border-radius: 50%; background: #2b2b33; border: 4px solid #8a8a99; }
+.trwagon .cargo { position: absolute; left: 12%; right: 12%; bottom: 46%; display: flex; justify-content: center; }
+.trwagon .cargo svg { width: 70%; height: auto; animation: ckdrop .4s cubic-bezier(.3, 1.4, .5, 1); }
+.trengine { width: min(18vw, 26vh); }
+.trengine svg { display: block; width: 100%; height: auto; }
+.trpuff { position: absolute; width: 40px; height: 40px; border-radius: 50%; background: #fff; opacity: .9; animation: trpuff 1.2s ease-out forwards; pointer-events: none; }
+@keyframes trpuff { to { transform: translate(-30px, -120px) scale(2.4); opacity: 0; } }
+</style>`);
+const TR_ENGINE = `<svg viewBox="0 0 140 110"><rect x="10" y="40" width="90" height="50" rx="8" fill="#e63946"/><rect x="60" y="10" width="46" height="46" rx="6" fill="#c62f3b"/>
+  <rect x="68" y="18" width="30" height="22" rx="4" fill="#cfeaf7"/><rect x="20" y="16" width="16" height="26" rx="3" fill="#2b2b33"/><path d="M100 70 L128 90 H100 Z" fill="#f6c90e"/>
+  <circle cx="30" cy="96" r="12" fill="#2b2b33" stroke="#8a8a99" stroke-width="4"/><circle cx="80" cy="96" r="12" fill="#2b2b33" stroke="#8a8a99" stroke-width="4"/>${face(83, 30, .55)}</svg>`;
+const TR_CARGO = { red: ["apple", "heart"], green: ["leaf", "tree"], yellow: ["sun", "star"], blue: ["fish", "drop"] };
+function trainPickArt() {
+  return `<svg viewBox="0 0 200 150"><rect y="120" width="200" height="6" fill="#6b4a32"/><svg x="110" y="50" width="88" height="70" viewBox="0 0 140 110">${TR_ENGINE.slice(TR_ENGINE.indexOf(">") + 1, -6)}</svg>
+    ${["#2a9d4b", "#f6c90e"].map((c, i) => `<rect x="${10 + i * 50}" y="80" width="44" height="30" rx="6" fill="${c}"/><circle cx="${20 + i * 50}" cy="114" r="6" fill="#2b2b33"/><circle cx="${44 + i * 50}" cy="114" r="6" fill="#2b2b33"/>`).join("")}
+    <g transform="translate(18 52) scale(.3)">${THINGS.leaf[1]}</g></svg>`;
+}
+function trainStart() { trainRound(); }
+function trainRound() {
+  game.full = new Set();
+  $("sky").innerHTML = `<div class="trroom"><div class="trload" id="trLoad"></div>
+    <div class="trtrain" id="trTrain">${KEY_COLORS.map((c) => `<div class="trwagon" data-c="${c}" style="--c:${BALLOON[c]}"><div class="cargo"></div><div class="body"></div><div class="wheels"><b></b><b></b></div></div>`).join("")}
+      <div class="trengine">${TR_ENGINE}</div></div></div>`;
+  document.querySelectorAll(".trwagon").forEach((d) => d.onclick = () => gameColor(d.dataset.c));
+  trainNext();
+}
+function trainNext() {
+  const left = KEY_COLORS.filter((c) => !game.full.has(c));
+  game.want = left[Math.floor(Math.random() * left.length)];
+  const opts = TR_CARGO[game.want]; game.thing = opts[Math.floor(Math.random() * opts.length)];
+  $("trLoad").innerHTML = thingSvg(game.thing, "newone");
+}
+function trainKey(c) {
+  const load = document.querySelector("#trLoad svg"), wagon = document.querySelector(`.trwagon[data-c="${c}"]`);
+  if (!load || !wagon) return;
+  if (c !== game.want) { load.classList.remove("nope", "newone"); void load.getBoundingClientRect(); load.classList.add("nope"); softNo(); return; }
+  wagon.querySelector(".cargo").innerHTML = thingSvg(game.thing);
+  $("trLoad").innerHTML = ""; game.full.add(c); tune([NOTES[c]], 0, 0.16);
+  if (game.full.size < 4) { game.busy = true; later(() => { game.busy = false; trainNext(); }, 500); return; }
+  game.busy = true; // all aboard: toot toot!
+  later(() => {
+    tune([587, 587, 0, 587, 784], 0.18, 0.14);
+    const eng = document.querySelector(".trengine").getBoundingClientRect();
+    for (let k = 0; k < 3; k++) later(() => { const p = document.createElement("i"); p.className = "trpuff"; p.style.left = eng.left + eng.width * .2 + "px"; p.style.top = eng.top - 10 + "px"; $("sky").appendChild(p); setTimeout(() => p.remove(), 1300); }, k * 250);
+  }, 300);
+  later(() => $("trTrain").classList.add("go"), 1100);
+  later(() => { game.busy = false; }, 3300);
+  if (++game.rounds >= 3) later(() => endGame(true), 3300); else later(trainRound, 3300);
 }

@@ -599,8 +599,13 @@ function isBedtime() {
 }
 /* Games: parents can switch the games part off, or single games (server, family settings). */
 const gamesCfg = () => (others && others.games) || { enabled: true, off: [] };
-const gameOn = (kind) => gamesCfg().enabled && !(gamesCfg().off || []).includes(kind);
+const gameOn = (kind) => FREE_TEST || (gamesCfg().enabled && !(gamesCfg().off || []).includes(kind)); // localhost: every game (see FREE_TEST)
+/* On this computer (localhost) the app is for testing: no time limits, no
+   night, so games and videos can always be tried. Add ?rules to the address
+   to test the real limits, the night screens and the parents' game switches here. */
+const FREE_TEST = NT.local && !new URLSearchParams(location.search).has("rules");
 function timeState() {
+  if (FREE_TEST) return { mode: "watch", turn: 0, left: turnSecs() };
   if (isBedtime()) return { mode: "bedtime", turn: turnCount() };
   // extra: a parent's "+10 minutes" (or, below 0, "end this turn now")
   const s = Math.max(0, todaySeconds() - (plan().extra || 0)), T = turnSecs(), n = turnCount();
@@ -1388,12 +1393,15 @@ function endGame(cheer) {
   clearInterval(game.spawn); clearInterval(game.clock); cancelAnimationFrame(game.raf);
   (game.timers || []).forEach(clearTimeout);
   if (game.stop) game.stop(); // e.g. the car game's phone stream
+  const kind = game.kind;
   game = null;
   if (cheer) {
     $("game").className = "game";
     $("sky").innerHTML = `<div class="done"><div class="pop cheer">${CHEER_SVG}</div></div>`;
     [784, 988, 1175, 1568].forEach((f, i) => { const a = audioCtx(); if (a) bell(a, f, a.currentTime + i * 0.18, 1, 0.18); });
-    setTimeout(leaveGame, 2600);
+    const sticker = window.stickerWon && kind !== "album"; // a sticker for the album (games.js)
+    if (sticker) window.stickerWon();
+    setTimeout(leaveGame, sticker ? 3800 : 2600);
   } else leaveGame();
 }
 function leaveGame() {
@@ -1519,7 +1527,7 @@ else Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json
   renderGrid();
 });
 </script>
-<script src="games.js?v=16"></script><!-- raise v whenever games.js changes, so TVs never keep an old copy -->
+<script src="games.js?v=19"></script><!-- raise v whenever games.js changes, so TVs never keep an old copy -->
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
