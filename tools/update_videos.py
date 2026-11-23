@@ -17,7 +17,7 @@ import xml.etree.ElementTree as ET
 # Watch-time limit for shows the parents want watched less (minutes).
 # day: most per day; a day at or over it also hides the show the next day.
 # week: most in the last 7 days.
-LIMITED = {"day": 20, "week": 60}
+LIMITED = {"day": 30, "week": 90}  # raised from 20 and 60 on 2026-11-23, the parents asked for a bit more
 
 CHANNELS = [
     # (key, title shown in the app, channel id, limit or None)
@@ -44,6 +44,9 @@ CHANNELS = [
     ("magicbus", "Magic School Bus", "UCi7STzPDqcOvmjm7-bEsvDg", None),
     ("berenstain", "Berenstain Bears", "UCGtFbbGApG0s_8mMuJd-zKg", None),
     ("moomin", "Moomin", "UC82jKc_wW8iHVXU9GrYRunw", None),
+    # Added 2026-11-23: the parents asked for Blaze. Fast and full of racing like
+    # PAW Patrol, so it has the same daily and weekly limit.
+    ("blaze", "Blaze and the Monster Machines", "UCmWZB57dUwFfj847-4y63JA", LIMITED),
 ]
 # The official handle of each channel. Before building, every channel id is
 # checked against it, so a look-alike channel (anyone can name a channel
@@ -57,6 +60,7 @@ OFFICIAL = {
     "littlebear": "@OfficialLittleBear", "arthur": "@arthur", "carebears": "@carebears", "puffin": "@PuffinRock",
     "mrrogers": "@MisterRogersNeighborhood", "clifford": "@CliffordtheBigRedDogClassic",
     "magicbus": "@TheMagicSchoolBusOfficial", "berenstain": "@OfficialBerenstainBears", "moomin": "@MoominOfficial",
+    "blaze": "@blazeandthemonstermachines",
 }
 # Each show scored 1-5 by Claude (a judgment, not from a source), used to keep
 # every day's list balanced (see dailyList in index.html):
@@ -90,6 +94,7 @@ TRAITS = {
     "magicbus":     {"real": 1, "learn": 5, "kind": 4, "calm": 2, "color": 4, "music": 2, "age": 2},
     "berenstain":   {"real": 4, "learn": 3, "kind": 5, "calm": 4, "color": 3, "music": 1, "age": 4},
     "moomin":       {"real": 2, "learn": 1, "kind": 4, "calm": 4, "color": 3, "music": 2, "age": 3},
+    "blaze":        {"real": 2, "learn": 4, "kind": 4, "calm": 1, "color": 5, "music": 3, "age": 5},
 }
 
 # Official playlists to take videos from, besides each channel's 15 newest

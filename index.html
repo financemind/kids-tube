@@ -163,6 +163,7 @@ button:focus-visible { outline: 6px solid var(--tomato); outline-offset: 4px; }
 .game .done { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: grid; place-items: center; align-content: center; }
 .video.gamecard { display: flex; align-items: center; justify-content: center; height: calc(var(--tile, 300px) * .5625);
   background: #bfe6ff; background-image: linear-gradient(#8fd3ff, #d9f2ff); font-size: calc(var(--tile, 300px) * .2); }
+.video.gamecard.huntcard { background: #fdf0d8; background-image: linear-gradient(#fff4dc, #f6e2b8); }
 .video.gamecard.dinocard { background: #d4ecc0; background-image: linear-gradient(#cfe9f2, #e6f3d8 62%, #a8cf8e 62%); }
 @keyframes tick { to { transform: rotate(360deg); } }
 .tracks { align-self: end; display: flex; align-items: center; gap: 8px; }
@@ -600,8 +601,8 @@ function isBedtime() {
 }
 /* Games: parents can switch the games part off, or single games (server, family settings). */
 const gamesCfg = () => (others && others.games) || { enabled: false, off: [] }; // games stay off until a parent switches them on
-// The little dinosaur has its own card and its own switch: the games switch does not hide it.
-const gameOn = (kind) => FREE_TEST || ((kind === "pet" || gamesCfg().enabled) && !(gamesCfg().off || []).includes(kind)); // localhost: every game (see FREE_TEST)
+// The little dinosaur and the treasure hunt have their own cards and switches: the games switch does not hide them.
+const gameOn = (kind) => FREE_TEST || ((kind === "pet" || kind === "hunt" || gamesCfg().enabled) && !(gamesCfg().off || []).includes(kind)); // localhost: every game (see FREE_TEST)
 /* On this computer (localhost) the app is for testing: no time limits, no
    night, so games and videos can always be tried. Add ?rules to the address
    to test the real limits, the night screens and the parents' game switches here. */
@@ -875,6 +876,14 @@ function renderGrid() {
     d.innerHTML = `<svg aria-hidden="true" viewBox="0 0 200 150" width="62%">${dinoSvg({ stage: 2 })}</svg>`;
     d.onclick = () => playGame("pet");
     $("grid").appendChild(d);
+  }
+  // The colour treasure hunt: a card of its own (it sends him off into the room).
+  if (window.huntBlob && gameOn("hunt")) {
+    const h = document.createElement("button");
+    h.className = "video gamecard huntcard"; h.setAttribute("aria-label", "Treasure hunt");
+    h.innerHTML = `<svg aria-hidden="true" viewBox="0 0 200 150" width="62%">${huntPickArt()}</svg>`;
+    h.onclick = () => playGame("hunt");
+    $("grid").appendChild(h);
   }
   for (const v of currentList()) {
     const b = document.createElement("button");
@@ -1385,6 +1394,7 @@ function beginGame(kind, vid) {
   logAction("game", { v: vid });
   game.clock = setInterval(() => {
     if (!game) return;
+    if (game.free) { if (!canWatch()) { endGame(false); stopTimeUpGame(); } return; } // e.g. the treasure hunt: not counted as watching
     addSecond("game", game.vid);
     if (++game.seconds >= GAME_SECONDS) return endGame(true);
     if (!canWatch()) { endGame(false); stopTimeUpGame(); }
@@ -1537,7 +1547,7 @@ else Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json
   renderGrid();
 });
 </script>
-<script src="games.js?v=20"></script><!-- raise v whenever games.js changes, so TVs never keep an old copy -->
+<script src="games.js?v=21"></script><!-- raise v whenever games.js changes, so TVs never keep an old copy -->
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

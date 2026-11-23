@@ -294,6 +294,12 @@ input.sw:disabled { opacity: .45; cursor: default; }
       <p class="note msg" id="petMsg"></p>
     </section>
     <section>
+      <div class="head"><span class="ic">🔍</span><h2>گنج رنگی</h2></div>
+      <p class="note">تلویزیون یک رنگ نشان می‌دهد و نویان در خانه چیزی به همان رنگ پیدا می‌کند. وقتی آورد، شما دکمهٔ همان رنگ را روی ریموت بزنید (یا صفحه را لمس کنید، یا یک دکمهٔ دستهٔ گوشی را). کارت خودش را دارد و وقتش از نوبت تماشا کم نمی‌شود.</p>
+      <label class="gameswitch"><b>گنج رنگی روشن باشد</b><input type="checkbox" class="sw" id="huntOn"></label>
+      <p class="note msg" id="huntMsg"></p>
+    </section>
+    <section>
       <div class="head"><span class="ic">🎈</span><h2>بازی‌ها</h2></div>
       <label class="gameswitch"><b>بازی‌ها روشن باشد</b><input type="checkbox" class="sw" id="gamesOn"></label>
       <div class="gamelist" id="gameList"></div>
@@ -602,6 +608,7 @@ let gamesNow = { enabled: false, off: [] };
 function showGames() {
   $("gamesOn").checked = gamesNow.enabled;
   $("petOn").checked = !gamesNow.off.includes("pet");
+  $("huntOn").checked = !gamesNow.off.includes("hunt");
   const box = $("gameList");
   box.innerHTML = "";
   for (const k of GAME_ORDER) {
@@ -648,7 +655,7 @@ function setupPlan(daily, plans) {
 /* ---- Now: every 5 seconds, what each open app shows (video, story, game…) ---- */
 let liveDevices = {}, titles = {};
 const GAME_NAMES = { balloons: "بازی بادکنک", colors: "بازی رنگ‌ها", count: "بازی شمردن", feed: "بازی غذا دادن", simon: "بازی تکرار کن", pet: "بازی دایناسور کوچولو", car: "بازی ماشین", maze: "بازی هزارتو", puzzle: "بازی پازل", pairs: "بازی جفت‌ها", sizes: "بازی کوچک تا بزرگ",
-  catch: "بازی سیب بگیر", paint: "بازی رنگ‌آمیزی", story: "بازی اول کدام است", dress: "بازی لباس دایناسور", cook: "بازی ساندویچ", photo: "بازی عکاسی", climb: "بازی بالا رفتن", album: "آلبوم استیکر",
+  catch: "بازی سیب بگیر", paint: "بازی رنگ‌آمیزی", story: "بازی اول کدام است", dress: "بازی لباس دایناسور", cook: "بازی ساندویچ", photo: "بازی عکاسی", climb: "بازی بالا رفتن", album: "آلبوم استیکر", hunt: "گنج رنگی",
   music: "بازی بلز", sounds: "بازی صدای حیوان‌ها", bubbles: "بازی حباب", hide: "بازی قایم‌باشک", tower: "بازی برج‌سازی", train: "بازی قطار" };
 const MODE_TEXT = { watch: "صفحهٔ اصلی (انتخاب ویدیو)", break: "استراحت بین نوبت‌ها", tomorrow: "وقت امروز تمام شده", bedtime: "وقت قصه (شب)" };
 function liveLine(d) {
@@ -761,6 +768,7 @@ gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r
   gamesNow = (all && all.games) || gamesNow; showGames();
   $("gamesOn").onchange = () => saveGames({ enabled: $("gamesOn").checked, off: gamesNow.off });
   // The little dinosaur: on its own switch (kept in the same "off" list on the server).
+  $("huntOn").onchange = () => saveGames({ enabled: gamesNow.enabled, off: $("huntOn").checked ? gamesNow.off.filter((x) => x !== "hunt") : [...gamesNow.off, "hunt"] }, "huntMsg");
   $("petOn").onchange = () => saveGames({ enabled: gamesNow.enabled, off: $("petOn").checked ? gamesNow.off.filter((x) => x !== "pet") : [...gamesNow.off, "pet"] }, "petMsg");
   $("sToday").textContent = dur(sum(watch, null, 0, 0));
   const dly = data.daily || {};
@@ -825,7 +833,7 @@ gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r
     "game-cook": { title: "بازی ساندویچ 🥪", show: "بازی" },
     "game-photo": { title: "بازی عکاسی 📷", show: "بازی" },
     "game-climb": { title: "بازی بالا رفتن 🧗", show: "بازی" },
-    "game-album": { title: "آلبوم استیکر ⭐", show: "بازی" },
+    "game-album": { title: "آلبوم استیکر ⭐", show: "بازی" }, "game-hunt": { title: "گنج رنگی 🔍", show: "بازی" },
     "game-music": { title: "بازی بلز 🎹", show: "بازی" },
     "game-sounds": { title: "بازی صدای حیوان‌ها 🐮", show: "بازی" },
     "game-bubbles": { title: "بازی حباب 🫧", show: "بازی" },

@@ -32,7 +32,8 @@
    - album:    the stickers won by finishing games (not a game, a book);
    - pet:      a little dinosaur of his own to look after: red feeds it,
                green plays ball, yellow cleans up, blue puts it to sleep.
-   The little dinosaur (pet) has its own card on the home screen, not in the picker.
+   The little dinosaur (pet) and the colour treasure hunt (hunt) have their own cards on
+   the home screen, not in the picker.
    The picker shows the games: red/green move, yellow opens. Every
    picture is drawn (SVG): the TV browser shows emoji without colour. */
 
@@ -165,7 +166,7 @@ const PICK = [
 window.PICK_KINDS = PICK.map(([kind]) => kind);
 const PICK_VID = { balloons: "game", colors: "game-colors", count: "game-count", feed: "game-feed", simon: "game-simon", pet: "game-pet", car: "game-car", maze: "game-maze", puzzle: "game-puzzle", pairs: "game-pairs", sizes: "game-sizes",
   catch: "game-catch", paint: "game-paint", story: "game-story", dress: "game-dress", cook: "game-cook", photo: "game-photo", climb: "game-climb",
-  music: "game-music", sounds: "game-sounds", bubbles: "game-bubbles", hide: "game-hide", tower: "game-tower", train: "game-train", album: "game-album" };
+  music: "game-music", sounds: "game-sounds", bubbles: "game-bubbles", hide: "game-hide", tower: "game-tower", train: "game-train", album: "game-album", hunt: "game-hunt" };
 function showPicker() {
   if (!canWatch()) return renderGrid();
   playingId = null; playingCat = null;
@@ -189,7 +190,7 @@ function playGame(kind) {
   if (!beginGame(kind, PICK_VID[kind])) return;
   ({ colors: colorsRound, count: countRound, feed: feedRound, simon: simonStart, pet: petStart, car: carStart, maze: mazeStart, puzzle: puzzleStart, pairs: pairsStart, sizes: sizesStart,
     catch: catchStart, paint: paintStart, story: storyStart, dress: dressStart, cook: cookStart, photo: photoStart, climb: climbStart,
-    music: musicStart, sounds: soundsStart, bubbles: bubblesStart, hide: hideStart, tower: towerStart, train: trainStart, album: albumStart })[kind]();
+    music: musicStart, sounds: soundsStart, bubbles: bubblesStart, hide: hideStart, tower: towerStart, train: trainStart, album: albumStart, hunt: huntStart })[kind]();
 }
 const later = (fn, ms) => { if (game) game.timers.push(setTimeout(() => { if (game) fn(); }, ms)); };
 const pickOther = (n, last) => { let x; do x = Math.floor(Math.random() * n); while (x === last && n > 1); return x; };
@@ -210,7 +211,7 @@ function gameColor(c) {
   if (game.busy) return;
   ({ colors: colorsKey, count: countKey, feed: feedKey, simon: simonKey, pet: petKey, car: carKey, maze: mazeKey, puzzle: puzzleKey, pairs: pairsKey, sizes: sizesKey,
     catch: catchKey, paint: paintKey, story: storyKey, dress: dressKey, cook: cookKey, photo: photoKey, climb: climbKey,
-    music: musicKey, sounds: soundsKey, bubbles: bubblesKey, hide: hideKey, tower: towerKey, train: trainKey, album: albumKey })[game.kind](c);
+    music: musicKey, sounds: soundsKey, bubbles: bubblesKey, hide: hideKey, tower: towerKey, train: trainKey, album: albumKey, hunt: huntKey })[game.kind](c);
 }
 
 /* ---- Find the colour ---- */
@@ -1937,6 +1938,69 @@ function trainKey(c) {
   later(() => $("trTrain").classList.add("go"), 1100);
   later(() => { game.busy = false; }, 3300);
   if (++game.rounds >= 3) later(() => endGame(true), 3300); else later(trainRound, 3300);
+}
+
+
+/* ---- Colour treasure hunt (out in the real room) ----
+   The TV shows a colour, with a few things of that colour as a hint, and the
+   little dinosaur holding an empty basket: "find something red!". Noyan goes
+   off to look around the house. The picture stays still while he is away (no
+   moving picture to keep him at the screen). When he brings something, a
+   parent presses that colour on the remote (or taps the screen, or any button
+   of the phone controller): the dinosaur dances and the next colour comes.
+   Four colours, then the cheer. It has its own card and switch, and the time
+   it is open does not count as watching. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.hunt { background: #fdf6e6; }
+.hnroom { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; display: grid; grid-template-rows: auto 1fr; justify-items: center; padding: 70px 20px 10px; direction: ltr; }
+.hnstars { display: flex; gap: 14px; }
+.hnstars i { width: min(7vh, 5vw); aspect-ratio: 1; border-radius: 50%; border: 5px solid #fff; background: #e6e0d2; box-shadow: 0 3px 0 rgba(0,0,0,.1); display: grid; place-items: center; }
+.hnstars i.got { background: var(--c); }
+.hnstars i.got::after { content: "★"; color: #fff; font: 700 min(4vh, 3vw)/1 Fredoka, sans-serif; }
+.hnstars i.now { outline: 5px dashed var(--c); outline-offset: 4px; }
+.hnmain { display: flex; align-items: center; justify-content: center; gap: clamp(16px, 4vw, 60px); width: 100%; cursor: pointer; }
+.hnblob { width: min(46vh, 34vw); }
+.hnblob svg, .hndino svg, .hnhints svg { display: block; width: 100%; height: auto; overflow: visible; }
+.hnhints { display: grid; gap: 10px; width: min(16vh, 12vw); }
+.hndino { width: min(40vh, 30vw); }
+.hndino .bod { transform-box: fill-box; transform-origin: 50% 100%; }
+</style>`);
+const HUNT_HINTS = { red: ["apple", "heart"], green: ["leaf", "tree"], yellow: ["sun", "star"], blue: ["fish", "drop"] };
+function huntBlob(c) { // a paint splash with a magnifying glass and a friendly face
+  return `<svg viewBox="0 0 200 200"><path d="M100 18 C130 14 150 40 168 52 C192 68 186 100 178 122 C170 150 150 176 118 182 C86 188 56 178 38 154 C18 128 12 96 26 70 C40 44 70 22 100 18 Z" fill="${BALLOON[c]}"/>
+    <circle cx="170" cy="172" r="12" fill="${BALLOON[c]}"/><circle cx="28" cy="36" r="9" fill="${BALLOON[c]}"/>
+    ${face(100, 104, 2.6, c === "yellow" ? "#1d2b4f" : "#fff")}
+    <g transform="translate(140 34)"><circle r="20" fill="rgba(255,255,255,.55)" stroke="#1d2b4f" stroke-width="7"/><path d="M14 14 L32 32" stroke="#1d2b4f" stroke-width="9" stroke-linecap="round"/></g></svg>`;
+}
+const huntBasket = (thing) => `<g transform="translate(128 98) scale(.9)">${catchBasket()}${thing ? `<g transform="translate(14 -10) scale(.32)">${THINGS[thing][1]}</g>` : ""}</g>`;
+function huntPickArt() { return `<svg viewBox="0 0 200 150"><svg x="10" y="10" width="120" height="120" viewBox="0 0 200 200">${huntBlob("red").replace(/<g transform="translate\(140 34\)">/, '<g transform="translate(150 30)">')}</svg><g transform="translate(120 60) scale(.4)">${THINGS.apple[1]}</g></svg>`; }
+function huntStart() {
+  game.free = true; // not counted as watching (see beginGame in index.html)
+  game.order = KEY_COLORS.slice().sort(() => Math.random() - .5); game.at = 0;
+  huntRound();
+  padListen("hunt", () => huntFound());
+}
+function huntRound() {
+  const c = game.order[game.at], [h1, h2] = HUNT_HINTS[c];
+  $("sky").innerHTML = `<div class="hnroom"><div class="hnstars">${game.order.map((k, i) => `<i class="${i < game.at ? "got" : i === game.at ? "now" : ""}" style="--c:${BALLOON[k]}"></i>`).join("")}</div>
+    <div class="hnmain" id="hnMain"><div class="hnhints">${thingSvg(h1)}${thingSvg(h2)}</div><div class="hnblob newone">${huntBlob(c)}</div>
+      <div class="hndino"><svg viewBox="0 0 200 150"><g class="bod" id="hnBod">${dinoSvg({ stage: 1 })}${huntBasket()}</g></svg></div></div></div>`;
+  $("hnMain").onclick = () => huntFound();
+  tune([NOTES[c], NOTES[c] * 1.25, NOTES[c] * 1.5], 0.14, 0.14);
+}
+function huntKey(c) {
+  if (c === game.order[game.at]) return huntFound();
+  const b = document.querySelector(".hnblob"); if (b) { b.classList.remove("nope", "newone"); void b.offsetWidth; b.classList.add("nope"); }
+}
+function huntFound() {
+  if (!game || game.kind !== "hunt" || game.busy) return;
+  const c = game.order[game.at];
+  game.busy = true;
+  $("hnBod").innerHTML = dinoSvg({ stage: 1, mood: "love", mouth: "open" }) + huntBasket(HUNT_HINTS[c][0]);
+  $("hnBod").classList.add("dance"); happy();
+  document.querySelectorAll(".hnstars i")[game.at].className = "got";
+  later(() => { game.busy = false; }, 2000);
+  if (++game.at >= 4) later(() => endGame(true), 2200); else later(huntRound, 2200);
 }
 
 // The home list may have been drawn before this file loaded: draw it again so the
