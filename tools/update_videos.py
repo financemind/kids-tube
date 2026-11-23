@@ -113,6 +113,17 @@ PLAYLIST_WORDS = {
     "peppa": ["most popular stories", "peppa pig and friends", "planes, trains"],
     "paw": ["full episodes", "to the rescue", "search & rescue", "water rescue", "air rescue", "fire rescue"],
 }
+# Some official channels also post other brands' videos (Peppa Pig's "Peppa Pig and
+# Friends" playlist has Disney, BabyBus, Rainbow Friends...; Blaze's channel has other
+# Nick Jr shows). For these, a video is kept only when its title has one of the words.
+REQUIRE_WORDS = {"peppa": ["peppa"], "blaze": ["blaze"], "paw": ["paw patrol"]}
+
+
+def own_show(key, title):
+    words = REQUIRE_WORDS.get(key)
+    return not words or any(w in (title or "").lower() for w in words)
+
+
 # Channels not listed in PLAYLIST_WORDS use these.
 DEFAULT_PLAYLIST_WORDS = ["full episode", "episodes", "season", "compilation", "best of", "songs", "stories"]
 SKIP_PLAYLIST = ["live", "#shorts", "shorts", "halloween", "christmas", "holiday", "sponsored", "toys", "roblox", "movie"]
@@ -304,14 +315,14 @@ def main():
             if "/shorts/" in link:
                 continue
             vid = e.find("yt:videoId", NS).text
-            if not embeddable(vid) or is_live(vid):
+            if not own_show(key, e.find("a:title", NS).text) or not embeddable(vid) or is_live(vid):
                 continue
             videos.append({"id": vid, "title": e.find("a:title", NS).text, "list": "تازه‌ها"})
         seen = {v["id"] for v in videos}
         for vid, vtitle, plist in playlist_videos(key, cid):
             if len(videos) >= MAX_PER_CHANNEL:
                 break
-            if vid in seen or not embeddable(vid):
+            if vid in seen or not own_show(key, vtitle) or not embeddable(vid):
                 continue
             seen.add(vid)
             videos.append({"id": vid, "title": vtitle, "list": plist})
