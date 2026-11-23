@@ -32,7 +32,8 @@
    - album:    the stickers won by finishing games (not a game, a book);
    - pet:      a little dinosaur of his own to look after: red feeds it,
                green plays ball, yellow cleans up, blue puts it to sleep.
-   The picker shows the five games: red/green move, yellow opens. Every
+   The little dinosaur (pet) has its own card on the home screen, not in the picker.
+   The picker shows the games: red/green move, yellow opens. Every
    picture is drawn (SVG): the TV browser shows emoji without colour. */
 
 const KEY_COLORS = ["red", "green", "yellow", "blue"]; // left to right on the remote
@@ -146,7 +147,6 @@ const PICK = [
   ["count", `<svg viewBox="0 0 200 100">${[0, 1, 2].map((i) => `<g transform="translate(${20 + i * 55} 10) scale(.5)">${THINGS.apple[1]}</g>`).join("")}
     ${[0, 1, 2].map((i) => `<circle cx="${70 + i * 30}" cy="88" r="7" fill="#1d2b4f"/>`).join("")}</svg>`],
   ["feed", `<svg viewBox="0 0 200 100"><g transform="translate(10 5) scale(.8)">${animal("chick", true)}</g><g transform="translate(100 5) scale(.8)">${animal("frog", false)}</g></svg>`],
-  ["pet", `<svg viewBox="0 0 200 150">${dinoSvg({ mood: "happy" })}</svg>`],
   ["car", `<svg viewBox="0 0 200 150"><rect x="55" y="0" width="90" height="150" fill="#5d6675"/>
     <g fill="#fff">${[10, 50, 90, 130].map((y) => `<rect x="97" y="${y}" width="6" height="22" rx="3"/>`).join("")}</g>
     <rect x="0" y="0" width="55" height="150" fill="#a8cf8e"/><rect x="145" y="0" width="55" height="150" fill="#a8cf8e"/>
@@ -1938,3 +1938,7 @@ function trainKey(c) {
   later(() => { game.busy = false; }, 3300);
   if (++game.rounds >= 3) later(() => endGame(true), 3300); else later(trainRound, 3300);
 }
+
+// The home list may have been drawn before this file loaded: draw it again so the
+// games card and the little dinosaur's card are there.
+try { if (typeof renderGrid === "function" && !$("home").hidden && $("grid").children.length) renderGrid(); } catch (e) {}

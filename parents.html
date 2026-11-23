@@ -288,6 +288,12 @@ input.sw:disabled { opacity: .45; cursor: default; }
       <p class="note msg" id="themeMsg"></p>
     </section>
     <section>
+      <div class="head"><span class="ic">🦖</span><h2>دایناسور کوچولو</h2></div>
+      <p class="note">کارت خودش را در صفحهٔ اصلی دارد و جدا از بازی‌ها روشن یا خاموش می‌شود.</p>
+      <label class="gameswitch"><b>دایناسور کوچولو روشن باشد</b><input type="checkbox" class="sw" id="petOn"></label>
+      <p class="note msg" id="petMsg"></p>
+    </section>
+    <section>
       <div class="head"><span class="ic">🎈</span><h2>بازی‌ها</h2></div>
       <label class="gameswitch"><b>بازی‌ها روشن باشد</b><input type="checkbox" class="sw" id="gamesOn"></label>
       <div class="gamelist" id="gameList"></div>
@@ -546,7 +552,7 @@ if (API) gate.then(showLogins);
 const PRESETS = [[2, 30], [3, 25], [3, 30], [4, 15], [5, 20], [6, 15]];
 function planText(p) { return `${fa(p.turns)} نوبت ${fa(p.minutes)} دقیقه‌ای`; }
 function showPlan(daily, plans) {
-  const def = { turns: daily.turns || 4, minutes: daily.turnMinutes || 15 };
+  const def = { turns: daily.turns || 3, minutes: daily.turnMinutes || 30 };
   const today = (plans || {})[dayKey(0)];
   const p = today || def;
   const brk = daily.breakMinutes ?? p.minutes * (daily.breakTimes || 4);
@@ -556,7 +562,7 @@ function showPlan(daily, plans) {
   [...$("presets").children].forEach((b) => b.classList.toggle("on", +b.dataset.t === p.turns && +b.dataset.m === p.minutes));
 }
 let plansNow = {}, dailyNow = {};
-const todayPlanNow = () => plansNow[dayKey(0)] || { turns: dailyNow.turns || 4, minutes: dailyNow.turnMinutes || 15, extra: 0 };
+const todayPlanNow = () => plansNow[dayKey(0)] || { turns: dailyNow.turns || 3, minutes: dailyNow.turnMinutes || 30, extra: 0 };
 // bedtime: tonight's later bedtime (minutes after midnight); left out, it keeps what today already has.
 async function postPlan(turns, minutes, extra, bedtime = todayPlanNow().bedtime) {
   if (!API) throw new Error("local test copy");
@@ -591,10 +597,11 @@ function showTonight() {
   }
 }
 /* Games: the whole games part on or off, and each game on its own. */
-const GAME_ORDER = ["balloons", "colors", "count", "feed", "pet", "car", "maze", "puzzle", "pairs", "sizes", "catch", "paint", "story", "dress", "cook", "photo", "climb", "music", "sounds", "bubbles", "hide", "tower", "train", "album", "simon"];
-let gamesNow = { enabled: true, off: [] };
+const GAME_ORDER = ["balloons", "colors", "count", "feed", "car", "maze", "puzzle", "pairs", "sizes", "catch", "paint", "story", "dress", "cook", "photo", "climb", "music", "sounds", "bubbles", "hide", "tower", "train", "album", "simon"];
+let gamesNow = { enabled: false, off: [] };
 function showGames() {
   $("gamesOn").checked = gamesNow.enabled;
+  $("petOn").checked = !gamesNow.off.includes("pet");
   const box = $("gameList");
   box.innerHTML = "";
   for (const k of GAME_ORDER) {
@@ -607,11 +614,11 @@ function showGames() {
     box.appendChild(l);
   }
 }
-async function saveGames(next) {
-  $("gamesMsg").textContent = "صبر کنید…";
+async function saveGames(next, msg = "gamesMsg") {
+  $(msg).textContent = "صبر کنید…";
   const r = await NT.call("/games", next);
-  if (r.ok && r.body) { gamesNow = r.body.games; $("gamesMsg").textContent = "✔ ذخیره شد. تلویزیون تا چند ثانیهٔ دیگر عوض می‌شود."; }
-  else $("gamesMsg").textContent = r.status === 403 ? "فقط پدر یا مادر می‌تواند عوض کند." : "به سرور وصل نشد. دوباره بزنید.";
+  if (r.ok && r.body) { gamesNow = r.body.games; $(msg).textContent = "✔ ذخیره شد. تلویزیون تا چند ثانیهٔ دیگر عوض می‌شود."; }
+  else $(msg).textContent = r.status === 403 ? "فقط پدر یا مادر می‌تواند عوض کند." : "به سرور وصل نشد. دوباره بزنید.";
   showGames();
 }
 async function savePlan(daily, turns, minutes) {
@@ -753,10 +760,12 @@ gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r
   themeNow = (all && all.theme) || ""; showThemes();
   gamesNow = (all && all.games) || gamesNow; showGames();
   $("gamesOn").onchange = () => saveGames({ enabled: $("gamesOn").checked, off: gamesNow.off });
+  // The little dinosaur: on its own switch (kept in the same "off" list on the server).
+  $("petOn").onchange = () => saveGames({ enabled: gamesNow.enabled, off: $("petOn").checked ? gamesNow.off.filter((x) => x !== "pet") : [...gamesNow.off, "pet"] }, "petMsg");
   $("sToday").textContent = dur(sum(watch, null, 0, 0));
   const dly = data.daily || {};
   setupPlan(dly, all && all.plans);
-  const todayPlan = ((all && all.plans) || {})[dayKey(0)] || { turns: dly.turns || 4, minutes: dly.turnMinutes || 15 };
+  const todayPlan = ((all && all.plans) || {})[dayKey(0)] || { turns: dly.turns || 3, minutes: dly.turnMinutes || 30 };
   const turns = todayPlan.turns, tm = todayPlan.minutes;
   const usedTurns = Math.min(turns, Math.floor(Math.max(0, sum(watch, null, 0, 0) - (todayPlan.extra || 0)) / (tm * 60)));
   $("sTodayLabel").textContent = `امروز (${fa(usedTurns)} از ${fa(turns)} نوبت ${fa(tm)} دقیقه‌ای تمام شده)`;

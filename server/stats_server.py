@@ -307,7 +307,7 @@ def games_set(fid, enabled, off):
 
 
 def family_games(fid):
-    return pin_info(fid).get("games") or {"enabled": True, "off": []}
+    return pin_info(fid).get("games") or {"enabled": False, "off": []}  # off until a parent switches them on
 
 
 # ---------- one family's watch data ----------

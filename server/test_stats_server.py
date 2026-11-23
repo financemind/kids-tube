@@ -209,7 +209,7 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.post("/api/plan", {"day": "2026-11-22", "turns": 4, "minutes": 15, "bedtime": 300}, parent)[0], 400)
         _, pl = self.post("/api/plan", {"day": "2026-11-22", "turns": 4, "minutes": 15}, parent)
         self.assertNotIn("bedtime", pl["plans"]["2026-11-22"])  # back to the usual time
-        self.assertEqual(self.post("/api/sync", {"device": "tv", "resetSeen": 0, "data": {}}, tv)[1]["games"], {"enabled": True, "off": []})
+        self.assertEqual(self.post("/api/sync", {"device": "tv", "resetSeen": 0, "data": {}}, tv)[1]["games"], {"enabled": False, "off": []})
         self.assertEqual(self.post("/api/games", {"enabled": True, "off": ["car"]}, tv)[0], 403)
         self.assertEqual(self.post("/api/games", {"enabled": "yes", "off": []}, parent)[0], 400)
         self.assertEqual(self.post("/api/games", {"enabled": False, "off": ["car", "car", "simon"]}, parent)[0], 200)
