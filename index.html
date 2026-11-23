@@ -675,7 +675,11 @@ function dailyList(topicKey = null, want = null) {
     for (const tp of data.topics || []) for (const v of tp.videos) add(v, v.show);
   }
   const k = cfg(), size = want || k.size || 12, rnd = seeded(dayKey() + (only ? only.key : ""));
-  let cands = pool.map((v) => ({ v, w: score(v) * fit(v) })).filter((x) => x.w > 0);
+  // Every show gets the same chance, however many episodes it has: a video's weight is
+  // shared by all the videos of its show (a show of 8 episodes and one of 200 count the same).
+  const perShowCount = {};
+  for (const v of pool) perShowCount[v.show] = (perShowCount[v.show] || 0) + 1;
+  let cands = pool.map((v) => ({ v, w: score(v) * fit(v) / perShowCount[v.show] })).filter((x) => x.w > 0);
   const perShow = {}, list = [], got = { exciting: 0, fantasy: 0, learn: 0, calm: 0, topic: 0 };
   const today = only || topicOfDay(), inTopic = new Set(today ? today.videos.map((v) => v.id) : []);
   while (list.length < size && cands.length) {
