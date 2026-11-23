@@ -9,7 +9,7 @@
   "size": 30,
   "start": "2026-11-16",
   "perShow": 4,
-  "perLessShow": 1,
+  "perLessShow": 4,
   "videoRestMinutes": 10,
   "videoHalfMinutes": 10,
   "showHalfMinutes": 20,

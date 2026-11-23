@@ -165,7 +165,7 @@ TOPICS = [
 # bedtimeHour/wakeHour: from bedtime to wake-up (local hours) no videos, only
 # bedtime stories as sound (stories.json, from update_stories.py).
 # topicPerDay: how many of the day's videos come from the topic of the day.
-DAILY = {"topicPerDay": 3, "balance": {"maxExciting": 3, "maxFantasy": 5, "minLearn": 6, "minCalm": 6}, "size": 30, "tvSize": 9, "start": "2026-11-16", "perShow": 4, "perLessShow": 1, "videoRestMinutes": 10, "videoHalfMinutes": 10, "showHalfMinutes": 20, "taperPerWeek": 0.7, "turns": 3, "turnMinutes": 30, "breakTimes": 4, "breakMinutes": 60, "bedtimeHour": 21, "wakeHour": 7}
+DAILY = {"topicPerDay": 3, "balance": {"maxExciting": 3, "maxFantasy": 5, "minLearn": 6, "minCalm": 6}, "size": 30, "tvSize": 9, "start": "2026-11-16", "perShow": 4, "perLessShow": 4, "videoRestMinutes": 10, "videoHalfMinutes": 10, "showHalfMinutes": 20, "taperPerWeek": 0.7, "turns": 3, "turnMinutes": 30, "breakTimes": 4, "breakMinutes": 60, "bedtimeHour": 21, "wakeHour": 7}
 
 MAX_MINUTES = 60
 NS = {"a": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015"}
