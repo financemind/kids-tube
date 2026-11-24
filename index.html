@@ -682,7 +682,29 @@ function dailyList(topicKey = null, want = null) {
   let cands = pool.map((v) => ({ v, w: score(v) * fit(v) / perShowCount[v.show] })).filter((x) => x.w > 0);
   const perShow = {}, list = [], got = { exciting: 0, fantasy: 0, learn: 0, calm: 0, topic: 0 };
   const today = only || topicOfDay(), inTopic = new Set(today ? today.videos.map((v) => v.id) : []);
-  while (list.length < size && cands.length) {
+  const note = (v) => { // count a chosen video in the day's mix and in its show's share
+    const t = traitsOf(v);
+    if (t.calm <= 2) got.exciting++;
+    if (t.real <= 2) got.fantasy++;
+    if (t.learn >= 4) got.learn++;
+    if (t.calm >= 4) got.calm++;
+    if (inTopic.has(v.id)) { got.topic++; v.topic = today.icon; }
+    perShow[v.show] = (perShow[v.show] || 0) + 1;
+    const cap = (s) => (showOf(s).limit ? (k.perLessShow || 1) : (k.perShow || 2));
+    cands = cands.filter((x) => (perShow[x.v.show] || 0) < cap(x.v.show));
+  };
+  // The limited shows are ones he loves (Peppa Pig, PAW Patrol, Blaze): while a show is
+  // under its time limit it always gets at least one place, somewhere in the first ten.
+  const must = [];
+  if (!only) for (const c of data.categories.filter((x) => x.limit)) {
+    const its = cands.filter((x) => x.v.show === c.key);
+    if (!its.length) continue; // over its time limit (score 0), so not today
+    let r = rnd() * its.reduce((a, x) => a + x.w, 0), pick = its[its.length - 1];
+    for (const x of its) if ((r -= x.w) <= 0) { pick = x; break; }
+    cands.splice(cands.indexOf(pick), 1);
+    must.push(pick.v); note(pick.v);
+  }
+  while (list.length < size - must.length && cands.length) {
     // Weighted draw: a higher score means a better chance; balance() keeps the day's mix.
     const wantTopic = got.topic < (k.topicPerDay ?? 4);
     let ws = cands.map((x) => x.w * balance(x.v, got, size - list.length));
@@ -694,16 +716,9 @@ function dailyList(topicKey = null, want = null) {
     while (i < cands.length - 1 && (r -= ws[i]) > 0) i++;
     const { v } = cands.splice(i, 1)[0];
     list.push(v);
-    const t = traitsOf(v);
-    if (t.calm <= 2) got.exciting++;
-    if (t.real <= 2) got.fantasy++;
-    if (t.learn >= 4) got.learn++;
-    if (t.calm >= 4) got.calm++;
-    if (inTopic.has(v.id)) { got.topic++; v.topic = today.icon; }
-    perShow[v.show] = (perShow[v.show] || 0) + 1;
-    const cap = (s) => (showOf(s).limit ? (k.perLessShow || 1) : (k.perShow || 2));
-    cands = cands.filter((x) => (perShow[x.v.show] || 0) < cap(x.v.show));
+    note(v);
   }
+  for (const v of must) list.splice(Math.floor(rnd() * Math.min(10, list.length + 1)), 0, v);
   return list;
 }
 
@@ -895,7 +910,11 @@ function renderGrid() {
     // Picture only: the child can't read. The title stays for screen readers.
     b.setAttribute("aria-label", v.title);
     b.innerHTML = `<img alt="" loading="lazy" src="${thumb(v.id, "hq720")}">${v.topic ? `<span class="topic" aria-hidden="true">${v.topic}</span>` : ""}`;
-    b.querySelector("img").onerror = function () { this.onerror = null; this.src = thumb(v.id); };
+    // No big picture: YouTube may answer with a small grey placeholder instead of an error,
+    // so a too-small picture also falls back to the normal one.
+    const im = b.querySelector("img"), fallback = () => { if (im.dataset.fb) return; im.dataset.fb = "1"; im.src = thumb(v.id); };
+    im.onerror = fallback;
+    im.onload = () => { if (im.naturalWidth < 200) fallback(); };
     b.onclick = () => openVideo(v, showOf(v.show));
     $("grid").appendChild(b);
   }
