@@ -52,7 +52,7 @@ SESSIONS = os.path.join(ROOT, "sessions.json")
 FAMILIES = os.path.join(ROOT, "families")
 LEGACY = ["stats.json", "plans.json", "reset", "log"]  # data from before accounts
 
-ACTIONS = {"app", "show", "hide", "open", "play", "pause", "home", "end", "again", "restart", "timeup", "rotate", "error", "page", "game"}
+ACTIONS = {"app", "show", "hide", "open", "play", "pause", "home", "end", "again", "restart", "timeup", "rotate", "error", "page", "game", "score"}
 PORT = int(os.environ.get("STATS_PORT", "8080"))
 ORIGINS = {"https://noyantv.com", "https://ntv.financemind.com", "https://financemind.github.io"}
 if os.environ.get("STATS_DEV"):
@@ -456,7 +456,7 @@ def clean_event(ev, device, label):
     for k in ("ua", "size"):
         if isinstance(ev.get(k), str):
             out[k] = ev[k][:200]
-    for k in ("t", "w", "from", "deg", "code"):
+    for k in ("t", "w", "from", "deg", "code", "ok", "no"):
         if isinstance(ev.get(k), (int, float)) and 0 <= ev[k] <= 10 ** 7:
             out[k] = int(ev[k])
     return out

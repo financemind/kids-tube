@@ -215,6 +215,22 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.post("/api/games", {"enabled": False, "off": ["car", "car", "simon"]}, parent)[0], 200)
         self.assertEqual(self.post("/api/sync", {"device": "tv", "resetSeen": 0, "data": {}}, tv)[1]["games"], {"enabled": False, "off": ["car", "simon"]})
 
+    def test_game_scores_reach_the_report(self):
+        parent = self.signup()
+        _, p = self.post("/api/pair/new")
+        self.post("/api/pair/approve", {"code": p["code"]}, parent)
+        tv = self.post("/api/pair/wait", {"pair": p["pair"]})[1]["token"]
+        import time
+        now = int(time.time() * 1000)
+        log = [{"at": now, "a": "score", "v": "game-count", "ok": 4, "no": 2, "x": "dropped"},
+               {"at": now, "a": "score", "v": "game-colors", "ok": -1}]
+        self.post("/api/sync", {"device": "tv", "resetSeen": 0, "data": {}, "log": log}, tv)
+        _, r = self.post("/api/sync", {"device": "tv", "resetSeen": 0, "all": True, "logSince": now - 1000, "data": {}}, tv)
+        scores = [e for e in r["log"] if e["a"] == "score"]
+        self.assertEqual({k: scores[0][k] for k in ("v", "ok", "no")}, {"v": "game-count", "ok": 4, "no": 2})
+        self.assertNotIn("x", scores[0])
+        self.assertNotIn("ok", scores[1])  # a bad number is left out
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -93,6 +93,29 @@ details.card > :not(summary) + :not(summary) { margin-top: 10px; }
 .day.today .col i { background: var(--bar); }
 .day span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .day.today span { color: var(--ink); font-weight: 700; }
+/* The 7-day look */
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; box-shadow: var(--shadow); display: grid; gap: 2px; align-content: start; min-width: 0; }
+.tile b { font-size: 20px; line-height: 1.35; font-variant-numeric: tabular-nums; }
+.tile span { color: var(--muted); font-size: 13px; }
+.hbars { display: grid; gap: 9px; }
+.hbars, .stack, .legend, .longest { min-width: 0; }
+.hbar { display: grid; grid-template-columns: minmax(0, 9em) 1fr auto; gap: 8px; align-items: center; font-size: 14px; }
+.hbar > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hbar .track { height: 12px; background: var(--soft); border-radius: 99px; overflow: hidden; }
+.hbar .track i { display: block; height: 100%; background: var(--bar); border-radius: 99px; }
+.hbar small { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stack { display: flex; height: 22px; border-radius: 99px; overflow: hidden; background: var(--soft); }
+.stack i { display: block; height: 100%; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--c); margin-inline-end: 5px; vertical-align: -1px; }
+.longest { display: grid; gap: 4px; font-size: 13px; margin: 0; padding: 0; list-style: none; }
+.longest li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.longest li span { direction: ltr; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.longest li b { white-space: nowrap; font-weight: 600; }
+.src { font-size: 12px; color: var(--muted); border-inline-start: 3px solid var(--line); padding-inline-start: 8px; }
+.day .col { position: relative; }
+.day .cap { position: absolute; left: -3px; right: -3px; border-top: 2px dashed #e08a3c; }
 /* Tables */
 .table { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -167,6 +190,8 @@ input.sw:disabled { opacity: .45; cursor: default; }
   .links { width: 100%; }
   .links a { flex: 1; text-align: center; }
   .stats { grid-template-columns: 1fr 1fr; }
+  .tiles { grid-template-columns: 1fr 1fr; }
+  .hbar { grid-template-columns: minmax(0, 7em) 1fr auto; }
   .stat.main { grid-column: 1 / -1; }
   .stat b { font-size: 19px; }
   .quick { grid-template-columns: 1fr 1fr; }
@@ -220,7 +245,7 @@ input.sw:disabled { opacity: .45; cursor: default; }
   </header>
 
   <nav class="jump" aria-label="بخش‌ها">
-    <a href="#gNow">الان</a><a href="#gToday">امروز</a><a href="#gSettings">ساعت و بازی</a><a href="#gReport">گزارش</a><a href="#gFamily">دستگاه‌ها</a>
+    <a href="#gNow">الان</a><a href="#gToday">امروز</a><a href="#gSettings">ساعت و بازی</a><a href="#gInsight">تحلیل</a><a href="#gReport">گزارش</a><a href="#gFamily">دستگاه‌ها</a>
   </nav>
 
   <div class="stats">
@@ -307,13 +332,54 @@ input.sw:disabled { opacity: .45; cursor: default; }
     </section>
   </div>
 
+  <div class="group" id="gInsight">
+    <h3>تحلیل ۷ روز اخیر</h3>
+    <div class="tiles" id="inTiles"></div>
+    <div class="grid2">
+      <section>
+        <div class="head"><span class="ic">🚒</span><h2>به چه علاقه دارد</h2></div>
+        <p class="note">موضوع ویدیوهایی که دیده، به اندازهٔ وقتی که پایشان گذاشته.</p>
+        <div class="hbars" id="inTopics"></div>
+      </section>
+      <section>
+        <div class="head"><span class="ic">📺</span><h2>برنامه‌هایی که بیشتر دیده</h2></div>
+        <p class="note">سهم هر برنامه از وقت تماشا.</p>
+        <div class="hbars" id="inShows"></div>
+      </section>
+    </div>
+    <div class="grid2">
+      <section>
+        <div class="head"><span class="ic">⏳</span><h2>ماندن پای ویدیو</h2></div>
+        <p class="note">هر ویدیویی که باز کرد، آخرش چه شد.</p>
+        <div class="stack" id="inStack"></div>
+        <div class="legend" id="inLegend"></div>
+        <p class="note">بیشترین ماندن پای یک ویدیو:</p>
+        <ul class="longest" id="inLongest"></ul>
+        <p class="note">ماندن پای ویدیو با «تمرکز» یکی نیست. ویدیوی بچه‌ها طوری ساخته می‌شود که بچه را نگه دارد.</p>
+      </section>
+      <section>
+        <div class="head"><span class="ic">🧩</span><h2>بازی‌ها: چند بار درست زد</h2></div>
+        <p class="note">فقط بازی‌هایی که جواب درست و غلط دارند (رنگ‌ها، شمردن، غذا دادن، تکرار کن، پازل، کوچک تا بزرگ، اول کدام است، بالا رفتن، صدای حیوان‌ها، قایم‌باشک، قطار).</p>
+        <div class="hbars" id="inGames"></div>
+      </section>
+    </div>
+    <section>
+      <div class="head"><span class="ic">🌈</span><h2>کارتون خیالی یا واقعی‌تر</h2></div>
+      <div class="stack" id="inFantasy"></div>
+      <div class="legend" id="inFantasyLegend"></div>
+      <p class="src">در یک فراتحلیل، بچه‌ها درست بعد از دیدن کارتون خیالی در آزمون‌های توجه کمی ضعیف‌تر بودند؛ این اثر کوتاه بود. (هینتن و همکاران، ۲۰۲۵، کمی مطمئنیم)</p>
+    </section>
+    <p class="note">این‌ها فقط شمردن است. برنامه نمی‌داند چه کسی کنترل دستش بوده، پس امتحان‌های پدر و مادر هم شمرده می‌شود. اینکه چه یاد گرفته را با حرف زدن با خودش بهتر می‌فهمید.</p>
+  </div>
+
   <div class="group" id="gReport">
     <h3>گزارش</h3>
     <div class="grid2">
       <section>
         <div class="head"><span class="ic">📊</span><h2>هر روز این هفته</h2></div>
-        <p class="note">دقیقه‌های تماشا در هر روز.</p>
+        <p class="note">دقیقه‌های تماشا در هر روز. خط‌چین نارنجی: یک ساعت.</p>
         <div class="week" id="week"></div>
+        <p class="src">سازمان جهانی بهداشت برای ۳ و ۴ ساله‌ها حداکثر یک ساعت صفحهٔ بی‌حرکت را می‌گوید، و کمتر بهتر است. شواهدش خیلی ضعیف است. (سازمان جهانی بهداشت، ۲۰۱۹، هنوز معلوم نیست)</p>
       </section>
       <section>
         <div class="head"><span class="ic">🚦</span><h2>برنامه‌های محدود</h2></div>
@@ -474,6 +540,7 @@ async function resetToday() {
     alert("به سرور وصل نشد. اینترنت را چک کنید و دوباره بزنید.");
   }
 }
+let todayStart = 0;
 async function getDevices(again = true) {
   if (!API) return null;
   // A browser that never opened the app has no device id: it only reads.
@@ -481,7 +548,8 @@ async function getDevices(again = true) {
   try {
     const resetSeen = Number(localStorage.getItem("resetSeen")) || 0;
     const midnight = kidNow(); midnight.setHours(DAY_START_HOUR, 0, 0, 0); // when the child's day began (7 am)
-    const body = JSON.stringify({ device: device || "viewer", readonly, all: true, label: localStorage.getItem("deviceLabel") || "", resetSeen, logSince: midnight.getTime(),
+    todayStart = midnight.getTime(); // the log comes for 7 days (for the analysis); the actions table shows today
+    const body = JSON.stringify({ device: device || "viewer", readonly, all: true, label: localStorage.getItem("deviceLabel") || "", resetSeen, logSince: midnight.getTime() - 6 * 86400000,
       data: { watch, vwatch, turnEnds: read("turnEnds") } });
     const r = await fetch(API, { method: "POST", headers: NT.headers(), body });
     if (!r.ok) return null;
@@ -800,13 +868,13 @@ gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r
 
   // The week, oldest day first (on the right, since the page is right to left).
   const totals = Array.from({ length: 7 }, (_, i) => sum(watch, null, 6 - i, 6 - i));
-  const max = Math.max(60, ...totals);
+  const max = Math.max(3900, ...totals); // room for the one-hour line
   const names = ["یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه"];
   totals.forEach((t, i) => {
     const d = kidNow(); d.setDate(d.getDate() - (6 - i));
     const el = document.createElement("div");
     el.className = i === 6 ? "day today" : "day";
-    el.innerHTML = `<span>${fa(Math.round(t / 60))}</span><div class="col"><i style="height:${(100 * t / max).toFixed(1)}%"></i></div><span>${i === 6 ? "امروز" : names[d.getDay()]}</span>`;
+    el.innerHTML = `<span>${fa(Math.round(t / 60))}</span><div class="col"><i style="height:${(100 * t / max).toFixed(1)}%"></i><b class="cap" style="bottom:${(100 * 3600 / max).toFixed(1)}%"></b></div><span>${i === 6 ? "امروز" : names[d.getDay()]}</span>`;
     $("week").appendChild(el);
   });
 
@@ -858,24 +926,114 @@ gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r
   // Today's actions, newest first.
   const ACT = { app: "برنامه باز شد", show: "برگشت به برنامه", hide: "از برنامه بیرون رفت", open: "ویدیو را باز کرد",
     play: "پخش", pause: "توقف", home: "برگشت به صفحهٔ اصلی", end: "ویدیو تمام شد", again: "دوباره از اول (بعد از پایان)",
-    restart: "دکمهٔ از اول", timeup: "وقت تمام شد ⏰", rotate: "چرخاندن تصویر", error: "ویدیو باز نشد", page: "ورق زد", game: "بازی را باز کرد" };
+    restart: "دکمهٔ از اول", score: "بازی تمام شد", timeup: "وقت تمام شد ⏰", rotate: "چرخاندن تصویر", error: "ویدیو باز نشد", page: "ورق زد", game: "بازی را باز کرد" };
   const topicTitle = Object.fromEntries((data.topics || []).map((t) => [t.key, t]));
   const clock = (ms) => new Date(ms).toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" });
   const mmss = (sec) => `${fa(Math.floor(sec / 60))}:${fa(sec % 60).padStart(2, "۰")}`;
-  const events = ((all && all.log) || []).slice().reverse();
+  const events = ((all && all.log) || []).filter((e) => e.at >= todayStart).slice().reverse();
   if (!events.length) emptyRow($("log"), 6, all ? "امروز هنوز کاری ثبت نشده." : "به سرور وصل نشد.");
   for (const e of events) {
     const tr = document.createElement("tr");
     if (["app", "show", "hide", "rotate"].includes(e.a)) tr.className = "quiet";
     let what = ACT[e.a] || e.a;
     if (e.a === "open" && e.from) what += ` (ادامه از ${mmss(e.from)})`;
+    if (e.a === "score") what += `: ${fa(e.ok || 0)} درست، ${fa(e.no || 0)} اشتباه`;
     if (e.a === "page") what += `: ${e.s === "today" ? "⭐ فهرست امروز" : ((topicTitle[e.s] || {}).icon || "") + " " + ((topicTitle[e.s] || {}).title || e.s)}`;
     const v = e.v ? (info[e.v] || { title: "ویدیویی که دیگر در فهرست نیست" }).title : "";
     tr.append(cell(clock(e.at), "n"), cell(what), cell(v, v ? "t" : ""), cell(e.w ? mmss(e.w) : "", "n"),
       cell(e.t != null && e.v ? mmss(e.t) : "", "n"), cell(e.dl || ""));
     $("log").appendChild(tr);
   }
+  insight(data, all, info);
 }));
+
+/* The 7-day analysis: only counting, no judging. */
+function insight(data, all, info) {
+  const log = ((all && all.log) || []).slice().sort((a, b) => a.at - b.at);
+  const pct = (a, b) => (b ? Math.round(100 * a / b) : 0);
+  const bars = (box, rows, empty) => {
+    box.innerHTML = "";
+    if (!rows.length) { box.innerHTML = `<p class="note empty"></p>`; box.firstChild.textContent = empty; return; }
+    const top = Math.max(...rows.map((r) => r.v), 1);
+    for (const r of rows) {
+      const el = document.createElement("div");
+      el.className = "hbar";
+      el.innerHTML = `<span></span><div class="track"><i style="width:${(100 * r.v / top).toFixed(1)}%;${r.color ? "background:" + r.color : ""}"></i></div><small></small>`;
+      el.children[0].textContent = r.name; el.children[0].title = r.name;
+      el.children[2].textContent = r.note;
+      box.appendChild(el);
+    }
+  };
+  const isVideo = (k) => !k.startsWith("game");
+  const videoTime = (from, to) => { let s = 0; for (let i = from; i <= to; i++) for (const [k, v] of Object.entries(watch[dayKey(i)] || {})) if (isVideo(k)) s += v; return s; };
+  const total = videoTime(0, 6);
+
+  // Interest: topics and shows.
+  const vt = {};
+  for (let i = 0; i <= 6; i++) for (const [id, sec] of Object.entries(vwatch[dayKey(i)] || {})) vt[id] = (vt[id] || 0) + sec;
+  const topics = (data.topics || []).map((t) => ({ name: `${t.icon || ""} ${t.title}`, v: t.videos.reduce((a, x) => a + (vt[x.id] || 0), 0) }))
+    .filter((r) => r.v >= 60).sort((a, b) => b.v - a.v).slice(0, 7).map((r) => ({ ...r, note: `${fa(pct(r.v, total))}٪` }));
+  bars($("inTopics"), topics, "هنوز چیزی دیده نشده.");
+  const shows = data.categories.map((c) => ({ name: c.title, v: sum(watch, c.key, 0, 6) })).filter((r) => r.v >= 60)
+    .sort((a, b) => b.v - a.v).slice(0, 7).map((r) => ({ ...r, note: `${fa(pct(r.v, total))}٪، ${dur(r.v)}` }));
+  bars($("inShows"), shows, "هنوز چیزی دیده نشده.");
+
+  // Staying with a video: rebuild each opened video from the log.
+  const open = {}, done = [];
+  for (const e of log) {
+    if (e.a === "open") open[e.d] = { v: e.v, w: 0 };
+    else if (open[e.d] && e.v === open[e.d].v) {
+      if (typeof e.w === "number") open[e.d].w = Math.max(open[e.d].w, e.w);
+      if (["end", "home", "timeup", "error"].includes(e.a)) { done.push({ ...open[e.d], how: e.a }); delete open[e.d]; }
+    }
+  }
+  const kinds = [
+    { key: "end", name: "تا آخر دید", c: "#3fa66b", n: done.filter((x) => x.how === "end").length },
+    { key: "timeup", name: "وقتش تمام شد", c: "#e0a23c", n: done.filter((x) => x.how === "timeup").length },
+    { key: "mid", name: "وسطش رفت", c: "#5b80e6", n: done.filter((x) => x.how === "home" && x.w >= 30).length },
+    { key: "skip", name: "زود رد کرد (کمتر از ۳۰ ثانیه)", c: "#c9cfdc", n: done.filter((x) => x.how === "home" && x.w < 30).length },
+  ];
+  const opened = kinds.reduce((a, k) => a + k.n, 0);
+  $("inStack").innerHTML = kinds.filter((k) => k.n).map((k) => `<i style="width:${pct(k.n, opened)}%;background:${k.c}"></i>`).join("");
+  $("inLegend").innerHTML = kinds.map((k) => `<span style="--c:${k.c}">${k.name}: ${fa(k.n)}</span>`).join("");
+  const longest = done.filter((x) => x.how !== "error").sort((a, b) => b.w - a.w).slice(0, 4);
+  $("inLongest").innerHTML = "";
+  for (const x of longest) {
+    const li = document.createElement("li");
+    li.innerHTML = "<span></span><b></b>";
+    li.children[0].textContent = (info[x.v] || { title: "ویدیویی که دیگر در فهرست نیست" }).title;
+    li.children[1].textContent = dur(x.w);
+    $("inLongest").appendChild(li);
+  }
+  if (!longest.length) $("inLongest").innerHTML = `<li class="empty">هنوز چیزی ثبت نشده.</li>`;
+
+  // Games with right and wrong answers.
+  const g = {};
+  for (const e of log) if (e.a === "score" && e.v) { const x = g[e.v] = g[e.v] || { ok: 0, no: 0, n: 0 }; x.ok += e.ok || 0; x.no += e.no || 0; x.n++; }
+  const games = Object.entries(g).map(([id, x]) => ({ name: ((info[id] || {}).title || id).replace(/^بازی /, ""), v: pct(x.ok, x.ok + x.no), color: "#3fa66b",
+    note: `${fa(pct(x.ok, x.ok + x.no))}٪، ${fa(x.ok)} درست، ${fa(x.no)} اشتباه، ${fa(x.n)} بار` })).sort((a, b) => b.v - a.v);
+  bars($("inGames"), games, "هنوز ثبت نشده. از وقتی این بخش اضافه شد، هر بار که نویان یکی از این بازی‌ها را تمام کند، اینجا می‌آید.");
+  const gOk = Object.values(g).reduce((a, x) => a + x.ok, 0), gNo = Object.values(g).reduce((a, x) => a + x.no, 0);
+
+  // Fantasy or more real (from each show's traits in the list).
+  const real = Object.fromEntries(data.categories.map((c) => [c.key, (c.traits || {}).real || 3]));
+  let fan = 0;
+  for (const c of data.categories) if (real[c.key] <= 2) fan += sum(watch, c.key, 0, 6);
+  const fanNames = data.categories.filter((c) => real[c.key] <= 2 && sum(watch, c.key, 0, 6) >= 60).map((c) => c.title);
+  $("inFantasy").innerHTML = total ? `<i style="width:${pct(fan, total)}%;background:#b77ce0"></i><i style="width:${100 - pct(fan, total)}%;background:#7fc4a8"></i>` : "";
+  $("inFantasyLegend").innerHTML = `<span style="--c:#b77ce0">خیالی: ${fa(pct(fan, total))}٪</span><span style="--c:#7fc4a8">واقعی‌تر: ${fa(100 - pct(fan, total))}٪</span>`;
+  if (fanNames.length) { const s = document.createElement("span"); s.textContent = "خیالی‌ها: " + fanNames.join("، "); $("inFantasyLegend").appendChild(s); s.style.setProperty("--c", "transparent"); }
+
+  // Tiles.
+  const tiles = [
+    [dur(total / 7), "میانگین تماشا در روز"],
+    [`${fa(kinds[0].n)} از ${fa(opened)}`, "ویدیوهایی که تا آخر دید"],
+    [longest.length ? dur(longest[0].w) : "—", "بیشترین ماندن پای یک ویدیو"],
+    [gOk + gNo ? `${fa(pct(gOk, gOk + gNo))}٪` : "—", "جواب درست در بازی‌ها"],
+  ];
+  $("inTiles").innerHTML = tiles.map(() => `<div class="tile"><b></b><span></span></div>`).join("");
+  [...$("inTiles").children].forEach((el, i) => { el.children[0].textContent = tiles[i][0]; el.children[1].textContent = tiles[i][1]; });
+}
 </script>
 </body>
 </html>

@@ -136,7 +136,11 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 const NOTES = { red: 523, green: 659, yellow: 784, blue: 1047 };
 function tune(freqs, gap = 0.12, vol = 0.16) { const a = audioCtx(); if (a) freqs.forEach((f, i) => bell(a, f, a.currentTime + 0.02 + i * gap, 0.8, vol)); }
 const happy = () => tune([523, 659, 784, 1047]);
-const softNo = () => tune([247], 0.1, 0.07);
+const softNo = () => { if (game) game.wrong = (game.wrong || 0) + 1; tune([247], 0.1, 0.07); }; // counted for the parents' report
+/* Games with a right answer: at the end, how many he got right (rounds) and
+   wrong (softNo) go to the parents' report. Pairs, maze and the dinosaur are
+   left out: a wrong turn there is part of playing, not a mistake. */
+window.SCORED = { colors: 1, count: 1, feed: 1, simon: 1, puzzle: 1, sizes: 1, story: 1, climb: 1, sounds: 1, hide: 1, train: 1 };
 
 /* ---- Picker ---- */
 const PICK = [
@@ -1727,7 +1731,7 @@ function soundsKey(c) {
   p.innerHTML = sdArt(who, true) + p.innerHTML.slice(p.innerHTML.indexOf("<i class"));
   sdSay(who);
   later(() => { if (p.isConnected) p.innerHTML = sdArt(who, false) + p.innerHTML.slice(p.innerHTML.indexOf("<i class")); }, 900);
-  if (who !== game.want) { p.classList.remove("nope"); void p.offsetWidth; p.classList.add("nope"); game.busy = true; later(() => { game.busy = false; soundsPlay(); }, 1300); return; }
+  if (who !== game.want) { game.wrong = (game.wrong || 0) + 1; p.classList.remove("nope"); void p.offsetWidth; p.classList.add("nope"); game.busy = true; later(() => { game.busy = false; soundsPlay(); }, 1300); return; }
   game.busy = true;
   later(() => { p.classList.add("dance"); happy(); }, 900);
   later(() => { game.busy = false; }, 2300);

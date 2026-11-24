@@ -1448,7 +1448,8 @@ function endGame(cheer) {
   clearInterval(game.spawn); clearInterval(game.clock); cancelAnimationFrame(game.raf);
   (game.timers || []).forEach(clearTimeout);
   if (game.stop) game.stop(); // e.g. the car game's phone stream
-  const kind = game.kind;
+  const kind = game.kind, right = game.rounds || game.got || 0, wrong = game.wrong || 0;
+  if (window.SCORED && SCORED[kind] && right + wrong > 0) logAction("score", { v: game.vid, ok: right, no: wrong });
   game = null;
   if (cheer) {
     $("game").className = "game";
@@ -1582,7 +1583,7 @@ else Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json
   renderGrid();
 });
 </script>
-<script src="games.js?v=21"></script><!-- raise v whenever games.js changes, so TVs never keep an old copy -->
+<script src="games.js?v=22"></script><!-- raise v whenever games.js changes, so TVs never keep an old copy -->
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
