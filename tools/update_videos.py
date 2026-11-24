@@ -197,7 +197,16 @@ def get(url, tries=4):
             time.sleep(3 * (n + 1))  # YouTube dropped the connection: wait and try again
 
 
+# Videos YouTube says can be embedded, but that still give error 150 in a real
+# player on our site (owner blocked other sites). Found by testing every video in
+# a browser; the updater never adds them back.
+BLOCKED_FILE = pathlib.Path(__file__).with_name("blocked_videos.json")
+BLOCKED = set(json.loads(BLOCKED_FILE.read_text())) if BLOCKED_FILE.exists() else set()
+
+
 def embeddable(video_id):
+    if video_id in BLOCKED:
+        return False
     try:
         get(f"https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={video_id}")
         return True

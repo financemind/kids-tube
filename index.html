@@ -664,7 +664,13 @@ const pageTopic = () => (page > 0 ? pageTopics()[(page - 1) % pageTopics().lengt
    from where it stopped). The next one in line then joins at the end. */
 const ROW_WATCHED = 20; // seconds watched today, at least
 const seenToday = (id) => ((vwatch[dayKey()] || {})[id] || 0) >= ROW_WATCHED && resumeAt(id) === 0; // at the end the saved place goes back to 0
-const fullList = () => dailyList(pageTopic() ? pageTopic().key : null, (cfg().size || 12) + 40);
+/* A video YouTube won't play here (owner blocked other sites, or not in this
+   country) is remembered on this device for 30 days and left out of the list. */
+const BROKEN_DAYS = 30;
+function brokenIds() { try { return JSON.parse(load("nt.broken") || "{}"); } catch (e) { return {}; } }
+const isBroken = (id) => { const at = brokenIds()[id]; return !!at && Date.now() - at < BROKEN_DAYS * 864e5; };
+function markBroken(id) { const b = brokenIds(); b[id] = Date.now(); save("nt.broken", JSON.stringify(b)); }
+const fullList = () => dailyList(pageTopic() ? pageTopic().key : null, (cfg().size || 12) + 40).filter((v) => !isBroken(v.id));
 const currentList = () => fullList().filter((v) => !seenToday(v.id)).slice(0, cfg().size || 12);
 function dailyList(topicKey = null, want = null) {
   const seen = new Set(), pool = [], only = topicKey && topicByKey(topicKey);
@@ -1050,6 +1056,7 @@ function onState(e) {
   if (locked) { if (e.data === S.PLAYING) player.pauseVideo(); return; }
   if (e.data === S.PLAYING) {
     quietApp(); // let YouTube have the sound
+    errRun = 0;
     if (storyMode) storyCover(); else $("cover").hidden = true; // a story: only the sound, the picture stays hidden
     setPlayIcon(true);
     ensureSound();
@@ -1078,10 +1085,10 @@ function onTick() {
    skipping shows that reached their limit. */
 let autoNext = null;
 function nextVideo() {
-  const list = fullList(), i = list.findIndex((v) => v.id === playingId);
+  const list = dailyList(pageTopic() ? pageTopic().key : null, (cfg().size || 12) + 40), i = list.findIndex((v) => v.id === playingId);
   for (let j = 1; j <= list.length; j++) {
     const v = list[(i + j + list.length) % list.length], c = showOf(v.show);
-    if (v.id !== playingId && !seenToday(v.id) && c && allowed(c)) return { v, c };
+    if (v.id !== playingId && !seenToday(v.id) && !isBroken(v.id) && c && allowed(c)) return { v, c };
   }
   return null;
 }
@@ -1177,9 +1184,14 @@ function timeUpSound() {
   [784, 988, 1175, 1568].forEach((f, i) => bell(a, f, t + 2.5 + i * 0.2, 1.2, 0.2)); // happy tune going up
 }
 
+let errRun = 0; // videos in a row that would not play
 function onErr(e) {
   logAction("error", { code: e && e.data });
   locked = true;
+  markBroken(playingId);
+  // Go straight on to the next one, so the child doesn't see an error. After 3 in a row, stop.
+  const next = ++errRun <= 3 && canWatch() && !storyMode ? nextVideo() : null;
+  if (next) { clearTimeout(autoNext); showCover(`<div class="msg">...</div>`, thumb(next.v.id)); autoNext = setTimeout(() => { if (!$("stage").hidden) openVideo(next.v, next.c); }, 800); return; }
   showCover(`<div class="done"><div class="msg">این ویدیو باز نشد.</div>${homeButton("backBtn")}</div>`, null);
   $("backBtn").onclick = goHome;
 }
