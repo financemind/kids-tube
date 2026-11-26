@@ -401,7 +401,8 @@ def live_status(fid):
 # the family's TV, which listens on an open stream (GET /api/pad/listen, as
 # server-sent events). The TV gets a one-time ticket first, so its login never
 # goes into a web address.
-PAD_BUTTONS = {"left", "right", "up", "down", "honk", "lane0", "lane1", "lane2", "blow", "shake"}  # lanes: tilt to steer; blow/shake: phone microphone and motion
+PAD_BUTTONS = {"left", "right", "up", "down", "honk", "lane0", "lane1", "lane2", "blow", "shake", "pop",
+               "red", "green", "yellow", "blue"}  # colours: the remote's colour keys; lanes: tilt to steer; blow/shake/pop: microphone and motion
 PAD_TICKETS = {}  # ticket -> (fid, expires)
 PADS = {}  # fid -> list of queues, one per listening TV
 MAX_PAD_LISTENERS = 4

@@ -8,235 +8,398 @@
 <title>دستهٔ بازی</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <style>
-/* The phone as a game controller for the TV, in four ways (tabs at the top;
-   the TV's code picks one with ?mode=):
-   - buttons: two huge buttons (left red, right green) and a yellow horn;
-   - tilt: hold the phone like a steering wheel; tilting picks the car's lane;
-   - blow: blow at the phone (its microphone) to put out the candles on the TV;
-   - shake: shake the phone to shake the apple tree on the TV.
-   Sounds play from the phone itself, in the child's hands. The microphone is
-   only measured on the phone (how loud); nothing is recorded or sent. */
+/* The phone as a controller made for each game. The TV's code opens
+   control.html?g=<game> (or p.html?g=… for short). Each game gets its own
+   look and, where it fits, a sensor:
+   - four big buttons in the remote's colours, drawn as that game's things
+     (balloons, paint pots, puzzle pieces, wagons, xylophone bars…), and the
+     TV sends pictures of the choices on screen so the buttons show them too;
+   - tilt: the phone as a steering wheel (car, catch) or a marble board (maze);
+   - blow: the microphone (candles, bubbles); shake: motion (tree, dress, tower…);
+   - tap to count (counting game); the camera sees a colour (treasure hunt).
+   Sounds play from the phone. Microphone and camera are only measured on the
+   phone; nothing is recorded or sent, only the button or the result. */
 [hidden] { display: none !important; }
-:root { --ink: #1d2b4f; --bg: #1d2b4f; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 html, body { margin: 0; height: 100%; overflow: hidden; touch-action: none; }
 body { background: radial-gradient(ellipse at 50% 0%, #2c3f80, #14204a 70%); color: #fff; font: 16px/1.5 system-ui, sans-serif; display: flex; flex-direction: column; }
-.tabs { display: flex; gap: 6px; padding: max(8px, env(safe-area-inset-top)) 10px 0; }
-.tabs button { flex: 1; font: 600 14px/1.2 system-ui, sans-serif; border: 0; border-radius: 12px; padding: 8px 4px; background: rgba(255, 255, 255, .12); color: #fff; }
-.tabs button.on { background: #f6c90e; color: #1d2b4f; }
-.status { padding: 6px 16px; text-align: center; font-size: 14px; opacity: .85; min-height: 2.6em; margin: 0; }
+header { display: flex; align-items: center; gap: 10px; padding: max(8px, env(safe-area-inset-top)) 12px 0; }
+header h1 { margin: 0; font-size: 20px; flex: 1; }
+header button { font: 600 14px/1 system-ui, sans-serif; border: 0; border-radius: 12px; padding: 9px 12px; background: rgba(255, 255, 255, .14); color: #fff; }
+.status { padding: 4px 16px; text-align: center; font-size: 14px; opacity: .85; min-height: 2.4em; margin: 0; }
 .status a { color: #ffd23f; }
-.mode { flex: 1; display: flex; min-height: 0; }
-.pad { flex: 1; display: flex; gap: 14px; padding: 10px max(14px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); direction: ltr; align-items: stretch; }
-.pad button { border: 0; border-radius: 34px; cursor: pointer; display: grid; place-items: center; box-shadow: 0 10px 0 rgba(0, 0, 0, .3), inset 0 -8px 0 rgba(0, 0, 0, .15); transition: transform .05s; }
-.pad button svg { width: 60%; max-width: 160px; height: auto; fill: #fff; filter: drop-shadow(0 4px 0 rgba(0, 0, 0, .2)); }
-.pad .left { flex: 1; background: #e63946; } .pad .right { flex: 1; background: #2a9d4b; }
-.pad .honk { flex: .6; background: #f6c90e; border-radius: 50%; align-self: center; aspect-ratio: 1; }
-.pad .honk svg { fill: #1d2b4f; }
-.pad button.down { transform: translateY(8px) scale(.97); box-shadow: 0 2px 0 rgba(0, 0, 0, .3), inset 0 -4px 0 rgba(0, 0, 0, .15); }
-@media (orientation: portrait) { .pad { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr auto; grid-template-areas: "l r" "h h"; }
-  .pad .left { grid-area: l; } .pad .right { grid-area: r; } .pad .honk { grid-area: h; width: 42%; justify-self: center; } }
-/* Tilt, blow and shake: one big picture in the middle, and a start button. */
-.big { flex: 1; display: grid; place-items: center; align-content: center; gap: 18px; padding: 12px 16px max(18px, env(safe-area-inset-bottom)); text-align: center; }
-.big svg.pic { width: min(62vw, 46vh); height: auto; transition: transform .08s linear; }
-.meter { width: min(70vw, 320px); height: 18px; border-radius: 99px; background: rgba(255, 255, 255, .15); overflow: hidden; }
+main { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 6px 12px max(14px, env(safe-area-inset-bottom)); }
+/* Four buttons, 2 x 2 (left/right columns like the remote: red, green / yellow, blue). */
+.pads { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 12px; direction: ltr; }
+.pad { position: relative; border: 0; border-radius: 28px; background: var(--c); display: grid; place-items: center; overflow: hidden;
+  box-shadow: 0 8px 0 rgba(0, 0, 0, .3), inset 0 -8px 0 rgba(0, 0, 0, .15); transition: transform .06s; color: #fff; font-size: 64px; }
+.pad.down { transform: translateY(6px) scale(.97); box-shadow: 0 2px 0 rgba(0, 0, 0, .3); }
+.pad .ic { width: 78%; height: 78%; display: grid; place-items: center; pointer-events: none; }
+.pad .ic svg { width: 100%; height: 100%; overflow: visible; }
+.pad .tv { position: absolute; inset: 10%; display: grid; place-items: center; pointer-events: none; background: rgba(255, 255, 255, .9); border-radius: 20px; }
+.pad .tv svg { width: 92%; height: 92%; overflow: visible; }
+.pad.pop .ic { animation: pop .35s ease-out; }
+@keyframes pop { 40% { transform: scale(1.35); opacity: 0; } 41% { transform: scale(.2); } 100% { transform: scale(1); opacity: 1; } }
+.pad.glow { filter: brightness(1.6) saturate(1.2); }
+.pad.flip .ic { animation: flip .4s ease-in-out; }
+@keyframes flip { 50% { transform: scaleX(0); } }
+.flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 9; }
+.flash.on { opacity: .9; transition: none; }
+/* Xylophone: four bars side by side, longest on the left. */
+.bars { flex: 1; display: flex; gap: 10px; align-items: center; direction: ltr; }
+.bars .pad { flex: 1; font-size: 34px; }
+/* Sensor panels */
+.sense { display: grid; justify-items: center; gap: 10px; text-align: center; }
+.sense.big { flex: 1; align-content: center; }
+.sense svg.pic { width: min(56vw, 34vh); height: auto; transition: transform .08s linear; }
+.meter { width: min(70vw, 320px); height: 16px; border-radius: 99px; background: rgba(255, 255, 255, .15); overflow: hidden; }
 .meter i { display: block; height: 100%; width: 0; background: #f6c90e; border-radius: 99px; transition: width .06s linear; }
-button.start { font: 700 20px/1 system-ui, sans-serif; border: 0; border-radius: 18px; padding: 16px 26px; background: #f6c90e; color: #1d2b4f; box-shadow: 0 8px 0 rgba(0, 0, 0, .25); }
-button.round { font: 700 18px/1 system-ui, sans-serif; border: 0; border-radius: 50%; width: 92px; height: 92px; background: #f6c90e; color: #1d2b4f; box-shadow: 0 8px 0 rgba(0, 0, 0, .25); }
-.hint { margin: 0; opacity: .8; font-size: 15px; }
+button.start { font: 700 19px/1 system-ui, sans-serif; border: 0; border-radius: 18px; padding: 15px 24px; background: #f6c90e; color: #1d2b4f; box-shadow: 0 7px 0 rgba(0, 0, 0, .25); }
+button.round { font: 700 22px/1 system-ui, sans-serif; border: 0; border-radius: 50%; width: 96px; height: 96px; background: #f6c90e; color: #1d2b4f; box-shadow: 0 7px 0 rgba(0, 0, 0, .25); }
+.hint { margin: 0; opacity: .8; font-size: 14px; }
+.tapzone { flex: 1; border-radius: 28px; background: rgba(255, 255, 255, .1); display: grid; place-items: center; align-content: center; gap: 12px; font-size: 90px; }
+.dots { display: flex; gap: 10px; min-height: 30px; }
+.dots i { width: 26px; height: 26px; border-radius: 50%; background: #f6c90e; }
+video.cam { width: min(80vw, 300px); aspect-ratio: 4 / 3; object-fit: cover; border-radius: 18px; transform: scaleX(-1); background: #000; }
+.swatch { width: 70px; height: 70px; border-radius: 50%; border: 4px solid #fff; }
+.camwrap { position: relative; } .camwrap::after { content: ""; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px; border: 3px solid #fff; border-radius: 10px; }
+/* Game list */
+.list { flex: 1; overflow: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; align-content: start; touch-action: pan-y; }
+.list button { border: 0; border-radius: 18px; padding: 12px 4px; background: rgba(255, 255, 255, .12); color: #fff; font: 600 13px/1.3 system-ui, sans-serif; display: grid; gap: 4px; justify-items: center; }
+.list button b { font-size: 34px; line-height: 1; }
 </style>
 </head>
 <body>
-<div class="tabs" id="tabs">
-  <button data-mode="buttons">🎮 دکمه</button><button data-mode="tilt">🚗 کج کن</button><button data-mode="blow">🎂 فوت</button><button data-mode="shake">🌳 تکان</button>
-</div>
+<header><h1 id="title">دستهٔ بازی</h1><button type="button" id="other">🔄 بازی دیگر</button></header>
 <p class="status" id="status">در حال وصل شدن…</p>
-
-<div class="mode" id="m-buttons">
-  <div class="pad">
-    <button class="left" data-btn="left" aria-label="Left"><svg viewBox="0 0 24 24"><path d="M15.5 4 7 12l8.5 8 2-2-6.4-6 6.4-6z"/></svg></button>
-    <button class="honk" data-btn="honk" aria-label="Horn"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg></button>
-    <button class="right" data-btn="right" aria-label="Right"><svg viewBox="0 0 24 24"><path d="M8.5 4 17 12l-8.5 8-2-2 6.4-6-6.4-6z"/></svg></button>
-  </div>
-</div>
-
-<div class="mode" id="m-tilt" hidden>
-  <div class="big">
-    <svg class="pic" id="wheel" viewBox="0 0 200 200"><circle cx="100" cy="100" r="86" fill="none" stroke="#e8e8ef" stroke-width="22"/>
-      <circle cx="100" cy="100" r="26" fill="#e05545"/><path d="M100 74 V22 M78 112 L30 140 M122 112 L170 140" stroke="#e8e8ef" stroke-width="16" stroke-linecap="round"/>
-      <circle cx="100" cy="14" r="9" fill="#f6c90e"/></svg>
-    <button class="start" id="tiltStart">شروع فرمان</button>
-    <p class="hint" id="tiltHint">گوشی را مثل فرمان با دو دست بگیرید و به چپ و راست کج کنید.</p>
-    <button class="round" id="tiltHonk" hidden aria-label="Horn">بوق</button>
-  </div>
-</div>
-
-<div class="mode" id="m-blow" hidden>
-  <div class="big">
-    <svg class="pic" id="flame" viewBox="0 0 200 220"><rect x="70" y="110" width="60" height="100" rx="10" fill="#f2a0c0"/><path d="M70 140 H130 M70 175 H130" stroke="#fff" stroke-width="8"/>
-      <path d="M100 110 V92" stroke="#444" stroke-width="5"/><path id="fire" d="M100 20 C124 52 122 82 100 92 C78 82 76 52 100 20 Z" fill="#ffb300"/></svg>
-    <div class="meter"><i id="level"></i></div>
-    <button class="start" id="blowStart">روشن کردن میکروفون</button>
-    <p class="hint">گوشی را جلوی دهان بچه بگیرید و بگویید فوت کند. صدا فقط روی همین گوشی اندازه گرفته می‌شود؛ چیزی ضبط یا فرستاده نمی‌شود.</p>
-  </div>
-</div>
-
-<div class="mode" id="m-shake" hidden>
-  <div class="big">
-    <svg class="pic" id="tree" viewBox="0 0 200 220"><rect x="88" y="120" width="24" height="90" rx="6" fill="#8a6a44"/>
-      <circle cx="100" cy="90" r="70" fill="#6f9a5e"/><circle cx="60" cy="105" r="38" fill="#87b072"/><circle cx="140" cy="100" r="36" fill="#5f8a50"/>
-      <circle cx="70" cy="80" r="11" fill="#e05545"/><circle cx="125" cy="70" r="11" fill="#e05545"/><circle cx="105" cy="115" r="11" fill="#e05545"/></svg>
-    <button class="start" id="shakeStart">شروع</button>
-    <p class="hint">گوشی را محکم در دست بگیرید و تکان بدهید.</p>
-  </div>
-</div>
-
+<main id="main"></main>
+<div class="flash" id="flash"></div>
 <script src="auth.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
-function say(html) { $("status").innerHTML = html; }
-const WHERE = { buttons: "بازی ماشین یا سیب بگیر", tilt: "بازی ماشین", blow: "بازی شمع‌ها", shake: "بازی درخت سیب" };
-let mode = new URLSearchParams(location.search).get("mode") || new URLSearchParams(location.search).get("m"); // ?m= is the short form in the TV's code
-if (!WHERE[mode]) mode = "buttons";
+const say = (html) => { $("status").innerHTML = html; };
+const COLORS = { red: "#e63946", green: "#2a9d4b", yellow: "#f6c90e", blue: "#2f7fe0" };
+const ORDER = ["red", "green", "yellow", "blue"];
+const NOTE = { red: 523, green: 659, yellow: 784, blue: 1047 };
 
-function hello() {
-  if (!NT.base) say("این صفحه روی این کامپیوتر به سرور وصل نیست.");
-  else if (!NT.token()) say('اول با گوشی وارد حساب خانواده شوید: <a href="account.html">ورود</a>');
-  else say(`${WHERE[mode]} را روی تلویزیون باز کنید، بعد گوشی را به بچه بدهید.`);
-}
-function setMode(m) {
-  mode = m;
-  for (const b of $("tabs").children) b.classList.toggle("on", b.dataset.mode === m);
-  for (const k of Object.keys(WHERE)) $("m-" + k).hidden = k !== m;
-  history.replaceState(null, "", "?mode=" + m);
-  hello();
-}
-for (const b of $("tabs").children) b.onclick = () => setMode(b.dataset.mode);
-
-// Each signal goes to the TV at once. The reply says how many TVs are listening.
-let lastWarn = 0;
-async function press(btn) {
-  const r = await NT.call("/pad", { btn });
-  if (!r.ok) return say(r.status === 401 ? 'اول وارد شوید: <a href="account.html">ورود</a>' : "به سرور وصل نشد.");
-  if (r.body.listeners) say("✔ وصل است. بازی کن!");
-  else if (Date.now() - lastWarn > 3000) { lastWarn = Date.now(); say(`تلویزیون هنوز در ${WHERE[mode]} نیست. اول آن را روی تلویزیون باز کنید.`); }
-}
-
-/* Sounds from the phone's own speaker (in the child's hands). */
+/* ---- Sounds from the phone ---- */
 let actx = null;
 const ac = () => { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === "suspended") actx.resume(); return actx; };
-function beep(freqs, type = "sine", len = 0.18, vol = 0.25, gap = 0.1) {
-  try {
-    const a = ac();
-    freqs.forEach((f, i) => { const o = a.createOscillator(), g = a.createGain(), t = a.currentTime + i * gap;
-      o.type = type; o.frequency.value = f; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + len);
-      o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + len + 0.02); });
-  } catch (e) {}
+function beep(freqs, type = "sine", len = 0.2, vol = 0.25, gap = 0.1) {
+  try { const a = ac(); freqs.forEach((f, i) => { const o = a.createOscillator(), g = a.createGain(), t = a.currentTime + i * gap;
+    o.type = type; o.frequency.value = f; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + len);
+    o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + len + 0.02); }); } catch (e) {}
 }
-function noise(len = 0.35, vol = 0.3, lowpass = 1200) { // a rustle or a puff
-  try {
-    const a = ac(), n = a.createBuffer(1, a.sampleRate * len, a.sampleRate), d = n.getChannelData(0);
+function noise(len = 0.3, vol = 0.3, lowpass = 1500) {
+  try { const a = ac(), n = a.createBuffer(1, a.sampleRate * len, a.sampleRate), d = n.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
     const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
-    s.buffer = n; f.type = "lowpass"; f.frequency.value = lowpass; g.gain.value = vol;
-    s.connect(f); f.connect(g); g.connect(a.destination); s.start();
-  } catch (e) {}
+    s.buffer = n; f.type = "lowpass"; f.frequency.value = lowpass; g.gain.value = vol; s.connect(f); f.connect(g); g.connect(a.destination); s.start(); } catch (e) {}
 }
-const honkSound = () => beep([392, 392], "square", 0.16, 0.12, 0.22);
+const buzz = (ms = 25) => { if (navigator.vibrate) navigator.vibrate(ms); };
+const SOUND = {
+  note: (c) => beep([NOTE[c]], "triangle", 0.35, 0.25),
+  bell: (c) => beep([NOTE[c], NOTE[c] * 2], "sine", 0.9, 0.18, 0),
+  pop: () => { noise(0.08, 0.5, 4000); beep([900], "sine", 0.06, 0.2); },
+  splash: () => noise(0.25, 0.3, 900),
+  click: () => { noise(0.05, 0.5, 6000); beep([1800], "square", 0.03, 0.08); },
+  chomp: () => beep([330, 262], "square", 0.08, 0.1, 0.09),
+  block: () => beep([196], "square", 0.08, 0.15),
+  honk: () => beep([392, 392], "square", 0.16, 0.12, 0.22),
+};
 
-/* ---- Buttons ---- */
-for (const b of document.querySelectorAll(".pad button")) {
-  b.addEventListener("pointerdown", (e) => {
-    e.preventDefault(); b.classList.add("down");
-    if (navigator.vibrate) navigator.vibrate(25);
-    if (b.dataset.btn === "honk") honkSound();
-    press(b.dataset.btn);
+/* ---- Pictures for the buttons (each game's own things) ---- */
+const svg = (inner, vb = "0 0 100 100") => `<svg viewBox="${vb}">${inner}</svg>`;
+const DRAW = {
+  balloon: () => svg(`<ellipse cx="50" cy="40" rx="30" ry="36" fill="rgba(255,255,255,.95)"/><ellipse cx="40" cy="28" rx="7" ry="11" fill="#fff" opacity=".9"/><path d="M50 76 l-5 7 h10 z M50 83 q6 8 -2 16" stroke="#fff" stroke-width="3" fill="none"/>`),
+  paint: (c) => svg(`<path d="M22 40 h56 l-6 50 h-44 z" fill="#fff"/><path d="M22 40 q28 -14 56 0 q-4 16 -14 6 q-6 18 -12 2 q-10 14 -16 -2 q-10 8 -14 -6z" fill="${COLORS[c]}" stroke="#fff" stroke-width="3"/>`),
+  piece: () => svg(`<path d="M20 30 h20 q-4 -14 10 -14 q14 0 10 14 h20 v20 q14 -4 14 10 q0 14 -14 10 v20 h-60 z" fill="#fff"/>`),
+  card: () => svg(`<rect x="22" y="12" width="56" height="76" rx="10" fill="#fff"/><text x="50" y="62" font-size="34" text-anchor="middle" fill="#bbb">؟</text>`),
+  block: () => svg(`<rect x="14" y="30" width="72" height="40" rx="8" fill="#fff"/><rect x="14" y="30" width="72" height="12" rx="6" fill="#fff" opacity=".6"/>`),
+  wagon: () => svg(`<rect x="12" y="34" width="76" height="36" rx="8" fill="#fff"/><circle cx="30" cy="76" r="9" fill="#333"/><circle cx="70" cy="76" r="9" fill="#333"/>`),
+  bush: () => svg(`<circle cx="32" cy="58" r="22" fill="#fff"/><circle cx="56" cy="46" r="26" fill="#fff"/><circle cx="72" cy="62" r="18" fill="#fff"/>`),
+  arrow: (c) => svg(`<path d="${{ red: "M66 18 L30 50 L66 82", green: "M34 18 L70 50 L34 82", yellow: "M18 66 L50 30 L82 66", blue: "M18 34 L50 70 L82 34" }[c]}" stroke="#fff" stroke-width="14" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`),
+  bubble: () => svg(`<circle cx="50" cy="50" r="34" fill="none" stroke="#fff" stroke-width="6"/><ellipse cx="38" cy="36" rx="8" ry="5" fill="#fff" transform="rotate(-30 38 36)"/>`),
+  emoji: (c, e) => `<span style="font-size:min(18vw,12vh)">${e}</span>`,
+};
+
+/* ---- One entry per game: its look, sound and sensors ---- */
+const GAMES = {
+  balloons: { name: "بادکنک", e: "🎈", draw: "balloon", sound: "pop", fx: "pop", hint: "بادکنک هم‌رنگ را بزن تا بترکد!" },
+  colors: { name: "رنگ‌ها", e: "🎨", draw: "paint", sound: "splash", hint: "رنگ همان چیزی را که روی تلویزیون است بزن." },
+  count: { name: "شمردن", e: "🍎", tapcount: true, hint: "روی سیب بزن و بشمار: یک، دو، سه…" },
+  feed: { name: "غذا دادن", e: "🐶", tv: true, sound: "chomp", hint: "به حیوانی که گرسنه است غذا بده." },
+  simon: { name: "تکرار کن", e: "🎵", draw: "emoji", emojis: ["", "", "", ""], sound: "bell", fx: "glow", hint: "رنگ‌ها را همان‌طور که روشن شدند بزن." },
+  pet: { name: "دایناسور کوچولو", e: "🦖", draw: "emoji", emojis: ["🍎", "⚽", "🧽", "🌙"], sound: "note", shake: "بازی با توپ: گوشی را تکان بده", hint: "غذا، توپ، تمیز کردن، خواب." },
+  car: { name: "ماشین", e: "🚗", tilt: "lanes", honk: "بوق", draw: "arrow", only: ["red", "green"], hint: "گوشی را مثل فرمان کج کن." },
+  maze: { name: "هزارتو", e: "🌳", tilt: "arrows", draw: "arrow", hint: "گوشی را مثل یک سینی کج کن تا دایناسور راه برود." },
+  puzzle: { name: "پازل", e: "🧩", draw: "piece", sound: "note", hint: "تکهٔ جای خالی را بزن." },
+  pairs: { name: "جفت‌ها", e: "🃏", draw: "card", sound: "note", fx: "flip", hint: "کارت‌ها را برگردان و جفت‌ها را پیدا کن." },
+  sizes: { name: "کوچک تا بزرگ", e: "📏", tv: true, sound: "note", hint: "اول کوچک‌ترین، بعد بزرگ‌تر." },
+  catch: { name: "سیب بگیر", e: "🧺", tilt: "lanes", honk: "پرش", draw: "arrow", only: ["red", "green"], hint: "گوشی را کج کن تا سبد زیر سیب برود." },
+  paint: { name: "رنگ‌آمیزی", e: "🖍️", draw: "paint", sound: "splash", hint: "یک رنگ بزن تا تکهٔ چشمک‌زن رنگ شود." },
+  story: { name: "اول کدام است", e: "📖", tv: true, draw: "card", sound: "note", hint: "اول چه شد؟ بعد چه؟" },
+  dress: { name: "لباس دایناسور", e: "🎩", tv: true, draw: "emoji", emojis: ["🎩", "👓", "🎀", "🏝️"], sound: "note", shake: "تکان بده تا همه‌چیز عوض شود!", hint: "کلاه، عینک، گردن، جا." },
+  cook: { name: "ساندویچ", e: "🥪", tv: true, draw: "emoji", emojis: ["🍅", "🥬", "🧀", "🍞"], sound: "chomp", hint: "لایه‌ها را روی هم بگذار؛ نان آبی آخرش است." },
+  photo: { name: "عکاسی", e: "📷", tv: true, draw: "bush", sound: "click", fx: "flash", hint: "حیوان از پشت کدام بوته سرک کشید؟ عکسش را بگیر!" },
+  climb: { name: "بالا رفتن", e: "🧗", tv: true, sound: "note", hint: "شکلی را که دایناسور می‌خواهد بزن." },
+  music: { name: "بلز", e: "🎹", bars: true, sound: "bell", fx: "glow", hint: "بزن و آهنگ بساز!" },
+  sounds: { name: "صدای حیوان‌ها", e: "🐮", tv: true, sound: "note", hint: "کدام حیوان این صدا را داد؟" },
+  bubbles: { name: "حباب", e: "🫧", draw: "bubble", sound: "pop", fx: "pop", blow: "pop", hint: "حباب هم‌رنگ را بزن، یا به گوشی فوت کن!" },
+  hide: { name: "قایم‌باشک", e: "🙈", tv: true, sound: "note", hint: "دایناسور پشت کدام قایم شده؟" },
+  tower: { name: "برج‌سازی", e: "🧱", draw: "block", sound: "block", shake: "تکان بده: یک تکهٔ تصادفی!", hint: "تکه‌ها را روی هم بچین." },
+  train: { name: "قطار", e: "🚂", tv: true, draw: "wagon", sound: "note", hint: "بار را در واگن هم‌رنگ بگذار." },
+  candles: { name: "شمع‌ها", e: "🎂", blow: "blow", only: [], hint: "گوشی را جلوی دهان بگیر و فوت کن!" },
+  tree: { name: "درخت سیب", e: "🌳", shake: "تکان بده تا سیب بیفتد!", shakeOnly: true, only: [], hint: "گوشی را محکم تکان بده." },
+  album: { name: "آلبوم استیکر", e: "⭐", draw: "emoji", emojis: ["✨", "✨", "✨", "✨"], sound: "bell", shake: "تکان بده تا استیکرها برقصند!", hint: "" },
+  hunt: { name: "گنج رنگی", e: "🔍", cam: true, honk: "✓ پیدا کرد", draw: "emoji", emojis: ["", "", "", ""], sound: "bell", hint: "دوربین را رو به چیزی بگیرید که آورده؛ رنگش را خودش می‌بیند." },
+};
+
+let kind = new URLSearchParams(location.search).get("g") || new URLSearchParams(location.search).get("m");
+const OLD = { tilt: "car", blow: "candles", shake: "tree", buttons: "car" }; // old links
+if (OLD[kind]) kind = OLD[kind];
+if (!GAMES[kind]) kind = null;
+
+function hello() {
+  if (!NT.base) say("این صفحه روی این کامپیوتر به سرور وصل نیست (فقط برای امتحان شکلش).");
+  else if (!NT.token()) say('اول با گوشی وارد حساب خانواده شوید: <a href="account.html">ورود</a>');
+  else if (kind) say(GAMES[kind].hint || "");
+  else say("بازی‌ای که روی تلویزیون باز است را انتخاب کنید.");
+}
+let lastWarn = 0;
+async function press(btn) {
+  if (!NT.base || !NT.token()) return;
+  const r = await NT.call("/pad", { btn });
+  if (!r.ok) return say(r.status === 401 ? 'اول وارد شوید: <a href="account.html">ورود</a>' : "به سرور وصل نشد.");
+  if (!r.body.listeners && Date.now() - lastWarn > 4000) { lastWarn = Date.now(); say(`تلویزیون هنوز در «${GAMES[kind] ? GAMES[kind].name : "بازی"}» نیست. اول آن را روی تلویزیون باز کنید.`); }
+}
+
+/* ---- Pictures from the TV: the four choices on screen ---- */
+let tvIcons = null;
+async function listenTv() {
+  if (!NT.base || !NT.token()) return;
+  const r = await NT.call("/rtc/ticket", { role: "phone" });
+  if (!r.ok) return setTimeout(listenTv, 4000);
+  const es = new EventSource(NT.base + "/rtc/listen?t=" + encodeURIComponent(r.body.ticket));
+  es.onmessage = (e) => {
+    let m; try { m = JSON.parse(e.data); } catch (err) { return; }
+    if (m.type !== "view" || !Array.isArray(m.icons)) return;
+    if (m.kind && m.kind !== kind && GAMES[m.kind]) { kind = m.kind; build(); } // the TV moved to another game: follow it
+    tvIcons = m.icons; showTv();
+  };
+  es.onerror = () => { es.close(); setTimeout(listenTv, 4000); };
+}
+function showTv() {
+  document.querySelectorAll(".pad[data-c]").forEach((p) => {
+    const i = ORDER.indexOf(p.dataset.c), icon = tvIcons && tvIcons[i];
+    let tv = p.querySelector(".tv");
+    if (!icon) { if (tv) tv.remove(); return; }
+    if (!tv) { tv = document.createElement("div"); tv.className = "tv"; p.appendChild(tv); }
+    tv.innerHTML = icon.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/ on\w+="[^"]*"/gi, "");
+    if (/viewBox="0 0 40 40"/.test(icon) || /viewBox="-20 -20 40 40"/.test(icon)) tv.style.background = "none"; // white pictures on the button's own colour
   });
-  for (const ev of ["pointerup", "pointerleave", "pointercancel"]) b.addEventListener(ev, () => b.classList.remove("down"));
 }
 
-/* ---- Tilt: the phone is a steering wheel; the tilt picks the lane ---- */
-async function motionOk() { // iPhone asks once; Android just says yes
+/* ---- Building the page for a game ---- */
+const stops = [];
+function build() {
+  stops.splice(0).forEach((f) => f());
+  const main = $("main"); main.innerHTML = "";
+  if (!kind) return gameList();
+  const g = GAMES[kind];
+  $("title").textContent = `${g.e} ${g.name}`;
+  history.replaceState(null, "", "?g=" + kind);
+  hello();
+  if (g.tapcount) tapCount(main);
+  if (g.cam) camColor(main);
+  if (g.tilt) tilt(main, g);
+  if (g.blow) blow(main, g);
+  if (g.shake) shake(main, g);
+  if (g.honk) { const b = document.createElement("button"); b.className = "round"; b.textContent = g.honk; b.style.alignSelf = "center";
+    b.addEventListener("pointerdown", (e) => { e.preventDefault(); buzz(30); SOUND.honk(); press("honk"); }); main.appendChild(b); }
+  const colors = g.only || ORDER;
+  if (colors.length) {
+    const box = document.createElement("div"); box.className = g.bars ? "bars" : "pads";
+    if (colors.length === 2) box.style.gridTemplateRows = "1fr";
+    for (const c of colors) {
+      const p = document.createElement("button"); p.className = "pad"; p.dataset.c = c; p.style.setProperty("--c", COLORS[c]);
+      if (g.bars) p.style.height = (100 - ORDER.indexOf(c) * 12) + "%";
+      const ic = document.createElement("div"); ic.className = "ic";
+      const d = g.draw || "emoji";
+      ic.innerHTML = d === "emoji" ? DRAW.emoji(c, (g.emojis || [])[ORDER.indexOf(c)] || "") : DRAW[d](c);
+      p.appendChild(ic);
+      p.addEventListener("pointerdown", (e) => { e.preventDefault(); tap(p, c, g); });
+      for (const ev of ["pointerup", "pointerleave", "pointercancel"]) p.addEventListener(ev, () => p.classList.remove("down"));
+      box.appendChild(p);
+    }
+    main.appendChild(box);
+    showTv();
+  }
+}
+function tap(p, c, g) {
+  p.classList.add("down"); buzz(20);
+  (SOUND[g.sound] || SOUND.note)(c);
+  if (g.fx === "flash") { $("flash").classList.add("on"); requestAnimationFrame(() => requestAnimationFrame(() => $("flash").classList.remove("on"))); }
+  else if (g.fx) { p.classList.remove(g.fx); void p.offsetWidth; p.classList.add(g.fx); setTimeout(() => p.classList.remove(g.fx), 400); }
+  const btn = g.tilt === "arrows" ? { red: "left", green: "right", yellow: "up", blue: "down" }[c] : g.tilt === "lanes" ? { red: "left", green: "right" }[c] : c;
+  press(btn);
+}
+function gameList() {
+  $("title").textContent = "دستهٔ بازی";
+  hello();
+  const box = document.createElement("div"); box.className = "list";
+  for (const [k, g] of Object.entries(GAMES)) {
+    const b = document.createElement("button"); b.innerHTML = `<b>${g.e}</b>${g.name}`;
+    b.onclick = () => { kind = k; build(); };
+    box.appendChild(b);
+  }
+  $("main").appendChild(box);
+}
+$("other").onclick = () => { kind = null; history.replaceState(null, "", "?"); build(); };
+
+/* ---- Sensors ---- */
+async function motionOk() {
   try {
     if (window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission) return (await DeviceOrientationEvent.requestPermission()) === "granted";
     if (window.DeviceMotionEvent && DeviceMotionEvent.requestPermission) return (await DeviceMotionEvent.requestPermission()) === "granted";
   } catch (e) { return false; }
   return true;
 }
-let lane = 1;
-function tiltAngle(e) { // left/right tilt, whichever way the phone is held
-  const angle = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
-  if (angle === 90) return e.beta; if (angle === -90 || angle === 270) return -e.beta;
-  return e.gamma;
-}
-$("tiltStart").onclick = async () => {
-  if (!(await motionOk())) return say("این گوشی اجازهٔ حس کج شدن را نداد.");
-  ac();
-  $("tiltStart").hidden = true; $("tiltHonk").hidden = false;
-  $("tiltHint").textContent = "صاف: وسط · کج به چپ: چپ · کج به راست: راست";
-  addEventListener("deviceorientation", (e) => {
-    if (mode !== "tilt" || e.gamma == null) return;
-    const t = Math.max(-45, Math.min(45, tiltAngle(e) || 0));
-    $("wheel").style.transform = `rotate(${t * 1.5}deg)`;
-    // A little room around each edge, so the car doesn't flicker between lanes.
-    let next = lane;
-    if (t < -18) next = 0; else if (t > 18) next = 2; else if (Math.abs(t) < 12) next = 1;
-    if (next !== lane) { lane = next; if (navigator.vibrate) navigator.vibrate(15); beep([lane === 1 ? 523 : 440], "sine", 0.08, 0.12); press("lane" + lane); }
-  });
-};
-$("tiltHonk").addEventListener("pointerdown", (e) => { e.preventDefault(); honkSound(); press("honk"); });
+function listenOn(target, ev, fn) { target.addEventListener(ev, fn); stops.push(() => target.removeEventListener(ev, fn)); }
+function panel(main, html, big = false) { const d = document.createElement("div"); d.className = "sense" + (big ? " big" : ""); d.innerHTML = html; main.appendChild(d); return d; }
+const tiltLR = (e) => { const a = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+  return a === 90 ? e.beta : (a === -90 || a === 270) ? -e.beta : e.gamma; };
+const tiltFB = (e) => { const a = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+  return a === 90 ? -e.gamma : (a === -90 || a === 270) ? e.gamma : e.beta - 35; }; // held a little towards you counts as level
 
-/* ---- Blow: how loud the microphone is, measured here only ---- */
-$("blowStart").onclick = async () => {
-  let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
-  catch (e) { return say("اجازهٔ میکروفون داده نشد."); }
-  $("blowStart").hidden = true;
-  const a = ac(), src = a.createMediaStreamSource(stream), an = a.createAnalyser();
-  an.fftSize = 1024; src.connect(an);
-  const buf = new Float32Array(an.fftSize);
-  let loudSince = 0, quietUntil = 0;
-  const step = () => {
-    an.getFloatTimeDomainData(buf);
-    let sum = 0; for (const v of buf) sum += v * v;
-    const rms = Math.sqrt(sum / buf.length), now = performance.now();
-    $("level").style.width = Math.min(100, rms * 400) + "%";
-    $("fire").style.transform = `scale(${1 - Math.min(0.6, rms * 3)}, 1)`; $("fire").style.transformOrigin = "100px 92px";
-    // A blow: loud for about a fifth of a second; then a short rest (so the puff sound isn't heard as another blow).
-    if (rms > 0.12 && now > quietUntil) {
-      if (!loudSince) loudSince = now;
-      else if (now - loudSince > 180) { loudSince = 0; quietUntil = now + 900; press("blow"); noise(0.45, 0.25, 900); if (navigator.vibrate) navigator.vibrate(40); }
-    } else loudSince = 0;
-    requestAnimationFrame(step);
+function tilt(main, g) {
+  const wheel = g.tilt === "lanes"
+    ? `<svg class="pic" id="wheel" viewBox="0 0 200 200"><circle cx="100" cy="100" r="86" fill="none" stroke="#e8e8ef" stroke-width="22"/><circle cx="100" cy="100" r="26" fill="#e05545"/><path d="M100 74 V22 M78 112 L30 140 M122 112 L170 140" stroke="#e8e8ef" stroke-width="16" stroke-linecap="round"/><circle cx="100" cy="14" r="9" fill="#f6c90e"/></svg>`
+    : `<svg class="pic" id="wheel" viewBox="0 0 200 200"><rect x="16" y="16" width="168" height="168" rx="22" fill="#f3e2b3" stroke="#3f8a43" stroke-width="12"/><circle id="ball" cx="100" cy="100" r="18" fill="#e05545"/></svg>`;
+  const d = panel(main, `${wheel}<button class="start" type="button">شروع ${g.tilt === "lanes" ? "فرمان" : "کج کردن"}</button>`);
+  d.querySelector("button").onclick = async () => {
+    if (!(await motionOk())) return say("این گوشی اجازهٔ حس کج شدن را نداد.");
+    ac(); d.querySelector("button").remove();
+    let lane = 1, dir = null, lastStep = 0;
+    listenOn(window, "deviceorientation", (e) => {
+      if (e.gamma == null) return;
+      const lr = Math.max(-45, Math.min(45, tiltLR(e) || 0));
+      if (g.tilt === "lanes") {
+        $("wheel").style.transform = `rotate(${lr * 1.5}deg)`;
+        let next = lane;
+        if (lr < -18) next = 0; else if (lr > 18) next = 2; else if (Math.abs(lr) < 12) next = 1;
+        if (next !== lane) { lane = next; buzz(15); beep([lane === 1 ? 523 : 440], "sine", 0.08, 0.12); press("lane" + lane); }
+      } else { // the maze: tilt like a board with a marble; one step every half second while tilted
+        const fb = Math.max(-45, Math.min(45, tiltFB(e) || 0)), now = performance.now();
+        $("ball").setAttribute("cx", 100 + lr * 1.7); $("ball").setAttribute("cy", 100 + fb * 1.7);
+        dir = Math.abs(lr) > Math.abs(fb) ? (lr < -20 ? "left" : lr > 20 ? "right" : null) : (fb < -20 ? "up" : fb > 20 ? "down" : null);
+        if (dir && now - lastStep > 500) { lastStep = now; buzz(15); beep([494], "sine", 0.06, 0.12); press(dir); }
+      }
+    });
   };
-  step();
-};
-
-/* ---- Shake: a strong jolt of the phone ---- */
-$("shakeStart").onclick = async () => {
-  if (!(await motionOk())) return say("این گوشی اجازهٔ حس تکان را نداد.");
-  ac();
-  $("shakeStart").hidden = true;
-  let last = 0, tilt = 0;
-  addEventListener("devicemotion", (e) => {
-    if (mode !== "shake") return;
-    const g = e.accelerationIncludingGravity || {}, x = g.x || 0, y = g.y || 0, z = g.z || 0;
-    const jolt = Math.abs(Math.sqrt(x * x + y * y + z * z) - 9.8), now = performance.now();
-    if (jolt > 11 && now - last > 450) {
-      last = now; press("shake");
-      noise(0.35, 0.3, 2500); setTimeout(() => beep([300, 200], "sine", 0.12, 0.25, 0.08), 250); // leaves, then an apple's bump
-      if (navigator.vibrate) navigator.vibrate(60);
-      tilt = tilt > 0 ? -8 : 8; $("tree").style.transform = `rotate(${tilt}deg)`; setTimeout(() => { $("tree").style.transform = ""; }, 200);
-    }
+}
+function blow(main, g) {
+  const d = panel(main, `<div class="meter"><i></i></div><button class="start" type="button">${g.only ? "روشن کردن میکروفون" : "🫧 فوت کردن با میکروفون"}</button>
+    <p class="hint">صدا فقط روی همین گوشی اندازه گرفته می‌شود؛ چیزی ضبط یا فرستاده نمی‌شود.</p>`, !!g.only);
+  if (g.only) d.insertAdjacentHTML("afterbegin", `<svg class="pic" viewBox="0 0 200 220"><rect x="70" y="110" width="60" height="100" rx="10" fill="#f2a0c0"/><path d="M70 140 H130 M70 175 H130" stroke="#fff" stroke-width="8"/><path d="M100 110 V92" stroke="#444" stroke-width="5"/><path id="fire" d="M100 20 C124 52 122 82 100 92 C78 82 76 52 100 20 Z" fill="#ffb300" style="transform-origin:100px 92px"/></svg>`);
+  d.querySelector("button").onclick = async () => {
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
+    catch (e) { return say("اجازهٔ میکروفون داده نشد."); }
+    d.querySelector("button").remove();
+    const a = ac(), src = a.createMediaStreamSource(stream), an = a.createAnalyser(); an.fftSize = 1024; src.connect(an);
+    const buf = new Float32Array(an.fftSize); let loudSince = 0, quietUntil = 0, on = true;
+    stops.push(() => { on = false; stream.getTracks().forEach((t) => t.stop()); });
+    const step = () => {
+      if (!on) return;
+      an.getFloatTimeDomainData(buf); let sum = 0; for (const v of buf) sum += v * v;
+      const rms = Math.sqrt(sum / buf.length), now = performance.now();
+      d.querySelector(".meter i").style.width = Math.min(100, rms * 400) + "%";
+      const fire = $("fire"); if (fire) fire.style.transform = `scale(${1 - Math.min(0.6, rms * 3)}, 1)`;
+      if (rms > 0.12 && now > quietUntil) {
+        if (!loudSince) loudSince = now;
+        else if (now - loudSince > 180) { loudSince = 0; quietUntil = now + 900; press(g.blow); noise(0.45, 0.25, 900); buzz(40); }
+      } else loudSince = 0;
+      requestAnimationFrame(step);
+    };
+    step();
+  };
+}
+function shake(main, g) {
+  const tree = g.shakeOnly ? `<svg class="pic" id="shk" viewBox="0 0 200 220"><rect x="88" y="120" width="24" height="90" rx="6" fill="#8a6a44"/><circle cx="100" cy="90" r="70" fill="#6f9a5e"/><circle cx="60" cy="105" r="38" fill="#87b072"/><circle cx="140" cy="100" r="36" fill="#5f8a50"/><circle cx="70" cy="80" r="11" fill="#e05545"/><circle cx="125" cy="70" r="11" fill="#e05545"/><circle cx="105" cy="115" r="11" fill="#e05545"/></svg>` : "";
+  const d = panel(main, `${tree}<button class="start" type="button">${g.shakeOnly ? "شروع" : "📳 " + g.shake}</button>`, !!g.shakeOnly);
+  d.querySelector("button").onclick = async () => {
+    if (!(await motionOk())) return say("این گوشی اجازهٔ حس تکان را نداد.");
+    ac(); const b = d.querySelector("button"); b.disabled = true; b.textContent = "📳 " + g.shake;
+    let last = 0, side = 1;
+    listenOn(window, "devicemotion", (e) => {
+      const a = e.accelerationIncludingGravity || {}, x = a.x || 0, y = a.y || 0, z = a.z || 0;
+      const jolt = Math.abs(Math.sqrt(x * x + y * y + z * z) - 9.8), now = performance.now();
+      if (jolt > 11 && now - last > 450) {
+        last = now; press("shake"); buzz(60);
+        noise(0.35, 0.3, 2500); if (g.shakeOnly) setTimeout(() => beep([300, 200], "sine", 0.12, 0.25, 0.08), 250);
+        const t = $("shk"); if (t) { side = -side; t.style.transform = `rotate(${side * 8}deg)`; setTimeout(() => { t.style.transform = ""; }, 200); }
+      }
+    });
+  };
+}
+function tapCount(main) { // tap the apple once for each apple on the TV; a short pause sends the number
+  const d = document.createElement("div"); d.className = "tapzone"; d.innerHTML = `<span>🍎</span><div class="dots" id="dots"></div>`;
+  main.appendChild(d);
+  let n = 0, timer = null;
+  d.addEventListener("pointerdown", (e) => {
+    e.preventDefault(); clearTimeout(timer);
+    n = n >= 4 ? 1 : n + 1; buzz(20); beep([[523, 659, 784, 1047][n - 1]], "triangle", 0.25, 0.25);
+    $("dots").innerHTML = "<i></i>".repeat(n);
+    d.firstElementChild.style.transform = "scale(1.2)"; setTimeout(() => { d.firstElementChild.style.transform = ""; }, 120);
+    timer = setTimeout(() => { press(ORDER[n - 1]); n = 0; setTimeout(() => { $("dots").innerHTML = ""; }, 500); }, 1200);
   });
-};
+}
+function camColor(main) { // the camera looks at what the child brought; its colour is sent when it holds still for a moment
+  const d = panel(main, `<div class="camwrap"><video class="cam" playsinline muted></video></div><div class="swatch" id="sw"></div><button class="start" type="button">روشن کردن دوربین</button>`);
+  d.querySelector("button").onclick = async () => {
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 320 } }, audio: false }); }
+    catch (e) { return say("اجازهٔ دوربین داده نشد."); }
+    d.querySelector("button").remove();
+    const v = d.querySelector("video"); v.srcObject = stream; await v.play();
+    const c = document.createElement("canvas"), g = c.getContext("2d", { willReadFrequently: true });
+    let on = true, seen = null, since = 0, quietUntil = 0;
+    stops.push(() => { on = false; stream.getTracks().forEach((t) => t.stop()); });
+    const step = () => {
+      if (!on) return;
+      if (v.videoWidth) {
+        c.width = 40; c.height = 40;
+        g.drawImage(v, v.videoWidth / 2 - 30, v.videoHeight / 2 - 30, 60, 60, 0, 0, 40, 40);
+        const px = g.getImageData(0, 0, 40, 40).data; let r = 0, gg = 0, b = 0;
+        for (let i = 0; i < px.length; i += 4) { r += px[i]; gg += px[i + 1]; b += px[i + 2]; }
+        const n = px.length / 4; r /= n; gg /= n; b /= n;
+        $("sw").style.background = `rgb(${r | 0},${gg | 0},${b | 0})`;
+        const col = colorName(r, gg, b), now = performance.now();
+        if (col !== seen) { seen = col; since = now; }
+        else if (col && now - since > 800 && now > quietUntil) { quietUntil = now + 3000; press(col); buzz(50); beep([784, 1047], "sine", 0.3, 0.2); say(`رنگ ${{ red: "قرمز", green: "سبز", yellow: "زرد", blue: "آبی" }[col]} دیده شد ✔`); }
+      }
+      setTimeout(step, 150);
+    };
+    step();
+  };
+}
+function colorName(r, g, b) { // which of the four colours (or none: too grey or too dark)
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), v = max / 255, s = max ? (max - min) / max : 0;
+  if (v < 0.25 || s < 0.35) return null;
+  let h = max === r ? (g - b) / (max - min) : max === g ? 2 + (b - r) / (max - min) : 4 + (r - g) / (max - min);
+  h = (h * 60 + 360) % 360;
+  if (h < 20 || h >= 330) return "red";
+  if (h >= 40 && h < 70) return "yellow";
+  if (h >= 80 && h < 170) return "green";
+  if (h >= 190 && h < 260) return "blue";
+  return null;
+}
 
-setMode(mode);
+build();
+listenTv();
 document.addEventListener("contextmenu", (e) => e.preventDefault());
-// Keep the connection to the server open and warm: a new secure connection costs
-// about three times as long as a press on an open one.
 if (NT.base && NT.token()) { NT.call("/me"); setInterval(() => { if (!document.hidden) NT.call("/me"); }, 20000); }
-// Keep the screen awake while the child plays (where the phone allows it).
 try { if (navigator.wakeLock) navigator.wakeLock.request("screen").catch(() => {}); } catch (e) {}
 </script>
 </body>

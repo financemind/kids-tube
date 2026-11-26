@@ -190,8 +190,9 @@ function showPicker() {
 }
 function playGame(kind) {
   document.querySelectorAll(".keys .k").forEach((k) => { k.innerHTML = ""; }); // the dots belong to the counting game only
-  if (kind === "balloons") return startGame();
+  if (kind === "balloons") { startGame(); return phoneHook("balloons"); }
   if (!beginGame(kind, PICK_VID[kind])) return;
+  later(() => phoneHook(kind), 0); // after the game has drawn itself
   ({ colors: colorsRound, count: countRound, feed: feedRound, simon: simonStart, pet: petStart, car: carStart, maze: mazeStart, puzzle: puzzleStart, pairs: pairsStart, sizes: sizesStart,
     catch: catchStart, paint: paintStart, story: storyStart, dress: dressStart, cook: cookStart, photo: photoStart, climb: climbStart,
     music: musicStart, sounds: soundsStart, bubbles: bubblesStart, hide: hideStart, tower: towerStart, train: trainStart, album: albumStart, hunt: huntStart, candles: candlesStart, tree: treeStart })[kind]();
@@ -242,6 +243,7 @@ function countRound() {
     k.innerHTML = DOTS[i].map(([x, y]) => `<b style="left:calc(50% + ${x}px - 5px);top:calc(50% + ${y}px - 5px)"></b>`).join("");
   });
   game.n = pickOther(4, game.n - 1) + 1;
+  phoneView(DOTS.map((d) => `<svg viewBox="-20 -20 40 40">${d.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" fill="#fff"/>`).join("")}</svg>`));
   $("sky").innerHTML = `<div class="board"><div class="row">${Array.from({ length: game.n }, () => thingSvg("apple", "newone")).join("")}</div></div>`;
 }
 function countKey(c) {
@@ -259,7 +261,7 @@ function countKey(c) {
 /* ---- Feed the animals ---- */
 function feedRound() {
   game.hungry = pickOther(4, game.hungry);
-  $("sky").innerHTML = `<div class="board"><div class="feedrow">${ANIMALS.map((a, i) => `<div class="pet${i === game.hungry ? " hungry" : ""}">
+  $("sky").innerHTML = `<div class="board"><div class="feedrow">${ANIMALS.map((a, i) => `<div class="pet${i === game.hungry ? " hungry" : ""}" data-c="${KEY_COLORS[i]}">
     <svg viewBox="0 0 100 100">${animal(a, i === game.hungry)}</svg><i class="mat" style="background:${BALLOON[KEY_COLORS[i]]}"></i></div>`).join("")}</div></div>`;
 }
 function feedKey(c) {
@@ -705,14 +707,11 @@ function carStart() {
       <i class="dash" id="dash1" style="left:33.3%"></i><i class="dash" id="dash2" style="left:66.6%"></i></div>
     <div class="me" id="me"><svg viewBox="-40 -56 80 104">${carSvg()}</svg></div>
     <div class="carhud"><svg viewBox="0 0 40 40">${carStar(20, 21, 18)}</svg><span id="starCount">0</span></div>
-    <div class="carqr" id="carqr">${window.qrSvg ? qrSvg(location.origin + "/control.html") : ""}<span>با گوشی بازی کنید: این کد را با دوربین گوشی بگیرید</span></div>
   </div>`;
   game.el = { room: $("carroom"), me: $("me"), road: $("road"), dash1: $("dash1"), dash2: $("dash2"), curbL: $("curbL"), curbR: $("curbR"), grass: $("grassdots") };
   carPlace();
   $("carroom").addEventListener("pointerdown", (e) => carKey(e.clientX < innerWidth / 2 ? "red" : "green"));
   game.raf = requestAnimationFrame(carFrame);
-  carListen();
-  later(() => { const q = $("carqr"); if (q && !game.padSeen) q.classList.add("gone"); }, 25000);
 }
 // Lanes: 0 (left), 1 (middle), 2 (right), as x positions on the screen.
 const laneX = (i) => game.W / 2 + (i - 1) * game.rw / 3;
@@ -812,6 +811,90 @@ async function padListen(kind, onBtn) {
     es.close();
     if (game && game.kind === kind) later(() => padListen(kind, onBtn), 3000);
   };
+}
+/* ---- The phone as this game's controller (control.html) ----
+   Every game shows a small code (top right) that opens the phone controller
+   made for it: control.html?g=<game>. What the phone sends arrives here and is
+   played like the remote's keys, plus what only a phone can do (tilt, blow,
+   shake). The TV also sends the phone small pictures of the four choices on
+   screen (the shapes, the animals…), so its buttons show the same things. */
+const PHONE_SEES = { sizes: ".szthing svg", climb: "svg", hide: ".hdthing svg", sounds: "svg", story: "svg", feed: "svg", photo: ".phbush" };
+function phoneQrSvg(kind) { // a code holds 42 characters at most: the short link if it fits, else the plain one (then pick the game on the phone)
+  if (!window.qrSvg) return "";
+  for (const u of [location.origin + "/p.html?g=" + kind, location.origin + "/control.html"]) { try { return qrSvg(u); } catch (e) {} }
+  return "";
+}
+function phoneView(icons) {
+  if (!game) return;
+  const clean = icons.map((x) => (x && x.length < 6000 ? x.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/ on\w+="[^"]*"/gi, "") : null));
+  const msg = JSON.stringify(clean);
+  if (msg.length > 18000 || msg === game.phoneView) return;
+  game.phoneView = msg; game.phoneViewIcons = clean;
+  phoneSendView();
+}
+function phoneSendView() {
+  if (!game || !game.phoneViewIcons || typeof API === "undefined" || !API || !NT.token()) return;
+  NT.call("/rtc", { to: "phone", msg: { type: "view", kind: game.kind, icons: game.phoneViewIcons } });
+}
+function phoneMirror() { // the pictures of the four choices, read from the screen
+  const sel = PHONE_SEES[game.kind]; if (!sel) return;
+  phoneView(KEY_COLORS.map((c) => {
+    const box = document.querySelector(`#sky [data-c="${c}"]`), el = box && box.querySelector(sel);
+    if (!el) return null;
+    const svg = el.tagName.toLowerCase() === "svg" ? el.outerHTML : (el.querySelector("svg") || el).outerHTML;
+    const s = box.querySelector(".szthing"); // sizes: keep each thing's size
+    return s ? svg.replace("<svg", `<svg style="transform:scale(${(getComputedStyle(s).getPropertyValue("--s") || 1)})"`) : svg;
+  }));
+}
+function phoneBtn(btn) { // one signal from the phone, played like the remote
+  const k = game.kind;
+  if (KEY_COLORS.includes(btn)) return k === "hunt" ? huntKey(btn) : gameColor(btn);
+  const arrow = { left: "red", right: "green", up: "yellow", down: "blue" }[btn];
+  if (arrow) { if (k === "maze") { if (!game.busy) mazeKey(arrow); } else if (btn === "left" || btn === "right") gameColor(arrow); return; }
+  const lane = /^lane([012])$/.exec(btn);
+  if (lane && (k === "car" || k === "catch")) { const l = Number(lane[1]); if (l !== game.lane) { game.lane = l; (k === "car" ? carPlace : catchPlace)(); tune([l === 1 ? 523 : 440], 0, 0.06); } return; }
+  if (btn === "honk") { if (k === "car") carHonk(); else if (k === "catch") catchHop(); else if (k === "hunt") huntFound(); return; }
+  if (btn === "blow") { if (k === "candles") candlesBlow(); else if (k === "bubbles") phonePopBubble(); return; }
+  if (btn === "pop" && k === "bubbles") return phonePopBubble();
+  if (btn === "shake") {
+    if (k === "tree") treeShake();
+    else if (k === "dress" || k === "tower") gameColor(KEY_COLORS[Math.floor(Math.random() * 4)]);
+    else if (k === "album") albumKey();
+    else if (k === "pet") gameColor("green"); // shaking = playing ball
+  }
+}
+function phonePopBubble() { // a blow at the phone pops the lowest bubble, whatever its colour
+  const b = (game.list || []).filter((x) => !x.gone).sort((p, q) => q.y - p.y)[0];
+  if (b) bubblesPop(b);
+}
+async function phoneHook(kind) {
+  if (!game || game.kind !== kind || game.phoneHooked) return;
+  game.phoneHooked = true;
+  const qr = document.createElement("div");
+  qr.className = "carqr"; qr.id = "carqr";
+  qr.innerHTML = `${phoneQrSvg(kind)}<span>دستهٔ این بازی روی گوشی: کد را با دوربین گوشی بگیرید</span>`;
+  $("game").appendChild(qr);
+  later(() => { if (!game.padSeen) qr.classList.add("gone"); }, 25000);
+  const mo = new MutationObserver(() => { clearTimeout(game.mirrorT); game.mirrorT = setTimeout(() => { if (game && game.kind === kind) phoneMirror(); }, 250); });
+  mo.observe($("sky"), { childList: true, subtree: true });
+  phoneMirror();
+  const resend = setInterval(phoneSendView, 5000); // a phone that opens later still gets the pictures
+  const stop = () => { qr.remove(); mo.disconnect(); clearInterval(resend); if (game && game.es) game.es.close(); };
+  const old = game.stop; game.stop = () => { stop(); if (old) old(); };
+  if (typeof API === "undefined" || !API || !NT.token()) return;
+  const listen = async () => {
+    const r = await NT.call("/pad/ticket");
+    if (!game || game.kind !== kind || !r.ok) return;
+    const es = game.es = new EventSource(NT.base + "/pad/listen?t=" + encodeURIComponent(r.body.ticket));
+    es.onmessage = (e) => {
+      if (!game || game.kind !== kind) return es.close();
+      let m = null; try { m = JSON.parse(e.data); } catch (err) { return; }
+      if (!game.padSeen) { game.padSeen = true; qr.classList.add("gone"); phoneSendView(); }
+      if (!game.busy || ["lane0", "lane1", "lane2", "left", "right", "honk"].includes(m.btn)) phoneBtn(m.btn);
+    };
+    es.onerror = () => { es.close(); if (game && game.kind === kind) later(listen, 3000); };
+  };
+  listen();
 }
 function carListen() {
   padListen("car", (btn) => {
@@ -1160,7 +1243,6 @@ function catchStart() {
   catchPlace();
   $("ctroom").addEventListener("pointerdown", (e) => gameColor(e.clientX < innerWidth / 2 ? "red" : "green"));
   game.raf = requestAnimationFrame(catchFrame);
-  padListen("catch", (btn) => { if (btn === "left") gameColor("red"); else if (btn === "right") gameColor("green"); else catchHop(); });
 }
 const catchX = (i) => game.W / 2 + (i - 1) * game.rw / 3;
 function catchPlace() { $("ctBasket").style.transform = `translate3d(${catchX(game.lane) - game.bw / 2}px, ${game.floor}px, 0)`; }
@@ -1339,7 +1421,10 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 .keys .k { position: relative; }
 .keys .k > svg { position: absolute; left: 12%; top: 12%; width: 76%; height: 76%; overflow: visible; }
 </style>`);
-function keyIcons(icons) { document.querySelectorAll(".keys .k").forEach((k, i) => { k.innerHTML = icons[i] ? `<svg viewBox="0 0 40 40">${icons[i]}</svg>` : ""; }); }
+function keyIcons(icons) {
+  document.querySelectorAll(".keys .k").forEach((k, i) => { k.innerHTML = icons[i] ? `<svg viewBox="0 0 40 40">${icons[i]}</svg>` : ""; });
+  phoneView(icons.map((x) => (x ? `<svg viewBox="0 0 40 40" style="background:none">${x}</svg>` : null))); // the phone's buttons show the same
+}
 const starPath = (cx, cy, r) => Array.from({ length: 10 }, (_, i) => { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * .45 : r; return `${i ? "L" : "M"}${(cx + Math.cos(a) * rr).toFixed(1)} ${(cy + Math.sin(a) * rr).toFixed(1)}`; }).join(" ") + " Z";
 
 /* ---- Dress up the dinosaur ----
@@ -1967,13 +2052,6 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 .phroom .apple { transition: transform .7s cubic-bezier(.5, 0, 1, 1); }
 .phroom .hud { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(255, 255, 255, .85); border-radius: 22px; padding: 6px 18px; font: 700 34px/1 Fredoka, sans-serif; color: #24324f; }
 </style>`);
-function phQrSvg(mode) { // the code holds at most 42 characters: the short link if it fits, else the plain one (pick the tab on the phone)
-  if (!window.qrSvg) return "";
-  try { return qrSvg(location.origin + "/control.html?m=" + mode); } catch (e) {}
-  try { return qrSvg(location.origin + "/control.html"); } catch (e) { return ""; }
-}
-const phQr = (mode) => `<div class="carqr" id="carqr">${phQrSvg(mode)}<span>با گوشی بازی کنید: این کد را با دوربین گوشی بگیرید</span></div>`;
-function phQrLater() { later(() => { const q = $("carqr"); if (q && !game.padSeen) q.classList.add("gone"); }, 25000); }
 function candlesPickArt() {
   return `<svg viewBox="0 0 200 150"><rect x="40" y="80" width="120" height="56" rx="10" fill="#f2a0c0"/><path d="M40 100 Q60 112 80 100 T120 100 T160 100" stroke="#fff" stroke-width="7" fill="none"/>
     ${[70, 100, 130].map((x) => `<rect x="${x - 5}" y="48" width="10" height="32" rx="3" fill="#7fb6ef"/><path d="M${x} 26 C${x + 9} 38 ${x + 8} 46 ${x} 48 C${x - 8} 46 ${x - 9} 38 ${x} 26 Z" fill="#ffb300"/>`).join("")}</svg>`;
@@ -1985,10 +2063,8 @@ function treePickArt() {
 const CANDLE_X = [150, 225, 300, 375, 450];
 function candlesStart() {
   game.round = 0;
-  $("sky").innerHTML = `<div class="phroom"><svg class="main" id="cake" viewBox="0 0 600 460"></svg>${phQr("blow")}</div>`;
+  $("sky").innerHTML = `<div class="phroom"><svg class="main" id="cake" viewBox="0 0 600 460"></svg></div>`;
   candlesRound();
-  padListen("candles", (btn) => { if (btn === "blow") { const q = $("carqr"); if (q) q.classList.add("gone"); candlesBlow(); } });
-  phQrLater();
 }
 function candlesRound() {
   game.lit = CANDLE_X.map(() => true); game.busy = false;
@@ -2019,11 +2095,9 @@ function candlesKey() { candlesBlow(); }
 const APPLES = [[210, 150], [300, 110], [390, 150], [250, 220], [350, 210], [180, 250], [420, 240], [300, 180]];
 function treeStart() {
   game.round = 0;
-  $("sky").innerHTML = `<div class="phroom"><div class="hud" id="treeHud">🍎 ۰</div><svg class="main" id="tree" viewBox="0 0 600 460"></svg>${phQr("shake")}</div>`;
+  $("sky").innerHTML = `<div class="phroom"><div class="hud" id="treeHud">🍎 ۰</div><svg class="main" id="tree" viewBox="0 0 600 460"></svg></div>`;
   game.got = 0;
   treeRound();
-  padListen("tree", (btn) => { if (btn === "shake") { const q = $("carqr"); if (q) q.classList.add("gone"); treeShake(); } });
-  phQrLater();
 }
 function treeRound() {
   game.on = APPLES.map(() => true); game.busy = false;
@@ -2088,7 +2162,6 @@ function huntStart() {
   game.free = true; // not counted as watching (see beginGame in index.html)
   game.order = KEY_COLORS.slice().sort(() => Math.random() - .5); game.at = 0;
   huntRound();
-  padListen("hunt", () => huntFound());
 }
 function huntRound() {
   const c = game.order[game.at], [h1, h2] = HUNT_HINTS[c];
