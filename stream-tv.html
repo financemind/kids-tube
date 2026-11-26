@@ -52,6 +52,9 @@ async function onMsg(m) {
     if (pc) pc.close();
     pc = new RTCPeerConnection({ iceServers: await iceServers() });
     pc.ontrack = (e) => {
+      // Show each frame as soon as it arrives: almost no waiting buffer (a little jumpier on a bad network).
+      try { e.receiver.playoutDelayHint = 0; } catch (err) {}
+      try { e.receiver.jitterBufferTarget = 0; } catch (err) {}
       $("v").srcObject = e.streams[0];
       $("wait").hidden = true; $("stats").hidden = false;
       if (e.track.kind === "audio") { $("sound").hidden = false; $("sound").focus(); }
@@ -127,12 +130,16 @@ async function showStats() {
   });
   if (!video) return;
   const fps = last ? Math.round((video.framesDecoded - last.framesDecoded) / ((video.timestamp - last.timestamp) / 1000)) : 0;
-  const buf = video.jitterBufferEmittedCount ? (1000 * video.jitterBufferDelay / video.jitterBufferEmittedCount) : 0;
+  // Over the last second only (the totals also hold the slow first seconds).
+  const d = (k) => (video[k] || 0) - ((last && last[k]) || 0);
+  const buf = d("jitterBufferEmittedCount") ? 1000 * d("jitterBufferDelay") / d("jitterBufferEmittedCount") : 0;
+  const dec = d("framesDecoded") ? 1000 * d("totalDecodeTime") / d("framesDecoded") : 0;
+  const codec = video.codecId && st.get(video.codecId) ? st.get(video.codecId).mimeType.replace("video/", "") : "";
   const rtt = pair && pair.currentRoundTripTime ? pair.currentRoundTripTime * 1000 : 0;
   last = video;
   const way = await pathNow(pc);
   const fa = (n) => Math.round(n).toLocaleString("fa-IR");
-  $("stats").textContent = `تصویر: ${fa(video.frameWidth || 0)}×${fa(video.frameHeight || 0)}\nفریم در ثانیه: ${fa(fps)}\nتأخیر شبکه و بافر: حدود ${fa(rtt / 2 + buf)} میلی‌ثانیه\nفریم‌های گم‌شده: ${fa(video.framesDropped || 0)}${way ? "\nراه: " + way : ""}`;
+  $("stats").textContent = `تصویر: ${fa(video.frameWidth || 0)}×${fa(video.frameHeight || 0)}\nفریم در ثانیه: ${fa(fps)}\nتأخیر شبکه و بافر: حدود ${fa(rtt / 2 + buf)} میلی‌ثانیه\nباز کردن هر فریم: ${fa(dec)} میلی‌ثانیه (${codec}${video.decoderImplementation ? "، " + video.decoderImplementation : ""})\nفریم‌های گم‌شده: ${fa(video.framesDropped || 0)}${way ? "\nراه: " + way : ""}`;
 }
 </script>
 </body>

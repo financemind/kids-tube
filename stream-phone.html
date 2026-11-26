@@ -155,7 +155,20 @@ async function pathNow(pc) {
   if (types.includes("srflx") || types.includes("prflx")) return "از راه اینترنت خانه";
   return "مستقیم داخل خانه";
 }
-let tvSdp = "";
+let tvSdp = "", videoSender = null;
+// A smaller picture (854×480) and a steady frame rate: less to squeeze, send and open.
+// Set once the TV has answered (before that the browser may not take it).
+async function tuneSender(sender) {
+  try {
+    const prm = sender.getParameters();
+    if (!prm.encodings || !prm.encodings.length) return;
+    prm.degradationPreference = "maintain-framerate";
+    prm.encodings[0].scaleResolutionDownBy = 1.5;
+    prm.encodings[0].maxBitrate = 2500000;
+    prm.encodings[0].maxFramerate = 30;
+    await sender.setParameters(prm);
+  } catch (e) {}
+}
 async function showDiag() {
   let pairs = 0, tried = 0;
   try { (await pc.getStats()).forEach((r) => { if (r.type === "candidate-pair") { pairs++; if (r.requestsSent) tried++; } }); } catch (e) {}
@@ -175,6 +188,7 @@ async function connect() {
     if (m.type === "answer" && pc) {
       tvSdp = m.sdp;
       await pc.setRemoteDescription({ type: "answer", sdp: m.sdp });
+      if (videoSender) tuneSender(videoSender);
       say("تلویزیون جواب داد…");
     }
   };
@@ -182,7 +196,18 @@ async function connect() {
   if (pc) pc.close();
   pc = new RTCPeerConnection({ iceServers: await iceServers() });
   const video = cv.captureStream(30);
-  for (const t of video.getVideoTracks()) pc.addTrack(t, video);
+  for (const t of video.getVideoTracks()) {
+    t.contentHint = "motion"; // a game: keep it smooth rather than sharp
+    const sender = pc.addTrack(t, video);
+    // H.264 first: TVs usually have a chip that opens it fast (VP8 is often opened by the slow main processor).
+    const tr = pc.getTransceivers().find((x) => x.sender === sender);
+    try {
+      const codecs = RTCRtpSender.getCapabilities("video").codecs;
+      const h264 = codecs.filter((c) => /h264/i.test(c.mimeType));
+      if (h264.length && tr.setCodecPreferences) tr.setCodecPreferences([...h264, ...codecs.filter((c) => !/h264/i.test(c.mimeType))]);
+    } catch (e) {}
+    videoSender = sender;
+  }
   for (const t of adest.stream.getAudioTracks()) pc.addTrack(t, video);
   pc.onconnectionstatechange = () => {
     const s = pc.connectionState;
