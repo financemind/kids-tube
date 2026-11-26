@@ -232,6 +232,19 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(t["urls"], ["turn:example.test:3478"])
         self.assertEqual(self.post("/api/rtc/turn", {}, None)[0], 401)
 
+    def test_rtc_diag_is_kept_per_family(self):
+        tok = self.signup()
+        self.assertEqual(self.post("/api/rtc/diag", {"role": "tv", "data": {"ev": "turn", "has": True}}, tok)[0], 200)
+        self.assertEqual(self.post("/api/rtc/diag", {"role": "tv", "data": "x"}, tok)[0], 400)
+        self.assertEqual(self.post("/api/rtc/diag", {"role": "tv", "data": {"x": "y" * 9000}}, tok)[0], 400)
+        fams = os.listdir(os.path.join(self.tmp.name, "families"))
+        found = []
+        for f in fams:
+            p = os.path.join(self.tmp.name, "families", f, "rtc-diag.jsonl")
+            if os.path.exists(p):
+                found += [json.loads(l) for l in open(p)]
+        self.assertEqual([(x["role"], x["ev"]) for x in found], [("tv", "turn")])
+
     def test_late_night_and_game_switches(self):
         parent = self.signup()
         _, p = self.post("/api/pair/new")

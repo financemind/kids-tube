@@ -501,6 +501,20 @@ def rtc_leave(key, q):
             lst.remove(q)
 
 
+def rtc_diag(fid, role, data):
+    # What each side saw while connecting (for fixing the test), last ~200 KB per family.
+    path = fam_path(fid, "rtc-diag.jsonl")
+    line = json.dumps({"at": now_ms(), "role": role, **data}, ensure_ascii=False)
+    with lock:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        try:
+            old = open(path).read()[-200_000:]
+        except OSError:
+            old = ""
+        with open(path, "w") as f:
+            f.write(old + line + "\n")
+
+
 def rtc_send(fid, to, msg):
     with lock:
         lst = list(RTCS.get((fid, to), []))
@@ -827,6 +841,12 @@ class Handler(BaseHTTPRequestHandler):
             if body.get("role") not in RTC_ROLES:
                 return self.reply(400, {"error": "bad request"})
             return self.reply(200, {"ticket": rtc_ticket(fid, body["role"])})
+        if path == "/api/rtc/diag":
+            data = body.get("data")
+            if body.get("role") not in RTC_ROLES or not isinstance(data, dict) or len(json.dumps(data)) > 8000:
+                return self.reply(400, {"error": "bad request"})
+            rtc_diag(fid, body["role"], data)
+            return self.reply(200, {"ok": True})
         if path == "/api/rtc/turn":
             return self.reply(200, {"turn": turn_login(fid)})
         if path == "/api/rtc":
