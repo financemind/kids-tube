@@ -199,6 +199,27 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(c2.getresponse().status, 403)
         c2.close()
 
+    def test_rtc_messages_pass_inside_the_family(self):
+        tok = self.signup()
+        other = self.signup("dad@example.org")
+        _, t = self.post("/api/rtc/ticket", {"role": "tv"}, tok)
+        self.assertEqual(self.post("/api/rtc/ticket", {"role": "fridge"}, tok)[0], 400)
+        import http.client
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        conn.request("GET", "/api/rtc/listen?t=" + t["ticket"])
+        resp = conn.getresponse()
+        self.assertEqual(resp.status, 200)
+        self.assertIn(b"hello", resp.fp.readline() + resp.fp.readline())
+        resp.fp.readline()
+        self.assertEqual(self.post("/api/rtc", {"to": "tv", "msg": {"type": "offer"}}, other)[1]["listeners"], 0)
+        self.assertEqual(self.post("/api/rtc", {"to": "phone", "msg": {"type": "offer"}}, tok)[1]["listeners"], 0)
+        self.assertEqual(self.post("/api/rtc", {"to": "tv", "msg": {"type": "offer", "sdp": "v=0"}}, tok)[1]["listeners"], 1)
+        self.assertIn(b'"sdp": "v=0"', resp.fp.readline())
+        conn.close()
+        self.assertEqual(self.post("/api/rtc", {"to": "tv", "msg": "x"}, tok)[0], 400)
+        self.assertEqual(self.post("/api/rtc", {"to": "tv", "msg": {"sdp": "x" * 30000}}, tok)[0], 400)
+        self.assertEqual(self.post("/api/rtc", {"to": "tv", "msg": {}}, None)[0], 401)
+
     def test_late_night_and_game_switches(self):
         parent = self.signup()
         _, p = self.post("/api/pair/new")

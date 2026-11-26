@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>تلویزیون: صفحهٔ گوشی</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+/* Test: the TV only shows what the phone draws. The phone sends its game as
+   live video (WebRTC); this page waits for it and plays it full screen.
+   Open stream-phone.html on a phone of the same family to start. */
+[hidden] { display: none !important; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #000; color: #fff; font: 22px/1.6 system-ui, sans-serif; overflow: hidden; }
+video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+.wait { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; gap: 14px; padding: 24px; background: radial-gradient(ellipse at 50% 0%, #2c3f80, #14204a 70%); }
+.wait b { font-size: 34px; }
+.wait small { opacity: .75; }
+.stats { position: fixed; top: 10px; left: 10px; direction: rtl; background: rgba(0, 0, 0, .6); border-radius: 12px; padding: 8px 14px; font-size: 16px; line-height: 1.6; white-space: pre-line; }
+button.sound { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); font: 700 22px/1 system-ui, sans-serif; padding: 16px 28px; border-radius: 16px; border: 0; background: #f6c90e; color: #1d2b4f; }
+</style>
+</head>
+<body>
+<video id="v" autoplay playsinline muted></video>
+<div class="wait" id="wait"><b id="title">در حال آماده شدن…</b><span id="msg"></span><small id="hint"></small></div>
+<div class="stats" id="stats" hidden></div>
+<button class="sound" id="sound" hidden>🔊 صدا</button>
+<script src="auth.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const say = (title, msg = "", hint = "") => { $("title").textContent = title; $("msg").textContent = msg; $("hint").textContent = hint; $("wait").hidden = false; };
+const send = (msg) => NT.call("/rtc", { to: "phone", msg });
+let pc = null, statTimer = null;
+
+if (!window.RTCPeerConnection) say("این مرورگر نمی‌تواند تصویر زنده بگیرد.", "مرورگر این تلویزیون WebRTC ندارد. این راه روی این تلویزیون کار نمی‌کند.");
+else if (!NT.base) say("این صفحه به سرور وصل نیست.", "روی noyantv.com باز کنید.");
+else if (!NT.token()) say("این تلویزیون هنوز وصل نشده.", "اول برنامهٔ نویان تی‌وی را روی همین تلویزیون باز کنید و وصلش کنید.");
+else listen();
+
+async function listen() {
+  const r = await NT.call("/rtc/ticket", { role: "tv" });
+  if (!r.ok) { say("به سرور وصل نشد.", "چند ثانیه دیگر دوباره امتحان می‌کنم."); return setTimeout(listen, 3000); }
+  const es = new EventSource(NT.base + "/rtc/listen?t=" + encodeURIComponent(r.body.ticket));
+  es.onopen = () => { if (!pc) say("آماده‌ام ✔", "حالا روی گوشی صفحهٔ «گوشی به‌جای کامپیوتر» را باز کنید و «وصل شو» را بزنید.", "noyantv.com/stream-phone.html"); };
+  es.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch (err) { return; } onMsg(m); };
+  es.onerror = () => { es.close(); setTimeout(listen, 3000); };
+}
+
+async function onMsg(m) {
+  if (m.type === "offer") {
+    if (pc) pc.close();
+    pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+    pc.ontrack = (e) => {
+      $("v").srcObject = e.streams[0];
+      $("wait").hidden = true; $("stats").hidden = false;
+      if (e.track.kind === "audio") { $("sound").hidden = false; $("sound").focus(); }
+      clearInterval(statTimer); statTimer = setInterval(showStats, 1000);
+    };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "failed") say("وصل نشد.", "تلویزیون و گوشی نتوانستند مستقیم به هم برسند. هر دو روی یک وای‌فای هستند؟");
+      if (pc.connectionState === "disconnected" || pc.connectionState === "closed") say("گوشی قطع شد.", "روی گوشی دوباره «وصل شو» را بزنید.");
+    };
+    say("دارم وصل می‌شوم…");
+    await pc.setRemoteDescription({ type: "offer", sdp: m.sdp });
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    await gathered(pc); // all network addresses go in one message, so no message can come too early
+    send({ type: "answer", sdp: pc.localDescription.sdp, ua: navigator.userAgent.slice(0, 120) });
+  } else if (m.type === "bye" && pc) {
+    pc.close(); pc = null; say("آماده‌ام ✔", "گوشی بازی را بست.");
+  }
+}
+
+function gathered(pc) {
+  return new Promise((done) => {
+    if (pc.iceGatheringState === "complete") return done();
+    pc.addEventListener("icegatheringstatechange", () => { if (pc.iceGatheringState === "complete") done(); });
+    setTimeout(done, 2500);
+  });
+}
+$("sound").onclick = () => { $("v").muted = false; $("v").play(); $("sound").hidden = true; };
+
+// What the test is for: picture size, frames a second, and about how late the picture is.
+let last = null;
+async function showStats() {
+  if (!pc) return;
+  const st = await pc.getStats();
+  let video = null, pair = null;
+  st.forEach((r) => {
+    if (r.type === "inbound-rtp" && r.kind === "video") video = r;
+    if (r.type === "candidate-pair" && r.state === "succeeded" && (r.nominated || r.selected)) pair = r;
+  });
+  if (!video) return;
+  const fps = last ? Math.round((video.framesDecoded - last.framesDecoded) / ((video.timestamp - last.timestamp) / 1000)) : 0;
+  const buf = video.jitterBufferEmittedCount ? (1000 * video.jitterBufferDelay / video.jitterBufferEmittedCount) : 0;
+  const rtt = pair && pair.currentRoundTripTime ? pair.currentRoundTripTime * 1000 : 0;
+  last = video;
+  const fa = (n) => Math.round(n).toLocaleString("fa-IR");
+  $("stats").textContent = `تصویر: ${fa(video.frameWidth || 0)}×${fa(video.frameHeight || 0)}\nفریم در ثانیه: ${fa(fps)}\nتأخیر شبکه و بافر: حدود ${fa(rtt / 2 + buf)} میلی‌ثانیه\nفریم‌های گم‌شده: ${fa(video.framesDropped || 0)}`;
+}
+</script>
+</body>
+</html>

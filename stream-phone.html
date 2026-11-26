@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#1d2b4f">
+<title>گوشی به‌جای کامپیوتر</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+/* Test: the phone is the game's computer and controller, the TV is only the
+   screen. The game is drawn here on a 1280×720 canvas and sent to the TV as
+   live video (WebRTC); the phone shows a small copy and two big buttons.
+   A running clock is drawn in the picture and shown here too: a photo of both
+   screens together shows how late the TV is. */
+[hidden] { display: none !important; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+html, body { margin: 0; height: 100%; overflow: hidden; touch-action: none; }
+body { background: radial-gradient(ellipse at 50% 0%, #2c3f80, #14204a 70%); color: #fff; font: 16px/1.5 system-ui, sans-serif; display: flex; flex-direction: column; gap: 10px;
+  padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.status { text-align: center; font-size: 14px; opacity: .9; min-height: 2.6em; margin: 0; }
+.status a { color: #ffd23f; }
+.top { display: flex; gap: 10px; align-items: center; }
+canvas { width: 46%; aspect-ratio: 16 / 9; border-radius: 10px; background: #000; flex: none; }
+.side { flex: 1; display: grid; gap: 6px; min-width: 0; }
+.clock { font: 700 26px/1 ui-monospace, monospace; direction: ltr; text-align: center; background: #000; border-radius: 10px; padding: 8px 4px; }
+button.go { font: 700 17px/1 system-ui, sans-serif; border: 0; border-radius: 12px; padding: 12px; background: #f6c90e; color: #1d2b4f; }
+button.go:disabled { opacity: .6; }
+.pad { flex: 1; display: flex; gap: 14px; direction: ltr; }
+.pad button { flex: 1; border: 0; border-radius: 30px; display: grid; place-items: center; box-shadow: 0 10px 0 rgba(0, 0, 0, .3); }
+.pad button svg { width: 50%; max-width: 140px; fill: #fff; }
+.pad .left { background: #e63946; } .pad .right { background: #2a9d4b; }
+.pad button.down { transform: translateY(8px); box-shadow: 0 2px 0 rgba(0, 0, 0, .3); }
+</style>
+</head>
+<body>
+<p class="status" id="status">در حال آماده شدن…</p>
+<div class="top">
+  <canvas id="c" width="1280" height="720"></canvas>
+  <div class="side">
+    <div class="clock" id="clock">0.000</div>
+    <button class="go" id="go" type="button">وصل شو به تلویزیون</button>
+  </div>
+</div>
+<div class="pad">
+  <button class="left" data-d="-1" aria-label="Left"><svg viewBox="0 0 24 24"><path d="M15.5 4 7 12l8.5 8 2-2-6.4-6 6.4-6z"/></svg></button>
+  <button class="right" data-d="1" aria-label="Right"><svg viewBox="0 0 24 24"><path d="M8.5 4 17 12l-8.5 8-2-2 6.4-6-6.4-6z"/></svg></button>
+</div>
+<script src="auth.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const say = (html) => { $("status").innerHTML = html; };
+const cv = $("c"), g = cv.getContext("2d");
+
+/* ---- The test game: catch the falling stars with the basket ---- */
+const W = 1280, H = 720;
+const st = { x: W / 2, dir: 0, stars: [], got: 0, t0: performance.now(), lastSpawn: 0 };
+let actx = null, adest = null;
+function beep() {
+  if (!actx) return;
+  const o = actx.createOscillator(), v = actx.createGain();
+  o.frequency.value = 880; o.type = "sine";
+  v.gain.setValueAtTime(0.25, actx.currentTime); v.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.25);
+  o.connect(v); v.connect(adest); v.connect(actx.destination);
+  o.start(); o.stop(actx.currentTime + 0.3);
+}
+function star(x, y, r) {
+  g.beginPath();
+  for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * .45 : r; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+  g.closePath(); g.fill();
+}
+function frame(now) {
+  const dt = Math.min(50, now - (st.last || now)); st.last = now;
+  st.x = Math.max(90, Math.min(W - 90, st.x + st.dir * dt * 0.9));
+  if (now - st.lastSpawn > 700) { st.lastSpawn = now; st.stars.push({ x: 80 + Math.random() * (W - 160), y: -40, v: 0.25 + Math.random() * 0.2 }); }
+  for (const s of st.stars) s.y += s.v * dt;
+  st.stars = st.stars.filter((s) => {
+    if (s.y > H - 120 && s.y < H - 60 && Math.abs(s.x - st.x) < 100) { st.got++; beep(); return false; }
+    return s.y < H + 40;
+  });
+  // Sky, stars, basket, score.
+  const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, "#1b2a6b"); sky.addColorStop(1, "#4a63c9");
+  g.fillStyle = sky; g.fillRect(0, 0, W, H);
+  g.fillStyle = "#ffd23f"; for (const s of st.stars) star(s.x, s.y, 34);
+  g.fillStyle = "#c97a3a"; g.beginPath(); g.moveTo(st.x - 90, H - 110); g.lineTo(st.x + 90, H - 110); g.lineTo(st.x + 65, H - 30); g.lineTo(st.x - 65, H - 30); g.closePath(); g.fill();
+  g.fillStyle = "#fff"; g.font = "700 64px system-ui"; g.textAlign = "right"; g.fillText("⭐ " + st.got, W - 40, 80);
+  // The clock: the same number shows on the phone; a photo of both shows the delay.
+  const clock = ((now - st.t0) / 1000).toFixed(3);
+  g.fillStyle = "rgba(0,0,0,.7)"; g.fillRect(30, 24, 330, 84);
+  g.fillStyle = "#fff"; g.font = "700 60px ui-monospace, monospace"; g.textAlign = "left"; g.fillText(clock, 48, 88);
+  $("clock").textContent = clock;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+for (const b of document.querySelectorAll(".pad button")) {
+  b.addEventListener("pointerdown", (e) => { e.preventDefault(); b.classList.add("down"); st.dir = Number(b.dataset.d); if (navigator.vibrate) navigator.vibrate(15); });
+  for (const ev of ["pointerup", "pointerleave", "pointercancel"]) b.addEventListener(ev, () => { b.classList.remove("down"); if (st.dir === Number(b.dataset.d)) st.dir = 0; });
+}
+document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+/* ---- Sending it to the TV ---- */
+let pc = null;
+if (!window.RTCPeerConnection || !cv.captureStream) { say("این مرورگر نمی‌تواند تصویر زنده بفرستد."); $("go").disabled = true; }
+else if (!NT.base) { say("این صفحه روی این کامپیوتر به سرور وصل نیست. بازی را اینجا می‌شود امتحان کرد."); $("go").disabled = true; }
+else if (!NT.token()) { say('اول با همین گوشی وارد حساب خانواده شوید: <a href="account.html">ورود</a>'); $("go").disabled = true; }
+else say("اول روی تلویزیون <b>noyantv.com/stream-tv.html</b> را باز کنید، بعد «وصل شو» را بزنید.");
+
+$("go").onclick = connect;
+async function connect() {
+  $("go").disabled = true;
+  say("دارم وصل می‌شوم…");
+  try { if (navigator.wakeLock) navigator.wakeLock.request("screen").catch(() => {}); } catch (e) {}
+  if (!actx) { actx = new (window.AudioContext || window.webkitAudioContext)(); adest = actx.createMediaStreamDestination(); }
+  const r = await NT.call("/rtc/ticket", { role: "phone" });
+  if (!r.ok) { say("به سرور وصل نشد."); $("go").disabled = false; return; }
+  const es = new EventSource(NT.base + "/rtc/listen?t=" + encodeURIComponent(r.body.ticket));
+  es.onmessage = async (e) => {
+    let m; try { m = JSON.parse(e.data); } catch (err) { return; }
+    if (m.type === "answer" && pc) {
+      await pc.setRemoteDescription({ type: "answer", sdp: m.sdp });
+      say("تلویزیون جواب داد…");
+    }
+  };
+  await new Promise((ok) => { es.onopen = ok; setTimeout(ok, 3000); });
+  if (pc) pc.close();
+  pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+  const video = cv.captureStream(30);
+  for (const t of video.getVideoTracks()) pc.addTrack(t, video);
+  for (const t of adest.stream.getAudioTracks()) pc.addTrack(t, video);
+  pc.onconnectionstatechange = () => {
+    const s = pc.connectionState;
+    if (s === "connected") say("✔ وصل است. حالا به تلویزیون نگاه کنید و بازی کنید.");
+    if (s === "failed") { say("وصل نشد. گوشی و تلویزیون روی یک وای‌فای هستند؟"); $("go").disabled = false; }
+    if (s === "disconnected") { say("قطع شد."); $("go").disabled = false; }
+  };
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await new Promise((done) => { // all network addresses in one message
+    if (pc.iceGatheringState === "complete") return done();
+    pc.addEventListener("icegatheringstatechange", () => { if (pc.iceGatheringState === "complete") done(); });
+    setTimeout(done, 2500);
+  });
+  const s = await NT.call("/rtc", { to: "tv", msg: { type: "offer", sdp: pc.localDescription.sdp } });
+  if (!s.ok) { say("به سرور وصل نشد."); $("go").disabled = false; return; }
+  if (!s.body.listeners) { say("تلویزیون هنوز آماده نیست. اول روی تلویزیون <b>noyantv.com/stream-tv.html</b> را باز کنید."); $("go").disabled = false; return; }
+  setTimeout(() => { if (pc && pc.connectionState !== "connected") { say("تلویزیون جواب نداد. صفحهٔ تلویزیون باز است؟"); $("go").disabled = false; } }, 12000);
+}
+addEventListener("pagehide", () => { if (pc) NT.call("/rtc", { to: "tv", msg: { type: "bye" } }, { keepalive: true }); });
+</script>
+</body>
+</html>

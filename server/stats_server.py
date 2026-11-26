@@ -446,6 +446,58 @@ def pad_send(fid, btn):
     return len(lst)
 
 
+# ---------- phone as the game's computer (test) ----------
+# The phone draws a game and sends it to the TV as live video (WebRTC). The two
+# only need to swap a few short messages first (offer, answer, network
+# addresses); this passes them on inside the family. Each side listens like the
+# pad does (one-time ticket, then server-sent events) and sends with POST
+# /api/rtc {to: "tv" | "phone", msg}. The video itself never comes here.
+RTC_ROLES = {"tv", "phone"}
+RTC_TICKETS = {}  # ticket -> (fid, role, expires)
+RTCS = {}  # (fid, role) -> list of queues
+MAX_RTC_MSG = 20_000
+
+
+def rtc_ticket(fid, role):
+    t = secrets.token_urlsafe(18)
+    with lock:
+        for k in [k for k, v in RTC_TICKETS.items() if v[2] < time.time()]:
+            del RTC_TICKETS[k]
+        RTC_TICKETS[t] = (fid, role, time.time() + 120)
+    return t
+
+
+def rtc_join(ticket):
+    with lock:
+        fid, role, exp = RTC_TICKETS.pop(ticket, (None, None, 0))
+        if not fid or exp < time.time():
+            return None, None
+        q = queue.Queue(maxsize=200)
+        lst = RTCS.setdefault((fid, role), [])
+        lst.append(q)
+        while len(lst) > 2:
+            lst.pop(0).put_nowait(None)  # the oldest one stops listening
+    return (fid, role), q
+
+
+def rtc_leave(key, q):
+    with lock:
+        lst = RTCS.get(key, [])
+        if q in lst:
+            lst.remove(q)
+
+
+def rtc_send(fid, to, msg):
+    with lock:
+        lst = list(RTCS.get((fid, to), []))
+    for q in lst:
+        try:
+            q.put_nowait(msg)
+        except queue.Full:
+            pass
+    return len(lst)
+
+
 def clean_event(ev, device, label):
     if not isinstance(ev, dict) or ev.get("a") not in ACTIONS or not isinstance(ev.get("at"), (int, float)):
         return None
@@ -635,12 +687,20 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {"ok": True})
         if self.path.startswith("/api/pad/listen?t="):
             return self.pad_stream(self.path.split("=", 1)[1])
+        if self.path.startswith("/api/rtc/listen?t="):
+            key, q = rtc_join(self.path.split("=", 1)[1])
+            if not key:
+                return self.reply(403, {"error": "ticket"})
+            return self.event_stream(q, lambda: rtc_leave(key, q))
         self.reply(404, {"error": "not found"})
 
     def pad_stream(self, ticket):
         fid, q = pad_join(ticket)
         if not fid:
             return self.reply(403, {"error": "ticket"})
+        self.event_stream(q, lambda: pad_leave(fid, q))
+
+    def event_stream(self, q, leave):
         self.send_response(200)
         self.cors()
         self.send_header("Content-Type", "text/event-stream")
@@ -664,7 +724,7 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError, OSError):
             pass
         finally:
-            pad_leave(fid, q)
+            leave()
 
     def client_ip(self):
         return self.headers.get("X-Forwarded-For", self.client_address[0]).split(",")[0].strip()
@@ -749,6 +809,15 @@ class Handler(BaseHTTPRequestHandler):
             if btn not in PAD_BUTTONS:
                 return self.reply(400, {"error": "bad request"})
             return self.reply(200, {"listeners": pad_send(fid, btn)})
+        if path == "/api/rtc/ticket":
+            if body.get("role") not in RTC_ROLES:
+                return self.reply(400, {"error": "bad request"})
+            return self.reply(200, {"ticket": rtc_ticket(fid, body["role"])})
+        if path == "/api/rtc":
+            to, msg = body.get("to"), body.get("msg")
+            if to not in RTC_ROLES or not isinstance(msg, dict) or len(json.dumps(msg)) > MAX_RTC_MSG:
+                return self.reply(400, {"error": "bad request"})
+            return self.reply(200, {"listeners": rtc_send(fid, to, msg)})
         if path == "/api/games":
             if s["kind"] != "parent":
                 return self.reply(403, {"error": "parents only"})
