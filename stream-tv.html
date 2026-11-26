@@ -128,7 +128,7 @@ async function pathNow(pc) {
 // Short reports to our server about connecting (no picture, no addresses):
 // whether a relay password came, which kinds of address were found, and why
 // reaching the relay failed if it did. Read on the server to fix this test.
-const VERSION = 12;
+const VERSION = 13;
 function report(ev, data = {}) { NT.call("/rtc/diag", { role: "tv", data: { ev, v: VERSION, ...data } }); }
 async function addRemote(pc, c) {
   const kind = ((c && c.candidate) || "").split(" ")[7] || "?";
@@ -217,6 +217,12 @@ async function showStats() {
   const lc = pair && st.get(pair.localCandidateId);
   if (lc) proto = (lc.candidateType === "relay" ? (lc.relayProtocol || lc.protocol) : lc.protocol || "").toUpperCase();
   const kbps = last ? Math.round(8 * d("bytesReceived") / ((video.timestamp - last.timestamp))) : 0;
+  // Every 5 seconds a short report: the waiting buffer and why it grows (jitter, lost packets).
+  if (!showStats.n) showStats.n = 0;
+  if (++showStats.n % 5 === 0) report("recv", { fps, kbps, buf: Math.round(buf), dec: Math.round(dec), net: Math.round(rtt / 2),
+    jitter: Math.round(1000 * (video.jitter || 0)), lost: d("packetsLost"), dropped: d("framesDropped"), nack: d("nackCount"), pli: d("pliCount"), freeze: d("freezeCount") });
+  // Keep asking for no waiting buffer (some browsers drift back up).
+  try { pc.getReceivers().forEach((r) => { if (r.track && r.track.kind === "video") r.playoutDelayHint = 0; }); } catch (e) {}
   last = video;
   const way = await pathNow(pc);
   const fa = (n) => Math.round(n).toLocaleString("fa-IR");
@@ -225,6 +231,7 @@ async function showStats() {
     + `صف تلویزیون (بافر): ${fa(buf)} میلی‌ثانیه\n`
     + `باز کردن هر فریم: ${fa(dec)} میلی‌ثانیه (${codec}${video.decoderImplementation ? "، " + video.decoderImplementation : ""})\n`
     + `جمع تقریبی: ${fa(rtt / 2 + buf + dec)} میلی‌ثانیه\n`
+    + `لرزش شبکه: ${fa(1000 * (video.jitter || 0))} میلی‌ثانیه، بستهٔ گم‌شده: ${fa(video.packetsLost || 0)}\n`
     + `فریم‌های گم‌شده: ${fa(video.framesDropped || 0)}${way ? "\nراه: " + way : ""}`;
 }
 </script>

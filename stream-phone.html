@@ -169,7 +169,7 @@ async function pathNow(pc) {
 // Short reports to our server about connecting (no picture, no addresses):
 // whether a relay password came, which kinds of address were found, and why
 // reaching the relay failed if it did. Read on the server to fix this test.
-const VERSION = 12;
+const VERSION = 13;
 function report(ev, data = {}) { NT.call("/rtc/diag", { role: "phone", data: { ev, v: VERSION, ...data } }); }
 async function addRemote(pc, c) {
   const kind = ((c && c.candidate) || "").split(" ")[7] || "?";
@@ -219,13 +219,21 @@ function watchPc(pc, gotTurn) {
    told to let go — mixing two TVs' answers left it stuck at "connecting". */
 let sid = "", tvId = null;
 const toTv = (msg, opts) => NT.call("/rtc", { to: "tv", msg: { ...msg, sid, tv: tvId } }, opts);
+let frameTimer = null, sendStatsTimer = null, capTrack = null;
+function frameClock() { // one frame every 1/fps second, at the chosen quality's rate
+  clearInterval(frameTimer);
+  const q = QUALITY[$("quality").value] || QUALITY.low;
+  frameTimer = setInterval(() => { if (capTrack && capTrack.requestFrame) capTrack.requestFrame(); }, Math.round(1000 / q.fps));
+}
 let tvSdp = "", videoSender = null, tvCands = [], myCands = [], early = [], offered = false;
 const asLines = (list) => list.map((c) => "a=" + c.candidate).join("\n");
 // A smaller picture (854×480) and a steady frame rate: less to squeeze, send and open.
 // Set once the TV has answered (before that the browser may not take it).
 // Low: 640×360, 20 frames a second, under 1 Mbit/s — less for a weak TV to open,
 // so frames don't pile up. Middle: 854×480, 30 a second. Changes at once while connected.
-const QUALITY = { low: { scale: 2, fps: 20, bps: 900000 }, mid: { scale: 1.5, fps: 30, bps: 2000000 } };
+// The bit-rate caps are generous on purpose: when the basket moves, frames get
+// bigger, and a tight cap spreads a big frame out so it arrives late.
+const QUALITY = { low: { scale: 2, fps: 20, bps: 1800000 }, mid: { scale: 1.5, fps: 30, bps: 3000000 } };
 async function tuneSender(sender) {
   try {
     const q = QUALITY[$("quality").value] || QUALITY.low;
@@ -238,7 +246,21 @@ async function tuneSender(sender) {
     await sender.setParameters(prm);
   } catch (e) {}
 }
-$("quality").onchange = () => { if (videoSender) tuneSender(videoSender); };
+// Every 5 seconds: frames sent, bit rate, why quality was lowered, and how long packets waited to go out.
+let lastOut = null;
+async function sendStats() {
+  if (!pc || pc.connectionState === "closed") return clearInterval(sendStatsTimer);
+  let out = null;
+  try { (await pc.getStats()).forEach((r) => { if (r.type === "outbound-rtp" && r.kind === "video") out = r; }); } catch (e) {}
+  if (!out) return;
+  const d = (k) => (out[k] || 0) - ((lastOut && lastOut[k]) || 0), secs = lastOut ? (out.timestamp - lastOut.timestamp) / 1000 : 5;
+  report("send", { fps: Math.round(d("framesEncoded") / secs), kbps: Math.round(8 * d("bytesSent") / secs / 1000),
+    size: `${out.frameWidth || 0}x${out.frameHeight || 0}`, limit: out.qualityLimitationReason || "",
+    wait: d("packetsSent") ? Math.round(1000 * d("totalPacketSendDelay") / d("packetsSent")) : 0,
+    enc: d("framesEncoded") ? Math.round(1000 * d("totalEncodeTime") / d("framesEncoded")) : 0, keys: d("keyFramesEncoded"), nack: d("nackCount"), pli: d("pliCount") });
+  lastOut = out;
+}
+$("quality").onchange = () => { if (videoSender) tuneSender(videoSender); if (capTrack) frameClock(); };
 $("codec").onchange = () => { if (pc && pc.connectionState === "connected") say("برای عوض شدن فرمت، دوباره «وصل شو» را بزنید."); $("go").disabled = false; };
 async function showDiag() {
   let pairs = 0, tried = 0;
@@ -266,6 +288,7 @@ async function connect() {
         tvSdp = m.sdp;
         await pc.setRemoteDescription({ type: "answer", sdp: m.sdp });
         if (videoSender) tuneSender(videoSender);
+        clearInterval(sendStatsTimer); sendStatsTimer = setInterval(sendStats, 5000);
         say("تلویزیون جواب داد…");
         report("answer", { tv: kinds(m.sdp) });
         for (const c of early.splice(0)) await addRemote(pc, c);
@@ -281,7 +304,11 @@ async function connect() {
   const servers = await iceServers();
   pc = new RTCPeerConnection({ iceServers: servers, iceTransportPolicy: RELAY_ONLY ? "relay" : "all" });
   watchPc(pc, servers.length > 1);
-  const video = cv.captureStream(30);
+  // Frames go out on a steady clock (not whenever the screen redraws): uneven
+  // frames made the TV keep a bigger and bigger waiting buffer.
+  const video = cv.captureStream(0);
+  capTrack = video.getVideoTracks()[0];
+  frameClock();
   for (const t of video.getVideoTracks()) {
     t.contentHint = "motion"; // a game: keep it smooth rather than sharp
     const sender = pc.addTrack(t, video);
