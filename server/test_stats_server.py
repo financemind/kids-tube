@@ -194,6 +194,8 @@ class ServerTest(unittest.TestCase):
         self.assertIn(b'"btn": "right"', line)
         conn.close()
         self.assertEqual(self.post("/api/pad", {"btn": "jump"}, tok)[0], 400)
+        for btn in ("lane0", "lane2", "blow", "shake"):
+            self.assertEqual(self.post("/api/pad", {"btn": btn}, tok)[0], 200)
         c2 = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
         c2.request("GET", "/api/pad/listen?t=" + t["ticket"])  # a ticket works once
         self.assertEqual(c2.getresponse().status, 403)

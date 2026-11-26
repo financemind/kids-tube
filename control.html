@@ -8,16 +8,25 @@
 <title>دستهٔ بازی</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <style>
-/* The phone as a game controller for the TV: two huge buttons (left red,
-   right green, like the remote's colour keys) and a yellow horn in the middle.
-   A parent opens it, hands the phone to the child, and the car on the TV moves.
-   Nothing to read for the child; one short line for the parent at the top. */
+/* The phone as a game controller for the TV, in four ways (tabs at the top;
+   the TV's code picks one with ?mode=):
+   - buttons: two huge buttons (left red, right green) and a yellow horn;
+   - tilt: hold the phone like a steering wheel; tilting picks the car's lane;
+   - blow: blow at the phone (its microphone) to put out the candles on the TV;
+   - shake: shake the phone to shake the apple tree on the TV.
+   Sounds play from the phone itself, in the child's hands. The microphone is
+   only measured on the phone (how loud); nothing is recorded or sent. */
+[hidden] { display: none !important; }
 :root { --ink: #1d2b4f; --bg: #1d2b4f; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 html, body { margin: 0; height: 100%; overflow: hidden; touch-action: none; }
 body { background: radial-gradient(ellipse at 50% 0%, #2c3f80, #14204a 70%); color: #fff; font: 16px/1.5 system-ui, sans-serif; display: flex; flex-direction: column; }
-.status { padding: max(10px, env(safe-area-inset-top)) 16px 6px; text-align: center; font-size: 14px; opacity: .85; min-height: 2.6em; }
+.tabs { display: flex; gap: 6px; padding: max(8px, env(safe-area-inset-top)) 10px 0; }
+.tabs button { flex: 1; font: 600 14px/1.2 system-ui, sans-serif; border: 0; border-radius: 12px; padding: 8px 4px; background: rgba(255, 255, 255, .12); color: #fff; }
+.tabs button.on { background: #f6c90e; color: #1d2b4f; }
+.status { padding: 6px 16px; text-align: center; font-size: 14px; opacity: .85; min-height: 2.6em; margin: 0; }
 .status a { color: #ffd23f; }
+.mode { flex: 1; display: flex; min-height: 0; }
 .pad { flex: 1; display: flex; gap: 14px; padding: 10px max(14px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); direction: ltr; align-items: stretch; }
 .pad button { border: 0; border-radius: 34px; cursor: pointer; display: grid; place-items: center; box-shadow: 0 10px 0 rgba(0, 0, 0, .3), inset 0 -8px 0 rgba(0, 0, 0, .15); transition: transform .05s; }
 .pad button svg { width: 60%; max-width: 160px; height: auto; fill: #fff; filter: drop-shadow(0 4px 0 rgba(0, 0, 0, .2)); }
@@ -25,37 +34,204 @@ body { background: radial-gradient(ellipse at 50% 0%, #2c3f80, #14204a 70%); col
 .pad .honk { flex: .6; background: #f6c90e; border-radius: 50%; align-self: center; aspect-ratio: 1; }
 .pad .honk svg { fill: #1d2b4f; }
 .pad button.down { transform: translateY(8px) scale(.97); box-shadow: 0 2px 0 rgba(0, 0, 0, .3), inset 0 -4px 0 rgba(0, 0, 0, .15); }
-/* Phone held upright: left and right still side by side (left on the left), the horn below them. */
 @media (orientation: portrait) { .pad { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr auto; grid-template-areas: "l r" "h h"; }
   .pad .left { grid-area: l; } .pad .right { grid-area: r; } .pad .honk { grid-area: h; width: 42%; justify-self: center; } }
+/* Tilt, blow and shake: one big picture in the middle, and a start button. */
+.big { flex: 1; display: grid; place-items: center; align-content: center; gap: 18px; padding: 12px 16px max(18px, env(safe-area-inset-bottom)); text-align: center; }
+.big svg.pic { width: min(62vw, 46vh); height: auto; transition: transform .08s linear; }
+.meter { width: min(70vw, 320px); height: 18px; border-radius: 99px; background: rgba(255, 255, 255, .15); overflow: hidden; }
+.meter i { display: block; height: 100%; width: 0; background: #f6c90e; border-radius: 99px; transition: width .06s linear; }
+button.start { font: 700 20px/1 system-ui, sans-serif; border: 0; border-radius: 18px; padding: 16px 26px; background: #f6c90e; color: #1d2b4f; box-shadow: 0 8px 0 rgba(0, 0, 0, .25); }
+button.round { font: 700 18px/1 system-ui, sans-serif; border: 0; border-radius: 50%; width: 92px; height: 92px; background: #f6c90e; color: #1d2b4f; box-shadow: 0 8px 0 rgba(0, 0, 0, .25); }
+.hint { margin: 0; opacity: .8; font-size: 15px; }
 </style>
 </head>
 <body>
-<p class="status" id="status">در حال وصل شدن…</p>
-<div class="pad">
-  <button class="left" data-btn="left" aria-label="Left"><svg viewBox="0 0 24 24"><path d="M15.5 4 7 12l8.5 8 2-2-6.4-6 6.4-6z"/></svg></button>
-  <button class="honk" data-btn="honk" aria-label="Horn"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg></button>
-  <button class="right" data-btn="right" aria-label="Right"><svg viewBox="0 0 24 24"><path d="M8.5 4 17 12l-8.5 8-2-2 6.4-6-6.4-6z"/></svg></button>
+<div class="tabs" id="tabs">
+  <button data-mode="buttons">🎮 دکمه</button><button data-mode="tilt">🚗 کج کن</button><button data-mode="blow">🎂 فوت</button><button data-mode="shake">🌳 تکان</button>
 </div>
+<p class="status" id="status">در حال وصل شدن…</p>
+
+<div class="mode" id="m-buttons">
+  <div class="pad">
+    <button class="left" data-btn="left" aria-label="Left"><svg viewBox="0 0 24 24"><path d="M15.5 4 7 12l8.5 8 2-2-6.4-6 6.4-6z"/></svg></button>
+    <button class="honk" data-btn="honk" aria-label="Horn"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg></button>
+    <button class="right" data-btn="right" aria-label="Right"><svg viewBox="0 0 24 24"><path d="M8.5 4 17 12l-8.5 8-2-2 6.4-6-6.4-6z"/></svg></button>
+  </div>
+</div>
+
+<div class="mode" id="m-tilt" hidden>
+  <div class="big">
+    <svg class="pic" id="wheel" viewBox="0 0 200 200"><circle cx="100" cy="100" r="86" fill="none" stroke="#e8e8ef" stroke-width="22"/>
+      <circle cx="100" cy="100" r="26" fill="#e05545"/><path d="M100 74 V22 M78 112 L30 140 M122 112 L170 140" stroke="#e8e8ef" stroke-width="16" stroke-linecap="round"/>
+      <circle cx="100" cy="14" r="9" fill="#f6c90e"/></svg>
+    <button class="start" id="tiltStart">شروع فرمان</button>
+    <p class="hint" id="tiltHint">گوشی را مثل فرمان با دو دست بگیرید و به چپ و راست کج کنید.</p>
+    <button class="round" id="tiltHonk" hidden aria-label="Horn">بوق</button>
+  </div>
+</div>
+
+<div class="mode" id="m-blow" hidden>
+  <div class="big">
+    <svg class="pic" id="flame" viewBox="0 0 200 220"><rect x="70" y="110" width="60" height="100" rx="10" fill="#f2a0c0"/><path d="M70 140 H130 M70 175 H130" stroke="#fff" stroke-width="8"/>
+      <path d="M100 110 V92" stroke="#444" stroke-width="5"/><path id="fire" d="M100 20 C124 52 122 82 100 92 C78 82 76 52 100 20 Z" fill="#ffb300"/></svg>
+    <div class="meter"><i id="level"></i></div>
+    <button class="start" id="blowStart">روشن کردن میکروفون</button>
+    <p class="hint">گوشی را جلوی دهان بچه بگیرید و بگویید فوت کند. صدا فقط روی همین گوشی اندازه گرفته می‌شود؛ چیزی ضبط یا فرستاده نمی‌شود.</p>
+  </div>
+</div>
+
+<div class="mode" id="m-shake" hidden>
+  <div class="big">
+    <svg class="pic" id="tree" viewBox="0 0 200 220"><rect x="88" y="120" width="24" height="90" rx="6" fill="#8a6a44"/>
+      <circle cx="100" cy="90" r="70" fill="#6f9a5e"/><circle cx="60" cy="105" r="38" fill="#87b072"/><circle cx="140" cy="100" r="36" fill="#5f8a50"/>
+      <circle cx="70" cy="80" r="11" fill="#e05545"/><circle cx="125" cy="70" r="11" fill="#e05545"/><circle cx="105" cy="115" r="11" fill="#e05545"/></svg>
+    <button class="start" id="shakeStart">شروع</button>
+    <p class="hint">گوشی را محکم در دست بگیرید و تکان بدهید.</p>
+  </div>
+</div>
+
 <script src="auth.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 function say(html) { $("status").innerHTML = html; }
-if (!NT.base) say("این صفحه روی این کامپیوتر به سرور وصل نیست.");
-else if (!NT.token()) say('اول با گوشی وارد حساب خانواده شوید: <a href="account.html">ورود</a>');
-else say("بازی ماشین را روی تلویزیون باز کنید، بعد گوشی را به بچه بدهید.");
+const WHERE = { buttons: "بازی ماشین یا سیب بگیر", tilt: "بازی ماشین", blow: "بازی شمع‌ها", shake: "بازی درخت سیب" };
+let mode = new URLSearchParams(location.search).get("mode") || new URLSearchParams(location.search).get("m"); // ?m= is the short form in the TV's code
+if (!WHERE[mode]) mode = "buttons";
 
-// Each press goes to the TV at once. The reply says how many TVs are listening.
+function hello() {
+  if (!NT.base) say("این صفحه روی این کامپیوتر به سرور وصل نیست.");
+  else if (!NT.token()) say('اول با گوشی وارد حساب خانواده شوید: <a href="account.html">ورود</a>');
+  else say(`${WHERE[mode]} را روی تلویزیون باز کنید، بعد گوشی را به بچه بدهید.`);
+}
+function setMode(m) {
+  mode = m;
+  for (const b of $("tabs").children) b.classList.toggle("on", b.dataset.mode === m);
+  for (const k of Object.keys(WHERE)) $("m-" + k).hidden = k !== m;
+  history.replaceState(null, "", "?mode=" + m);
+  hello();
+}
+for (const b of $("tabs").children) b.onclick = () => setMode(b.dataset.mode);
+
+// Each signal goes to the TV at once. The reply says how many TVs are listening.
+let lastWarn = 0;
 async function press(btn) {
-  if (navigator.vibrate) navigator.vibrate(25);
   const r = await NT.call("/pad", { btn });
   if (!r.ok) return say(r.status === 401 ? 'اول وارد شوید: <a href="account.html">ورود</a>' : "به سرور وصل نشد.");
-  say(r.body.listeners ? "✔ وصل است. بازی کن!" : "تلویزیون هنوز در بازی ماشین نیست. اول بازی ماشین را روی تلویزیون باز کنید.");
+  if (r.body.listeners) say("✔ وصل است. بازی کن!");
+  else if (Date.now() - lastWarn > 3000) { lastWarn = Date.now(); say(`تلویزیون هنوز در ${WHERE[mode]} نیست. اول آن را روی تلویزیون باز کنید.`); }
 }
+
+/* Sounds from the phone's own speaker (in the child's hands). */
+let actx = null;
+const ac = () => { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === "suspended") actx.resume(); return actx; };
+function beep(freqs, type = "sine", len = 0.18, vol = 0.25, gap = 0.1) {
+  try {
+    const a = ac();
+    freqs.forEach((f, i) => { const o = a.createOscillator(), g = a.createGain(), t = a.currentTime + i * gap;
+      o.type = type; o.frequency.value = f; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + len);
+      o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + len + 0.02); });
+  } catch (e) {}
+}
+function noise(len = 0.35, vol = 0.3, lowpass = 1200) { // a rustle or a puff
+  try {
+    const a = ac(), n = a.createBuffer(1, a.sampleRate * len, a.sampleRate), d = n.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+    const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+    s.buffer = n; f.type = "lowpass"; f.frequency.value = lowpass; g.gain.value = vol;
+    s.connect(f); f.connect(g); g.connect(a.destination); s.start();
+  } catch (e) {}
+}
+const honkSound = () => beep([392, 392], "square", 0.16, 0.12, 0.22);
+
+/* ---- Buttons ---- */
 for (const b of document.querySelectorAll(".pad button")) {
-  b.addEventListener("pointerdown", (e) => { e.preventDefault(); b.classList.add("down"); press(b.dataset.btn); });
+  b.addEventListener("pointerdown", (e) => {
+    e.preventDefault(); b.classList.add("down");
+    if (navigator.vibrate) navigator.vibrate(25);
+    if (b.dataset.btn === "honk") honkSound();
+    press(b.dataset.btn);
+  });
   for (const ev of ["pointerup", "pointerleave", "pointercancel"]) b.addEventListener(ev, () => b.classList.remove("down"));
 }
+
+/* ---- Tilt: the phone is a steering wheel; the tilt picks the lane ---- */
+async function motionOk() { // iPhone asks once; Android just says yes
+  try {
+    if (window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission) return (await DeviceOrientationEvent.requestPermission()) === "granted";
+    if (window.DeviceMotionEvent && DeviceMotionEvent.requestPermission) return (await DeviceMotionEvent.requestPermission()) === "granted";
+  } catch (e) { return false; }
+  return true;
+}
+let lane = 1;
+function tiltAngle(e) { // left/right tilt, whichever way the phone is held
+  const angle = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+  if (angle === 90) return e.beta; if (angle === -90 || angle === 270) return -e.beta;
+  return e.gamma;
+}
+$("tiltStart").onclick = async () => {
+  if (!(await motionOk())) return say("این گوشی اجازهٔ حس کج شدن را نداد.");
+  ac();
+  $("tiltStart").hidden = true; $("tiltHonk").hidden = false;
+  $("tiltHint").textContent = "صاف: وسط · کج به چپ: چپ · کج به راست: راست";
+  addEventListener("deviceorientation", (e) => {
+    if (mode !== "tilt" || e.gamma == null) return;
+    const t = Math.max(-45, Math.min(45, tiltAngle(e) || 0));
+    $("wheel").style.transform = `rotate(${t * 1.5}deg)`;
+    // A little room around each edge, so the car doesn't flicker between lanes.
+    let next = lane;
+    if (t < -18) next = 0; else if (t > 18) next = 2; else if (Math.abs(t) < 12) next = 1;
+    if (next !== lane) { lane = next; if (navigator.vibrate) navigator.vibrate(15); beep([lane === 1 ? 523 : 440], "sine", 0.08, 0.12); press("lane" + lane); }
+  });
+};
+$("tiltHonk").addEventListener("pointerdown", (e) => { e.preventDefault(); honkSound(); press("honk"); });
+
+/* ---- Blow: how loud the microphone is, measured here only ---- */
+$("blowStart").onclick = async () => {
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
+  catch (e) { return say("اجازهٔ میکروفون داده نشد."); }
+  $("blowStart").hidden = true;
+  const a = ac(), src = a.createMediaStreamSource(stream), an = a.createAnalyser();
+  an.fftSize = 1024; src.connect(an);
+  const buf = new Float32Array(an.fftSize);
+  let loudSince = 0, quietUntil = 0;
+  const step = () => {
+    an.getFloatTimeDomainData(buf);
+    let sum = 0; for (const v of buf) sum += v * v;
+    const rms = Math.sqrt(sum / buf.length), now = performance.now();
+    $("level").style.width = Math.min(100, rms * 400) + "%";
+    $("fire").style.transform = `scale(${1 - Math.min(0.6, rms * 3)}, 1)`; $("fire").style.transformOrigin = "100px 92px";
+    // A blow: loud for about a fifth of a second; then a short rest (so the puff sound isn't heard as another blow).
+    if (rms > 0.12 && now > quietUntil) {
+      if (!loudSince) loudSince = now;
+      else if (now - loudSince > 180) { loudSince = 0; quietUntil = now + 900; press("blow"); noise(0.45, 0.25, 900); if (navigator.vibrate) navigator.vibrate(40); }
+    } else loudSince = 0;
+    requestAnimationFrame(step);
+  };
+  step();
+};
+
+/* ---- Shake: a strong jolt of the phone ---- */
+$("shakeStart").onclick = async () => {
+  if (!(await motionOk())) return say("این گوشی اجازهٔ حس تکان را نداد.");
+  ac();
+  $("shakeStart").hidden = true;
+  let last = 0, tilt = 0;
+  addEventListener("devicemotion", (e) => {
+    if (mode !== "shake") return;
+    const g = e.accelerationIncludingGravity || {}, x = g.x || 0, y = g.y || 0, z = g.z || 0;
+    const jolt = Math.abs(Math.sqrt(x * x + y * y + z * z) - 9.8), now = performance.now();
+    if (jolt > 11 && now - last > 450) {
+      last = now; press("shake");
+      noise(0.35, 0.3, 2500); setTimeout(() => beep([300, 200], "sine", 0.12, 0.25, 0.08), 250); // leaves, then an apple's bump
+      if (navigator.vibrate) navigator.vibrate(60);
+      tilt = tilt > 0 ? -8 : 8; $("tree").style.transform = `rotate(${tilt}deg)`; setTimeout(() => { $("tree").style.transform = ""; }, 200);
+    }
+  });
+};
+
+setMode(mode);
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 // Keep the connection to the server open and warm: a new secure connection costs
 // about three times as long as a press on an open one.

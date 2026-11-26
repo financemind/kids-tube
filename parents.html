@@ -671,7 +671,7 @@ function showTonight() {
   }
 }
 /* Games: the whole games part on or off, and each game on its own. */
-const GAME_ORDER = ["balloons", "colors", "count", "feed", "car", "maze", "puzzle", "pairs", "sizes", "catch", "paint", "story", "dress", "cook", "photo", "climb", "music", "sounds", "bubbles", "hide", "tower", "train", "album", "simon"];
+const GAME_ORDER = ["balloons", "colors", "count", "feed", "car", "maze", "puzzle", "pairs", "sizes", "catch", "paint", "story", "dress", "cook", "photo", "climb", "music", "sounds", "bubbles", "hide", "tower", "train", "candles", "tree", "album", "simon"];
 let gamesNow = { enabled: false, off: [] };
 function showGames() {
   $("gamesOn").checked = gamesNow.enabled;
@@ -722,7 +722,7 @@ function setupPlan(daily, plans) {
 }
 /* ---- Now: every 5 seconds, what each open app shows (video, story, game…) ---- */
 let liveDevices = {}, titles = {};
-const GAME_NAMES = { balloons: "بازی بادکنک", colors: "بازی رنگ‌ها", count: "بازی شمردن", feed: "بازی غذا دادن", simon: "بازی تکرار کن", pet: "بازی دایناسور کوچولو", car: "بازی ماشین", maze: "بازی هزارتو", puzzle: "بازی پازل", pairs: "بازی جفت‌ها", sizes: "بازی کوچک تا بزرگ",
+const GAME_NAMES = { candles: "بازی شمع‌ها (فوت با گوشی)", tree: "بازی درخت سیب (تکان با گوشی)", balloons: "بازی بادکنک", colors: "بازی رنگ‌ها", count: "بازی شمردن", feed: "بازی غذا دادن", simon: "بازی تکرار کن", pet: "بازی دایناسور کوچولو", car: "بازی ماشین", maze: "بازی هزارتو", puzzle: "بازی پازل", pairs: "بازی جفت‌ها", sizes: "بازی کوچک تا بزرگ",
   catch: "بازی سیب بگیر", paint: "بازی رنگ‌آمیزی", story: "بازی اول کدام است", dress: "بازی لباس دایناسور", cook: "بازی ساندویچ", photo: "بازی عکاسی", climb: "بازی بالا رفتن", album: "آلبوم استیکر", hunt: "گنج رنگی",
   music: "بازی بلز", sounds: "بازی صدای حیوان‌ها", bubbles: "بازی حباب", hide: "بازی قایم‌باشک", tower: "بازی برج‌سازی", train: "بازی قطار" };
 const MODE_TEXT = { watch: "صفحهٔ اصلی (انتخاب ویدیو)", break: "استراحت بین نوبت‌ها", tomorrow: "وقت امروز تمام شده", bedtime: "وقت قصه (شب)" };
@@ -907,7 +907,9 @@ gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r
     "game-bubbles": { title: "بازی حباب 🫧", show: "بازی" },
     "game-hide": { title: "بازی قایم‌باشک 🙈", show: "بازی" },
     "game-tower": { title: "بازی برج‌سازی 🧱", show: "بازی" },
-    "game-train": { title: "بازی قطار 🚂", show: "بازی" } };
+    "game-train": { title: "بازی قطار 🚂", show: "بازی" },
+    "game-candles": { title: "بازی شمع‌ها 🎂", show: "بازی" },
+    "game-tree": { title: "بازی درخت سیب 🌳", show: "بازی" } };
   const showTitle = {};
   for (const c of data.categories) { showTitle[c.key] = c.title; for (const v of c.videos) { info[v.id] = { title: v.title, show: c.title }; titles[v.id] = v.title; } }
   for (const tp of data.topics || []) for (const v of tp.videos) info[v.id] = info[v.id] || { title: v.title, show: showTitle[v.show] || "—" };

@@ -164,13 +164,13 @@ const PICK = [
   ["cook", cookPickArt], ["photo", photoPickArt], ["climb", climbPickArt],
   ["simon", `<svg viewBox="0 0 200 100">${["#e63946", "#2a9d4b", "#f6c90e", "#2f7fe0"].map((c, i) => `<circle cx="${30 + i * 47}" cy="50" r="20" fill="${c}" opacity="${i === 1 ? 1 : .4}"/>`).join("")}</svg>`],
   ["music", musicPickArt], ["sounds", soundsPickArt], ["bubbles", bubblesPickArt], ["hide", hidePickArt],
-  ["tower", towerPickArt], ["train", trainPickArt],
+  ["tower", towerPickArt], ["train", trainPickArt], ["candles", candlesPickArt], ["tree", treePickArt],
   ["album", albumPickArt],
 ];
 window.PICK_KINDS = PICK.map(([kind]) => kind);
 const PICK_VID = { balloons: "game", colors: "game-colors", count: "game-count", feed: "game-feed", simon: "game-simon", pet: "game-pet", car: "game-car", maze: "game-maze", puzzle: "game-puzzle", pairs: "game-pairs", sizes: "game-sizes",
   catch: "game-catch", paint: "game-paint", story: "game-story", dress: "game-dress", cook: "game-cook", photo: "game-photo", climb: "game-climb",
-  music: "game-music", sounds: "game-sounds", bubbles: "game-bubbles", hide: "game-hide", tower: "game-tower", train: "game-train", album: "game-album", hunt: "game-hunt" };
+  music: "game-music", sounds: "game-sounds", bubbles: "game-bubbles", hide: "game-hide", tower: "game-tower", train: "game-train", album: "game-album", hunt: "game-hunt", candles: "game-candles", tree: "game-tree" };
 function showPicker() {
   if (!canWatch()) return renderGrid();
   playingId = null; playingCat = null;
@@ -194,7 +194,7 @@ function playGame(kind) {
   if (!beginGame(kind, PICK_VID[kind])) return;
   ({ colors: colorsRound, count: countRound, feed: feedRound, simon: simonStart, pet: petStart, car: carStart, maze: mazeStart, puzzle: puzzleStart, pairs: pairsStart, sizes: sizesStart,
     catch: catchStart, paint: paintStart, story: storyStart, dress: dressStart, cook: cookStart, photo: photoStart, climb: climbStart,
-    music: musicStart, sounds: soundsStart, bubbles: bubblesStart, hide: hideStart, tower: towerStart, train: trainStart, album: albumStart, hunt: huntStart })[kind]();
+    music: musicStart, sounds: soundsStart, bubbles: bubblesStart, hide: hideStart, tower: towerStart, train: trainStart, album: albumStart, hunt: huntStart, candles: candlesStart, tree: treeStart })[kind]();
 }
 const later = (fn, ms) => { if (game) game.timers.push(setTimeout(() => { if (game) fn(); }, ms)); };
 const pickOther = (n, last) => { let x; do x = Math.floor(Math.random() * n); while (x === last && n > 1); return x; };
@@ -215,7 +215,7 @@ function gameColor(c) {
   if (game.busy) return;
   ({ colors: colorsKey, count: countKey, feed: feedKey, simon: simonKey, pet: petKey, car: carKey, maze: mazeKey, puzzle: puzzleKey, pairs: pairsKey, sizes: sizesKey,
     catch: catchKey, paint: paintKey, story: storyKey, dress: dressKey, cook: cookKey, photo: photoKey, climb: climbKey,
-    music: musicKey, sounds: soundsKey, bubbles: bubblesKey, hide: hideKey, tower: towerKey, train: trainKey, album: albumKey, hunt: huntKey })[game.kind](c);
+    music: musicKey, sounds: soundsKey, bubbles: bubblesKey, hide: hideKey, tower: towerKey, train: trainKey, album: albumKey, hunt: huntKey, candles: candlesKey, tree: treeKey })[game.kind](c);
 }
 
 /* ---- Find the colour ---- */
@@ -816,6 +816,8 @@ async function padListen(kind, onBtn) {
 function carListen() {
   padListen("car", (btn) => {
     const q = $("carqr"); if (q) q.classList.add("gone");
+    const m = /^lane([012])$/.exec(btn || ""); // the phone held as a steering wheel: its tilt is the lane
+    if (m) { const l = Number(m[1]); if (l !== game.lane) { game.lane = l; carPlace(); tune([l === 1 ? 523 : 440], 0, 0.06); } return; }
     carKey({ left: "red", right: "green", honk: "yellow" }[btn] || "");
   });
 }
@@ -1944,6 +1946,110 @@ function trainKey(c) {
   if (++game.rounds >= 3) later(() => endGame(true), 3300); else later(trainRound, 3300);
 }
 
+
+/* ---- Blow out the candles / Shake the apple tree (with the phone) ----
+   Two games for the phone's own senses: the child blows at the phone (its
+   microphone, measured on the phone only) to put out the candles on a cake,
+   or shakes the phone to shake an apple tree so apples drop into a basket.
+   The phone page is control.html?mode=blow / ?mode=shake (a code on screen);
+   any colour key or a tap also blows or shakes, so it works without a phone. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.candles, .game.tree { background: linear-gradient(#bfe3ff, #eaf7ff 66%, #a8dc8c 66%); }
+.phroom { position: absolute; inset: 0 0 120px 0; display: grid; place-items: center; }
+.phroom svg.main { width: min(70vw, 62vh); height: auto; overflow: visible; }
+.phroom .flame { transform-box: fill-box; transform-origin: 50% 100%; animation: flick .5s ease-in-out infinite alternate; }
+@keyframes flick { to { transform: scale(.9, 1.08) rotate(3deg); } }
+.phroom .smoke { animation: smoke 1.4s ease-out forwards; }
+@keyframes smoke { to { transform: translateY(-60px); opacity: 0; } }
+.phroom .crown { transform-box: fill-box; transform-origin: 50% 100%; }
+.phroom .crown.shake { animation: crown .5s ease-in-out; }
+@keyframes crown { 25% { transform: rotate(-5deg); } 50% { transform: rotate(4deg); } 75% { transform: rotate(-2deg); } }
+.phroom .apple { transition: transform .7s cubic-bezier(.5, 0, 1, 1); }
+.phroom .hud { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(255, 255, 255, .85); border-radius: 22px; padding: 6px 18px; font: 700 34px/1 Fredoka, sans-serif; color: #24324f; }
+</style>`);
+function phQrSvg(mode) { // the code holds at most 42 characters: the short link if it fits, else the plain one (pick the tab on the phone)
+  if (!window.qrSvg) return "";
+  try { return qrSvg(location.origin + "/control.html?m=" + mode); } catch (e) {}
+  try { return qrSvg(location.origin + "/control.html"); } catch (e) { return ""; }
+}
+const phQr = (mode) => `<div class="carqr" id="carqr">${phQrSvg(mode)}<span>با گوشی بازی کنید: این کد را با دوربین گوشی بگیرید</span></div>`;
+function phQrLater() { later(() => { const q = $("carqr"); if (q && !game.padSeen) q.classList.add("gone"); }, 25000); }
+function candlesPickArt() {
+  return `<svg viewBox="0 0 200 150"><rect x="40" y="80" width="120" height="56" rx="10" fill="#f2a0c0"/><path d="M40 100 Q60 112 80 100 T120 100 T160 100" stroke="#fff" stroke-width="7" fill="none"/>
+    ${[70, 100, 130].map((x) => `<rect x="${x - 5}" y="48" width="10" height="32" rx="3" fill="#7fb6ef"/><path d="M${x} 26 C${x + 9} 38 ${x + 8} 46 ${x} 48 C${x - 8} 46 ${x - 9} 38 ${x} 26 Z" fill="#ffb300"/>`).join("")}</svg>`;
+}
+function treePickArt() {
+  return `<svg viewBox="0 0 200 150"><rect x="92" y="80" width="16" height="60" rx="4" fill="#8a6a44"/><circle cx="100" cy="62" r="46" fill="#6f9a5e"/><circle cx="70" cy="74" r="26" fill="#87b072"/>
+    <circle cx="80" cy="56" r="8" fill="#e05545"/><circle cx="118" cy="50" r="8" fill="#e05545"/><circle cx="108" cy="80" r="8" fill="#e05545"/><path d="M140 138 h40 l-6 -20 h-28 z" fill="#c98a4a"/></svg>`;
+}
+const CANDLE_X = [150, 225, 300, 375, 450];
+function candlesStart() {
+  game.round = 0;
+  $("sky").innerHTML = `<div class="phroom"><svg class="main" id="cake" viewBox="0 0 600 460"></svg>${phQr("blow")}</div>`;
+  candlesRound();
+  padListen("candles", (btn) => { if (btn === "blow") { const q = $("carqr"); if (q) q.classList.add("gone"); candlesBlow(); } });
+  phQrLater();
+}
+function candlesRound() {
+  game.lit = CANDLE_X.map(() => true); game.busy = false;
+  $("cake").innerHTML = `<ellipse cx="300" cy="440" rx="240" ry="18" fill="#1f2a1a" opacity=".15"/>
+    <rect x="70" y="260" width="460" height="170" rx="26" fill="#f2a0c0"/><rect x="70" y="330" width="460" height="16" fill="#e889ad"/>
+    <path d="M70 290 Q110 320 150 290 T230 290 T310 290 T390 290 T470 290 T530 290" stroke="#fff" stroke-width="18" fill="none" stroke-linecap="round"/>
+    ${CANDLE_X.map((x, i) => `<rect x="${x - 13}" y="150" width="26" height="110" rx="6" fill="${["#7fb6ef", "#f6c90e", "#8fd18a", "#f28c38", "#b69cf0"][i]}"/>
+      <path d="M${x} 150 V132" stroke="#444" stroke-width="5"/>
+      <path class="flame" id="fl${i}" d="M${x} 70 C${x + 26} 104 ${x + 22} 128 ${x} 134 C${x - 22} 128 ${x - 26} 104 ${x} 70 Z" fill="#ffb300"/>`).join("")}`;
+}
+function candlesBlow() {
+  if (!game || game.kind !== "candles" || game.busy) return;
+  const left = game.lit.map((on, i) => (on ? i : -1)).filter((i) => i >= 0);
+  if (!left.length) return;
+  for (const i of left.sort(() => Math.random() - 0.5).slice(0, 1 + (Math.random() < 0.35 ? 1 : 0))) { // one candle, sometimes two
+    game.lit[i] = false;
+    const f = $("fl" + i); if (!f) continue;
+    f.outerHTML = `<g class="smoke"><circle cx="${CANDLE_X[i]}" cy="118" r="12" fill="#bbb" opacity=".7"/><circle cx="${CANDLE_X[i] + 10}" cy="96" r="9" fill="#ccc" opacity=".6"/></g>`;
+  }
+  tune([392], 0, 0.08);
+  if (game.lit.some((x) => x)) return;
+  game.busy = true; // all out: the birthday tune, then new candles
+  later(() => tune([392, 392, 440, 392, 523, 494], 0.32, 0.16), 400);
+  if (++game.round >= 3) later(() => endGame(true), 2800); else later(candlesRound, 3200);
+}
+function candlesKey() { candlesBlow(); }
+
+const APPLES = [[210, 150], [300, 110], [390, 150], [250, 220], [350, 210], [180, 250], [420, 240], [300, 180]];
+function treeStart() {
+  game.round = 0;
+  $("sky").innerHTML = `<div class="phroom"><div class="hud" id="treeHud">🍎 ۰</div><svg class="main" id="tree" viewBox="0 0 600 460"></svg>${phQr("shake")}</div>`;
+  game.got = 0;
+  treeRound();
+  padListen("tree", (btn) => { if (btn === "shake") { const q = $("carqr"); if (q) q.classList.add("gone"); treeShake(); } });
+  phQrLater();
+}
+function treeRound() {
+  game.on = APPLES.map(() => true); game.busy = false;
+  $("tree").innerHTML = `<ellipse cx="300" cy="440" rx="220" ry="16" fill="#1f2a1a" opacity=".15"/><rect x="272" y="250" width="56" height="190" rx="14" fill="#8a6a44"/>
+    <g class="crown" id="crown"><circle cx="300" cy="180" r="150" fill="#6f9a5e"/><circle cx="200" cy="215" r="90" fill="#87b072"/><circle cx="410" cy="200" r="86" fill="#5f8a50"/>
+    ${APPLES.map(([x, y], i) => `<g class="apple" id="ap${i}"><circle cx="${x}" cy="${y}" r="22" fill="#e05545"/><path d="M${x} ${y - 22} q4 -12 12 -14" stroke="#6a4a2a" stroke-width="5" fill="none"/></g>`).join("")}</g>
+    <path d="M420 440 h150 l-20 -70 h-110 z" fill="#c98a4a"/><path d="M432 400 h126" stroke="#a8743c" stroke-width="8"/>`;
+}
+function treeShake() {
+  if (!game || game.kind !== "tree" || game.busy) return;
+  const c = $("crown"); if (!c) return;
+  c.classList.remove("shake"); void c.getBoundingClientRect(); c.classList.add("shake");
+  const left = game.on.map((on, i) => (on ? i : -1)).filter((i) => i >= 0);
+  if (!left.length) return;
+  const i = left[Math.floor(Math.random() * left.length)], [x, y] = APPLES[i];
+  game.on[i] = false;
+  const a = $("ap" + i);
+  // Out of the crown (so it doesn't shake along) and down into the basket.
+  $("tree").appendChild(a); requestAnimationFrame(() => { a.style.transform = `translate(${490 - x + (Math.random() * 40 - 20)}px, ${385 - y}px)`; });
+  later(() => { tune([330, 262], 0.1, 0.1); game.got++; const h = $("treeHud"); if (h) h.textContent = "🍎 " + game.got.toLocaleString("fa-IR"); }, 700);
+  if (game.on.some((x) => x)) return;
+  game.busy = true;
+  later(happy, 900);
+  if (++game.round >= 2) later(() => endGame(true), 2600); else later(treeRound, 2800);
+}
+function treeKey() { treeShake(); }
 
 /* ---- Colour treasure hunt (out in the real room) ----
    The TV shows a colour, with a few things of that colour as a hint, and the
