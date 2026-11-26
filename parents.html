@@ -650,14 +650,17 @@ async function postPlan(turns, minutes, extra, bedtime = todayPlanNow().bedtime)
 }
 /* Tonight: let the evening go on later this once (only stories after that time). */
 const hm = (min) => `${fa(Math.floor(min / 60) % 24)}:${String(min % 60).padStart(2, "0").replace(/\d/g, (d) => fa(+d))}`;
+const OPEN_NIGHT = 1860; // 7 in the morning: no night lock at all tonight
 function showTonight() {
   const usual = (dailyNow.bedtimeHour ?? 21) * 60, now = todayPlanNow().bedtime ?? usual;
-  $("tonightNow").textContent = now === usual ? `امشب مثل همیشه از ساعت ${hm(usual)} فقط قصه است.` : `امشب تا ساعت ${hm(now)} باز است (معمولاً ${hm(usual)}). فردا دوباره عادی می‌شود.`;
+  $("tonightNow").textContent = now === usual ? `امشب مثل همیشه از ساعت ${hm(usual)} فقط قصه است.`
+    : now >= OPEN_NIGHT ? "قفل شب امشب باز است: تا صبح فقط وقت روزانه و نوبت‌ها اندازه دارد. فردا دوباره عادی می‌شود."
+    : `امشب تا ساعت ${hm(now)} باز است (معمولاً ${hm(usual)}). فردا دوباره عادی می‌شود.`;
   const box = $("tonightBtns");
   box.innerHTML = "";
-  for (const min of [usual, usual + 30, usual + 60, usual + 90, usual + 120, usual + 180].filter((m) => m <= 1560)) {
+  for (const min of [...[usual, usual + 30, usual + 60, usual + 90, usual + 120, usual + 180].filter((m) => m <= 1560), OPEN_NIGHT]) {
     const b = document.createElement("button");
-    b.type = "button"; b.textContent = min === usual ? `عادی (${hm(usual)})` : `تا ${hm(min)}`;
+    b.type = "button"; b.textContent = min === usual ? `عادی (${hm(usual)})` : min === OPEN_NIGHT ? "🔓 قفل شب باز تا صبح" : `تا ${hm(min)}`;
     b.className = min === now ? "on" : "";
     b.onclick = async () => {
       $("tonightMsg").textContent = "صبر کنید…";
@@ -693,7 +696,8 @@ async function saveGames(next, msg = "gamesMsg") {
   $(msg).textContent = "صبر کنید…";
   const r = await NT.call("/games", next);
   if (r.ok && r.body) { gamesNow = r.body.games; $(msg).textContent = "✔ ذخیره شد. تلویزیون تا چند ثانیهٔ دیگر عوض می‌شود."; }
-  else $(msg).textContent = r.status === 403 ? "فقط پدر یا مادر می‌تواند عوض کند." : "به سرور وصل نشد. دوباره بزنید.";
+  else if (r.status === 403) $(msg).innerHTML = 'این دستگاه به‌عنوان تلویزیون وصل است. بازی‌ها را فقط با ورود پدر یا مادر می‌شود عوض کرد: <a href="account.html">ورود</a>';
+  else $(msg).textContent = "به سرور وصل نشد. دوباره بزنید.";
   showGames();
 }
 async function savePlan(daily, turns, minutes) {

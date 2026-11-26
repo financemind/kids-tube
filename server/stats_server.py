@@ -336,7 +336,7 @@ def do_reset(fid, day):
 def save_plan(fid, day, turns, minutes, extra=0, bedtime=None):
     """extra: seconds given (or, below 0, taken away) on top of the turns, e.g. +10 minutes for this turn.
     bedtime: tonight only, minutes after midnight when only stories are left (e.g. 1350 = 22:30;
-    up to 1560 = 2 at night); None = the usual time."""
+    up to 1560 = 2 at night; 1860 = 7 in the morning, i.e. no night lock tonight); None = the usual time."""
     with lock:
         plans = read_json(fam_path(fid, "plans.json"), {})
         plans[day] = {"turns": turns, "minutes": minutes, "extra": extra}
@@ -823,7 +823,7 @@ class Handler(BaseHTTPRequestHandler):
             if not (isinstance(day, str) and DAY.match(day) and isinstance(turns, int) and 1 <= turns <= 8
                     and isinstance(minutes, int) and 5 <= minutes <= 60
                     and isinstance(extra, int) and -86400 <= extra <= 86400
-                    and (bedtime is None or (isinstance(bedtime, int) and 1080 <= bedtime <= 1560))):
+                    and (bedtime is None or (isinstance(bedtime, int) and 1080 <= bedtime <= 1860))):  # 1860: open all night
                 return self.reply(400, {"error": "bad request"})
             return self.reply(200, {"plans": save_plan(fid, day, turns, minutes, extra, bedtime)})
         if path == "/api/live":
