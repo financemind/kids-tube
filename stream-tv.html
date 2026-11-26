@@ -64,7 +64,7 @@ async function onMsg(m) {
     if (pc) pc.close();
     curSid = m.sid || "";
     const servers = await iceServers();
-    pc = new RTCPeerConnection({ iceServers: servers, iceTransportPolicy: RELAY_ONLY || m.relay ? "relay" : "all" });
+    pc = new RTCPeerConnection({ iceServers: servers, iceTransportPolicy: m.relay === false ? "all" : "relay" });
     watchPc(pc, servers.length > 1);
     mine = []; theirs = []; answered = false;
     // Each address goes to the phone as soon as it is found: the relay's can take a few seconds on the TV.
@@ -79,7 +79,7 @@ async function onMsg(m) {
       clearInterval(statTimer); statTimer = setInterval(showStats, 1000);
     };
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "failed") say("وصل نشد.", "تلویزیون و گوشی نتوانستند مستقیم به هم برسند. هر دو روی یک وای‌فای هستند؟", `آدرس‌های تلویزیون: ${kinds((pc.localDescription ? pc.localDescription.sdp : "") + "\n" + asLines(mine))}، آدرس‌های گوشی: ${kinds(m.sdp + "\n" + asLines(theirs))}، نسخهٔ صفحه: ${VERSION}، مرورگر: ${navigator.userAgent.slice(0, 90)}`);
+      if (pc.connectionState === "failed") say("وصل نشد.", "روی گوشی یک بار دیگر «وصل شو» را بزنید.", `آدرس‌های تلویزیون: ${kinds((pc.localDescription ? pc.localDescription.sdp : "") + "\n" + asLines(mine))}، آدرس‌های گوشی: ${kinds(m.sdp + "\n" + asLines(theirs))}، نسخهٔ صفحه: ${VERSION}، مرورگر: ${navigator.userAgent.slice(0, 90)}`);
       if (pc.connectionState === "disconnected" || pc.connectionState === "closed") say("گوشی قطع شد.", "روی گوشی دوباره «وصل شو» را بزنید.");
     };
     say("دارم وصل می‌شوم…");
@@ -107,8 +107,10 @@ async function iceServers() {
   if (r.ok && r.body && r.body.turn) list.push({ ...r.body.turn, urls: r.body.turn.urls.filter((u) => !/transport=tcp/.test(u)) });
   return list;
 }
-// ?relay in the address: only through our relay (to test that path on its own).
-const RELAY_ONLY = new URLSearchParams(location.search).has("relay");
+// Only through our relay: at home the phone and the TV can't reach each other
+// directly, and trying those routes too only slowed things down and mixed it up.
+// ?direct in the address tries the direct routes as well.
+const RELAY_ONLY = !new URLSearchParams(location.search).has("direct");
 // Which way the picture goes: straight inside the home, or through our relay.
 async function pathNow(pc) {
   const st = await pc.getStats();
@@ -126,7 +128,7 @@ async function pathNow(pc) {
 // Short reports to our server about connecting (no picture, no addresses):
 // whether a relay password came, which kinds of address were found, and why
 // reaching the relay failed if it did. Read on the server to fix this test.
-const VERSION = 11;
+const VERSION = 12;
 function report(ev, data = {}) { NT.call("/rtc/diag", { role: "tv", data: { ev, v: VERSION, ...data } }); }
 async function addRemote(pc, c) {
   const kind = ((c && c.candidate) || "").split(" ")[7] || "?";

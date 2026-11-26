@@ -148,8 +148,10 @@ async function iceServers() {
   if (r.ok && r.body && r.body.turn) list.push({ ...r.body.turn, urls: r.body.turn.urls.filter((u) => !/transport=tcp/.test(u)) });
   return list;
 }
-// ?relay in the address: only through our relay (to test that path on its own).
-const RELAY_ONLY = new URLSearchParams(location.search).has("relay");
+// Only through our relay: at home the phone and the TV can't reach each other
+// directly, and trying those routes too only slowed things down and mixed it up.
+// ?direct in the address tries the direct routes as well.
+const RELAY_ONLY = !new URLSearchParams(location.search).has("direct");
 // Which way the picture goes: straight inside the home, or through our relay.
 async function pathNow(pc) {
   const st = await pc.getStats();
@@ -167,7 +169,7 @@ async function pathNow(pc) {
 // Short reports to our server about connecting (no picture, no addresses):
 // whether a relay password came, which kinds of address were found, and why
 // reaching the relay failed if it did. Read on the server to fix this test.
-const VERSION = 11;
+const VERSION = 12;
 function report(ev, data = {}) { NT.call("/rtc/diag", { role: "phone", data: { ev, v: VERSION, ...data } }); }
 async function addRemote(pc, c) {
   const kind = ((c && c.candidate) || "").split(" ")[7] || "?";
@@ -297,7 +299,7 @@ async function connect() {
   pc.onconnectionstatechange = () => {
     const s = pc.connectionState;
     if (s === "connected") { say("✔ وصل است. حالا به تلویزیون نگاه کنید و بازی کنید."); setTimeout(async () => { const way = await pathNow(pc); if (way) say("✔ وصل است، " + way + ". حالا به تلویزیون نگاه کنید و بازی کنید."); }, 1500); }
-    if (s === "failed") { say("وصل نشد. گوشی و تلویزیون روی یک وای‌فای هستند؟ (گوشی روی اینترنت سیم‌کارت نباشد.) اگر بودند، «راه دوم» را بزنید."); $("go").disabled = false; $("go2").hidden = false; showDiag(); }
+    if (s === "failed") { say("وصل نشد. یک بار دیگر «وصل شو» را بزنید."); $("go").disabled = false; if (!RELAY_ONLY) $("go2").hidden = false; showDiag(); }
     if (s === "connected") $("diag").hidden = true;
     if (s === "disconnected") { say("قطع شد."); $("go").disabled = false; }
   };
@@ -311,7 +313,7 @@ async function connect() {
   for (const c of myCands) if (!pc.localDescription.sdp.includes(c.candidate)) toTv({ type: "ice", c: c.toJSON() });
   if (!s.ok) { say("به سرور وصل نشد."); $("go").disabled = false; return; }
   if (!s.body.listeners) { say("تلویزیون هنوز آماده نیست. اول روی تلویزیون <b>noyantv.com/stream-tv.html</b> را باز کنید."); $("go").disabled = false; return; }
-  setTimeout(() => { if (pc && !["connected", "failed"].includes(pc.connectionState)) { say(tvSdp ? "تلویزیون جواب داد ولی وصل نشد. «راه دوم» را امتحان کنید." : "تلویزیون جواب نداد. صفحهٔ تلویزیون باز است؟"); $("go").disabled = false; $("go2").hidden = false; showDiag(); } }, 15000);
+  setTimeout(() => { if (pc && !["connected", "failed"].includes(pc.connectionState)) { say(tvSdp ? "تلویزیون جواب داد ولی وصل نشد. یک بار دیگر «وصل شو» را بزنید." : "تلویزیون جواب نداد. صفحهٔ تلویزیون باز است؟"); $("go").disabled = false; if (!RELAY_ONLY) $("go2").hidden = false; showDiag(); } }, 15000);
 }
 addEventListener("pagehide", () => { if (pc) { toTv({ type: "bye" }, { keepalive: true }); pc.close(); } }); // also frees the relay slot
 </script>
