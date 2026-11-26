@@ -144,7 +144,8 @@ function kinds(sdp) {
 async function iceServers() {
   const list = [{ urls: "stun:stun.l.google.com:19302" }];
   const r = await NT.call("/rtc/turn");
-  if (r.ok && r.body && r.body.turn) list.push(r.body.turn);
+  // UDP only: TCP to the relay piles up delay (and each address takes one of the family's relay slots).
+  if (r.ok && r.body && r.body.turn) list.push({ ...r.body.turn, urls: r.body.turn.urls.filter((u) => !/transport=tcp/.test(u)) });
   return list;
 }
 // Which way the picture goes: straight inside the home, or through our relay.
@@ -164,7 +165,7 @@ async function pathNow(pc) {
 // Short reports to our server about connecting (no picture, no addresses):
 // whether a relay password came, which kinds of address were found, and why
 // reaching the relay failed if it did. Read on the server to fix this test.
-const VERSION = 8;
+const VERSION = 9;
 function report(ev, data = {}) { NT.call("/rtc/diag", { role: "phone", data: { ev, v: VERSION, ...data } }); }
 function watchPc(pc, gotTurn) {
   report("start", { turn: gotTurn, ua: navigator.userAgent.slice(0, 140) });
@@ -278,7 +279,7 @@ async function connect() {
   if (!s.body.listeners) { say("تلویزیون هنوز آماده نیست. اول روی تلویزیون <b>noyantv.com/stream-tv.html</b> را باز کنید."); $("go").disabled = false; return; }
   setTimeout(() => { if (pc && !["connected", "failed"].includes(pc.connectionState)) { say(tvSdp ? "تلویزیون جواب داد ولی وصل نشد. «راه دوم» را امتحان کنید." : "تلویزیون جواب نداد. صفحهٔ تلویزیون باز است؟"); $("go").disabled = false; $("go2").hidden = false; showDiag(); } }, 15000);
 }
-addEventListener("pagehide", () => { if (pc) NT.call("/rtc", { to: "tv", msg: { type: "bye" } }, { keepalive: true }); });
+addEventListener("pagehide", () => { if (pc) { NT.call("/rtc", { to: "tv", msg: { type: "bye" } }, { keepalive: true }); pc.close(); } }); // also frees the relay slot
 </script>
 </body>
 </html>
