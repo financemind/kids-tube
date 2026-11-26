@@ -148,6 +148,8 @@ async function iceServers() {
   if (r.ok && r.body && r.body.turn) list.push({ ...r.body.turn, urls: r.body.turn.urls.filter((u) => !/transport=tcp/.test(u)) });
   return list;
 }
+// ?relay in the address: only through our relay (to test that path on its own).
+const RELAY_ONLY = new URLSearchParams(location.search).has("relay");
 // Which way the picture goes: straight inside the home, or through our relay.
 async function pathNow(pc) {
   const st = await pc.getStats();
@@ -165,7 +167,7 @@ async function pathNow(pc) {
 // Short reports to our server about connecting (no picture, no addresses):
 // whether a relay password came, which kinds of address were found, and why
 // reaching the relay failed if it did. Read on the server to fix this test.
-const VERSION = 9;
+const VERSION = 10;
 function report(ev, data = {}) { NT.call("/rtc/diag", { role: "phone", data: { ev, v: VERSION, ...data } }); }
 function watchPc(pc, gotTurn) {
   report("start", { turn: gotTurn, ua: navigator.userAgent.slice(0, 140) });
@@ -188,6 +190,11 @@ function watchPc(pc, gotTurn) {
     report("end", { conn: pc.connectionState, pairs });
   });
 }
+/* One connection, one TV page: each try has its own code (sid). If more than
+   one TV page is open and answers, only the first is used and the others are
+   told to let go — mixing two TVs' answers left it stuck at "connecting". */
+let sid = "", tvId = null;
+const toTv = (msg, opts) => NT.call("/rtc", { to: "tv", msg: { ...msg, sid, tv: tvId } }, opts);
 let tvSdp = "", videoSender = null, tvCands = [], myCands = [], early = [], offered = false;
 const asLines = (list) => list.map((c) => "a=" + c.candidate).join("\n");
 // A smaller picture (854×480) and a steady frame rate: less to squeeze, send and open.
@@ -216,7 +223,7 @@ async function showDiag() {
   $("diag").textContent = `آدرس‌های گوشی: ${kinds((pc.localDescription ? pc.localDescription.sdp : "") + "\n" + asLines(myCands))}\nآدرس‌های تلویزیون: ${tvSdp ? kinds(tvSdp + "\n" + asLines(tvCands)) : "جوابی نیامد"}\nراه‌های امتحان‌شده: ${tried} از ${pairs}\nنسخهٔ صفحه: ${VERSION}`;
 }
 async function connect() {
-  $("go").disabled = true; tvSdp = ""; tvCands = []; myCands = []; early = []; offered = false;
+  $("go").disabled = true; tvSdp = ""; sid = Math.random().toString(36).slice(2, 12); tvId = null; tvCands = []; myCands = []; early = []; offered = false;
   say("دارم وصل می‌شوم…");
   try { if (navigator.wakeLock) navigator.wakeLock.request("screen").catch(() => {}); } catch (e) {}
   if (!actx) { actx = new (window.AudioContext || window.webkitAudioContext)(); adest = actx.createMediaStreamDestination(); }
@@ -227,7 +234,11 @@ async function connect() {
   es.onmessage = (e) => {
     let m; try { m = JSON.parse(e.data); } catch (err) { return; }
     chain = chain.then(async () => { // in order: the answer before its addresses
+      if (m.sid !== sid) return; // from an earlier try
       if (m.type === "answer" && pc) {
+        if (tvId) { report("second-tv"); return; } // another TV page answered too: ignored
+        tvId = m.tv;
+        toTv({ type: "chosen" }); // the other TV pages let go
         tvSdp = m.sdp;
         await pc.setRemoteDescription({ type: "answer", sdp: m.sdp });
         if (videoSender) tuneSender(videoSender);
@@ -235,6 +246,7 @@ async function connect() {
         report("answer", { tv: kinds(m.sdp) });
         for (const c of early.splice(0)) { try { await pc.addIceCandidate(c); } catch (err) {} }
       } else if (m.type === "ice" && pc) {
+        if (m.tv !== tvId) return; // not from the chosen TV
         tvCands.push(m.c);
         if (pc.remoteDescription) { try { await pc.addIceCandidate(m.c); } catch (err) {} } else early.push(m.c);
       }
@@ -243,7 +255,7 @@ async function connect() {
   await new Promise((ok) => { es.onopen = ok; setTimeout(ok, 3000); });
   if (pc) pc.close();
   const servers = await iceServers();
-  pc = new RTCPeerConnection({ iceServers: servers });
+  pc = new RTCPeerConnection({ iceServers: servers, iceTransportPolicy: RELAY_ONLY ? "relay" : "all" });
   watchPc(pc, servers.length > 1);
   const video = cv.captureStream(30);
   for (const t of video.getVideoTracks()) {
@@ -268,18 +280,18 @@ async function connect() {
     if (s === "disconnected") { say("قطع شد."); $("go").disabled = false; }
   };
   // Each network address goes to the TV as soon as it is found (the relay's can take a few seconds).
-  pc.onicecandidate = (e) => { if (!e.candidate) return; myCands.push(e.candidate); if (offered) NT.call("/rtc", { to: "tv", msg: { type: "ice", c: e.candidate.toJSON() } }); };
+  pc.onicecandidate = (e) => { if (!e.candidate) return; myCands.push(e.candidate); if (offered) toTv({ type: "ice", c: e.candidate.toJSON() }); };
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
   await new Promise((done) => setTimeout(done, 600)); // the quick home addresses go in the offer itself
-  const s = await NT.call("/rtc", { to: "tv", msg: { type: "offer", sdp: pc.localDescription.sdp } });
+  const s = await toTv({ type: "offer", sdp: pc.localDescription.sdp, relay: RELAY_ONLY });
   offered = true;
-  for (const c of myCands) if (!pc.localDescription.sdp.includes(c.candidate)) NT.call("/rtc", { to: "tv", msg: { type: "ice", c: c.toJSON() } });
+  for (const c of myCands) if (!pc.localDescription.sdp.includes(c.candidate)) toTv({ type: "ice", c: c.toJSON() });
   if (!s.ok) { say("به سرور وصل نشد."); $("go").disabled = false; return; }
   if (!s.body.listeners) { say("تلویزیون هنوز آماده نیست. اول روی تلویزیون <b>noyantv.com/stream-tv.html</b> را باز کنید."); $("go").disabled = false; return; }
   setTimeout(() => { if (pc && !["connected", "failed"].includes(pc.connectionState)) { say(tvSdp ? "تلویزیون جواب داد ولی وصل نشد. «راه دوم» را امتحان کنید." : "تلویزیون جواب نداد. صفحهٔ تلویزیون باز است؟"); $("go").disabled = false; $("go2").hidden = false; showDiag(); } }, 15000);
 }
-addEventListener("pagehide", () => { if (pc) { NT.call("/rtc", { to: "tv", msg: { type: "bye" } }, { keepalive: true }); pc.close(); } }); // also frees the relay slot
+addEventListener("pagehide", () => { if (pc) { toTv({ type: "bye" }, { keepalive: true }); pc.close(); } }); // also frees the relay slot
 </script>
 </body>
 </html>

@@ -489,7 +489,7 @@ def rtc_join(ticket):
         q = queue.Queue(maxsize=200)
         lst = RTCS.setdefault((fid, role), [])
         lst.append(q)
-        while len(lst) > 2:
+        while len(lst) > 4:  # a few TV pages may be open; each phone try picks one (sid)
             lst.pop(0).put_nowait(None)  # the oldest one stops listening
     return (fid, role), q
 

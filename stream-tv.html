@@ -30,7 +30,10 @@ button.sound { position: fixed; bottom: 24px; left: 50%; transform: translateX(-
 <script>
 const $ = (id) => document.getElementById(id);
 const say = (title, msg = "", hint = "") => { $("title").textContent = title; $("msg").textContent = msg; $("hint").textContent = hint; $("wait").hidden = false; };
-const send = (msg) => NT.call("/rtc", { to: "phone", msg });
+// Each TV page has its own id; it answers one phone try (sid) at a time.
+const myId = Math.random().toString(36).slice(2, 12);
+let curSid = "";
+const send = (msg) => NT.call("/rtc", { to: "phone", msg: { ...msg, sid: curSid, tv: myId } });
 let pc = null, statTimer = null, chain = Promise.resolve();
 let mine = [], theirs = [], answered = false; // network addresses found after the first message (sent one by one)
 const asLines = (list) => list.map((c) => "a=" + c.candidate).join("\n");
@@ -51,10 +54,17 @@ async function listen() {
 }
 
 async function onMsg(m) {
+  if (m.type !== "offer" && m.sid !== curSid) return; // for another try
+  if (m.tv && m.tv !== myId) { // the phone chose another TV page
+    if (pc) { pc.close(); pc = null; }
+    say("گوشی به صفحهٔ تلویزیون دیگری وصل شد.", "اگر این صفحه روی دستگاه دیگری یا در زبانهٔ دیگری هم باز است، آن‌ها را ببندید.");
+    return;
+  }
   if (m.type === "offer") {
     if (pc) pc.close();
+    curSid = m.sid || "";
     const servers = await iceServers();
-    pc = new RTCPeerConnection({ iceServers: servers });
+    pc = new RTCPeerConnection({ iceServers: servers, iceTransportPolicy: RELAY_ONLY || m.relay ? "relay" : "all" });
     watchPc(pc, servers.length > 1);
     mine = []; theirs = []; answered = false;
     // Each address goes to the phone as soon as it is found: the relay's can take a few seconds on the TV.
@@ -97,6 +107,8 @@ async function iceServers() {
   if (r.ok && r.body && r.body.turn) list.push({ ...r.body.turn, urls: r.body.turn.urls.filter((u) => !/transport=tcp/.test(u)) });
   return list;
 }
+// ?relay in the address: only through our relay (to test that path on its own).
+const RELAY_ONLY = new URLSearchParams(location.search).has("relay");
 // Which way the picture goes: straight inside the home, or through our relay.
 async function pathNow(pc) {
   const st = await pc.getStats();
@@ -114,7 +126,7 @@ async function pathNow(pc) {
 // Short reports to our server about connecting (no picture, no addresses):
 // whether a relay password came, which kinds of address were found, and why
 // reaching the relay failed if it did. Read on the server to fix this test.
-const VERSION = 9;
+const VERSION = 10;
 function report(ev, data = {}) { NT.call("/rtc/diag", { role: "tv", data: { ev, v: VERSION, ...data } }); }
 function watchPc(pc, gotTurn) {
   report("start", { turn: gotTurn, ua: navigator.userAgent.slice(0, 140) });
