@@ -44,8 +44,8 @@ button.go2 { background: #fff; }
   <div class="side">
     <div class="clock" id="clock">0.000</div>
     <div class="opts">
-      <select id="quality" aria-label="Quality"><option value="low">کیفیت کم (سریع‌تر)</option><option value="mid">کیفیت متوسط</option></select>
-      <select id="codec" aria-label="Format"><option value="h264">فرمت H.264</option><option value="vp8">فرمت VP8</option></select>
+      <select id="quality" aria-label="Quality"><option value="mid">کیفیت متوسط</option><option value="high">کیفیت بالا</option><option value="low">کیفیت کم</option></select>
+      <select id="codec" aria-label="Format"><option value="vp8">فرمت VP8</option><option value="h264">فرمت H.264</option></select>
     </div>
     <button class="go" id="go" type="button">وصل شو به تلویزیون</button>
     <button class="go go2" id="go2" type="button" hidden>راه دوم: با اجازهٔ میکروفون</button>
@@ -169,7 +169,7 @@ async function pathNow(pc) {
 // Short reports to our server about connecting (no picture, no addresses):
 // whether a relay password came, which kinds of address were found, and why
 // reaching the relay failed if it did. Read on the server to fix this test.
-const VERSION = 13;
+const VERSION = 16;
 function report(ev, data = {}) { NT.call("/rtc/diag", { role: "phone", data: { ev, v: VERSION, ...data } }); }
 async function addRemote(pc, c) {
   const kind = ((c && c.candidate) || "").split(" ")[7] || "?";
@@ -222,7 +222,7 @@ const toTv = (msg, opts) => NT.call("/rtc", { to: "tv", msg: { ...msg, sid, tv: 
 let frameTimer = null, sendStatsTimer = null, capTrack = null;
 function frameClock() { // one frame every 1/fps second, at the chosen quality's rate
   clearInterval(frameTimer);
-  const q = QUALITY[$("quality").value] || QUALITY.low;
+  const q = QUALITY[$("quality").value] || QUALITY.mid;
   frameTimer = setInterval(() => { if (capTrack && capTrack.requestFrame) capTrack.requestFrame(); }, Math.round(1000 / q.fps));
 }
 let tvSdp = "", videoSender = null, tvCands = [], myCands = [], early = [], offered = false;
@@ -233,13 +233,28 @@ const asLines = (list) => list.map((c) => "a=" + c.candidate).join("\n");
 // so frames don't pile up. Middle: 854×480, 30 a second. Changes at once while connected.
 // The bit-rate caps are generous on purpose: when the basket moves, frames get
 // bigger, and a tight cap spreads a big frame out so it arrives late.
-const QUALITY = { low: { scale: 2, fps: 20, bps: 1800000 }, mid: { scale: 1.5, fps: 30, bps: 3000000 } };
+// Middle is the default now that VP8 keeps the TV's buffer steady; high is the full 1280×720.
+const QUALITY = { low: { scale: 2, fps: 20, bps: 1800000 }, mid: { scale: 1.5, fps: 30, bps: 3000000 }, high: { scale: 1, fps: 30, bps: 5000000 } };
+// Chrome starts a video slowly (a few hundred kbit/s) and only creeps up, so the
+// picture stayed blurry. These Chrome settings make it start, and stay, at a good rate.
+function fastStart(sdp) {
+  const q = QUALITY[$("quality").value] || QUALITY.mid, max = Math.round(q.bps / 1000);
+  const start = Math.round(max * 0.6), min = Math.round(max * 0.3);
+  const pts = [...sdp.matchAll(/^a=rtpmap:(\d+) (VP8|H264|VP9)\/90000/gmi)].map((x) => x[1]);
+  const extra = `x-google-start-bitrate=${start};x-google-min-bitrate=${min};x-google-max-bitrate=${max}`;
+  let out = sdp;
+  for (const pt of pts) {
+    const re = new RegExp(`^(a=fmtp:${pt} .*)$`, "m");
+    out = re.test(out) ? out.replace(re, `$1;${extra}`) : out.replace(new RegExp(`^(a=rtpmap:${pt} .*)$`, "m"), `$1\r\na=fmtp:${pt} ${extra}`);
+  }
+  return out;
+}
 async function tuneSender(sender) {
   try {
-    const q = QUALITY[$("quality").value] || QUALITY.low;
+    const q = QUALITY[$("quality").value] || QUALITY.mid;
     const prm = sender.getParameters();
     if (!prm.encodings || !prm.encodings.length) return;
-    prm.degradationPreference = "balanced";
+    prm.degradationPreference = "maintain-resolution"; // a sharp picture; if the line is busy, fewer frames instead
     prm.encodings[0].scaleResolutionDownBy = q.scale;
     prm.encodings[0].maxBitrate = q.bps;
     prm.encodings[0].maxFramerate = q.fps;
@@ -286,7 +301,7 @@ async function connect() {
         tvId = m.tv;
         toTv({ type: "chosen" }); // the other TV pages let go
         tvSdp = m.sdp;
-        await pc.setRemoteDescription({ type: "answer", sdp: m.sdp });
+        await pc.setRemoteDescription({ type: "answer", sdp: fastStart(m.sdp) });
         if (videoSender) tuneSender(videoSender);
         clearInterval(sendStatsTimer); sendStatsTimer = setInterval(sendStats, 5000);
         say("تلویزیون جواب داد…");
@@ -312,7 +327,8 @@ async function connect() {
   for (const t of video.getVideoTracks()) {
     t.contentHint = "motion"; // a game: keep it smooth rather than sharp
     const sender = pc.addTrack(t, video);
-    // The chosen format first (H.264: TVs often have a chip for it; VP8: sometimes faster when they don't).
+    // The chosen format first. VP8 is the default: with H.264 this phone sent a full
+    // picture several times every 5 s, and each one made the TV's buffer grow for good.
     const tr = pc.getTransceivers().find((x) => x.sender === sender);
     try {
       const want = $("codec").value === "vp8" ? /vp8/i : /h264/i;
