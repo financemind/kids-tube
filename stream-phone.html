@@ -128,7 +128,7 @@ $("go2").onclick = async () => {
 // Which kinds of network address each side offered, in plain words.
 function kinds(sdp) {
   const c = { "خانه (اسم پنهان)": 0, "خانه (آدرس واقعی)": 0, "اینترنت": 0, "رله": 0 };
-  for (const line of (sdp || "").split("\n")) {
+  for (const line of new Set((sdp || "").split("\n").map((l) => l.trim()))) { // each address once
     const m = line.match(/^a=candidate:\S+ \d+ (\S+) \d+ (\S+) \d+ typ (\S+)/i);
     if (!m) continue;
     if (m[3] === "host") c[m[2].endsWith(".local") ? "خانه (اسم پنهان)" : "خانه (آدرس واقعی)"]++;
@@ -161,7 +161,8 @@ async function pathNow(pc) {
   if (types.includes("srflx") || types.includes("prflx")) return "از راه اینترنت خانه";
   return "مستقیم داخل خانه";
 }
-let tvSdp = "", videoSender = null;
+let tvSdp = "", videoSender = null, tvCands = [], myCands = [], early = [], offered = false;
+const asLines = (list) => list.map((c) => "a=" + c.candidate).join("\n");
 // A smaller picture (854×480) and a steady frame rate: less to squeeze, send and open.
 // Set once the TV has answered (before that the browser may not take it).
 // Low: 640×360, 20 frames a second, under 1 Mbit/s — less for a weak TV to open,
@@ -185,24 +186,31 @@ async function showDiag() {
   let pairs = 0, tried = 0;
   try { (await pc.getStats()).forEach((r) => { if (r.type === "candidate-pair") { pairs++; if (r.requestsSent) tried++; } }); } catch (e) {}
   $("diag").hidden = false;
-  $("diag").textContent = `آدرس‌های گوشی: ${kinds(pc.localDescription && pc.localDescription.sdp)}\nآدرس‌های تلویزیون: ${tvSdp ? kinds(tvSdp) : "جوابی نیامد"}\nراه‌های امتحان‌شده: ${tried} از ${pairs}`;
+  $("diag").textContent = `آدرس‌های گوشی: ${kinds((pc.localDescription ? pc.localDescription.sdp : "") + "\n" + asLines(myCands))}\nآدرس‌های تلویزیون: ${tvSdp ? kinds(tvSdp + "\n" + asLines(tvCands)) : "جوابی نیامد"}\nراه‌های امتحان‌شده: ${tried} از ${pairs}`;
 }
 async function connect() {
-  $("go").disabled = true; tvSdp = "";
+  $("go").disabled = true; tvSdp = ""; tvCands = []; myCands = []; early = []; offered = false;
   say("دارم وصل می‌شوم…");
   try { if (navigator.wakeLock) navigator.wakeLock.request("screen").catch(() => {}); } catch (e) {}
   if (!actx) { actx = new (window.AudioContext || window.webkitAudioContext)(); adest = actx.createMediaStreamDestination(); }
   const r = await NT.call("/rtc/ticket", { role: "phone" });
   if (!r.ok) { say("به سرور وصل نشد."); $("go").disabled = false; return; }
   const es = new EventSource(NT.base + "/rtc/listen?t=" + encodeURIComponent(r.body.ticket));
-  es.onmessage = async (e) => {
+  let chain = Promise.resolve();
+  es.onmessage = (e) => {
     let m; try { m = JSON.parse(e.data); } catch (err) { return; }
-    if (m.type === "answer" && pc) {
-      tvSdp = m.sdp;
-      await pc.setRemoteDescription({ type: "answer", sdp: m.sdp });
-      if (videoSender) tuneSender(videoSender);
-      say("تلویزیون جواب داد…");
-    }
+    chain = chain.then(async () => { // in order: the answer before its addresses
+      if (m.type === "answer" && pc) {
+        tvSdp = m.sdp;
+        await pc.setRemoteDescription({ type: "answer", sdp: m.sdp });
+        if (videoSender) tuneSender(videoSender);
+        say("تلویزیون جواب داد…");
+        for (const c of early.splice(0)) { try { await pc.addIceCandidate(c); } catch (err) {} }
+      } else if (m.type === "ice" && pc) {
+        tvCands.push(m.c);
+        if (pc.remoteDescription) { try { await pc.addIceCandidate(m.c); } catch (err) {} } else early.push(m.c);
+      }
+    }).catch(() => {});
   };
   await new Promise((ok) => { es.onopen = ok; setTimeout(ok, 3000); });
   if (pc) pc.close();
@@ -229,14 +237,14 @@ async function connect() {
     if (s === "connected") $("diag").hidden = true;
     if (s === "disconnected") { say("قطع شد."); $("go").disabled = false; }
   };
+  // Each network address goes to the TV as soon as it is found (the relay's can take a few seconds).
+  pc.onicecandidate = (e) => { if (!e.candidate) return; myCands.push(e.candidate); if (offered) NT.call("/rtc", { to: "tv", msg: { type: "ice", c: e.candidate.toJSON() } }); };
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-  await new Promise((done) => { // all network addresses in one message
-    if (pc.iceGatheringState === "complete") return done();
-    pc.addEventListener("icegatheringstatechange", () => { if (pc.iceGatheringState === "complete") done(); });
-    setTimeout(done, 2500);
-  });
+  await new Promise((done) => setTimeout(done, 600)); // the quick home addresses go in the offer itself
   const s = await NT.call("/rtc", { to: "tv", msg: { type: "offer", sdp: pc.localDescription.sdp } });
+  offered = true;
+  for (const c of myCands) if (!pc.localDescription.sdp.includes(c.candidate)) NT.call("/rtc", { to: "tv", msg: { type: "ice", c: c.toJSON() } });
   if (!s.ok) { say("به سرور وصل نشد."); $("go").disabled = false; return; }
   if (!s.body.listeners) { say("تلویزیون هنوز آماده نیست. اول روی تلویزیون <b>noyantv.com/stream-tv.html</b> را باز کنید."); $("go").disabled = false; return; }
   setTimeout(() => { if (pc && !["connected", "failed"].includes(pc.connectionState)) { say(tvSdp ? "تلویزیون جواب داد ولی وصل نشد. «راه دوم» را امتحان کنید." : "تلویزیون جواب نداد. صفحهٔ تلویزیون باز است؟"); $("go").disabled = false; $("go2").hidden = false; showDiag(); } }, 15000);
