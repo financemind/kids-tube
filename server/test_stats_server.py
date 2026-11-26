@@ -220,6 +220,18 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.post("/api/rtc", {"to": "tv", "msg": {"sdp": "x" * 30000}}, tok)[0], 400)
         self.assertEqual(self.post("/api/rtc", {"to": "tv", "msg": {}}, None)[0], 401)
 
+    def test_relay_passwords(self):
+        tok = self.signup()
+        self.assertIsNone(self.post("/api/rtc/turn", {}, tok)[1]["turn"])  # no relay set up
+        self.mod.TURN_SECRET, self.mod.TURN_URLS = "s3cret", ["turn:example.test:3478"]
+        t = self.post("/api/rtc/turn", {}, tok)[1]["turn"]
+        import base64, hashlib, hmac, time
+        expires = int(t["username"].split(":")[0])
+        self.assertTrue(time.time() < expires < time.time() + 7 * 3600)
+        self.assertEqual(t["credential"], base64.b64encode(hmac.new(b"s3cret", t["username"].encode(), hashlib.sha1).digest()).decode())
+        self.assertEqual(t["urls"], ["turn:example.test:3478"])
+        self.assertEqual(self.post("/api/rtc/turn", {}, None)[0], 401)
+
     def test_late_night_and_game_switches(self):
         parent = self.signup()
         _, p = self.post("/api/pair/new")

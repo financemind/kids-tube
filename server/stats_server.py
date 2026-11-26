@@ -33,6 +33,7 @@ Tokens are random; only their SHA-256 is stored. Data: STATS_ROOT (default
 files from before accounts (stats.json, plans.json, reset, log/) are moved by
 hand into the right family: python3 stats_server.py --claim <email>
 """
+import base64
 import hashlib
 import hmac
 import json
@@ -456,6 +457,19 @@ RTC_ROLES = {"tv", "phone"}
 RTC_TICKETS = {}  # ticket -> (fid, role, expires)
 RTCS = {}  # (fid, role) -> list of queues
 MAX_RTC_MSG = 20_000
+# When the two can't reach each other directly, the picture goes through our
+# relay (coturn on this server). Its passwords are made from a shared secret
+# and stop working after a few hours (coturn's use-auth-secret).
+TURN_SECRET = os.environ.get("TURN_SECRET", "")
+TURN_URLS = [u for u in os.environ.get("TURN_URLS", "").split(",") if u]
+
+
+def turn_login(fid):
+    if not (TURN_SECRET and TURN_URLS):
+        return None
+    user = f"{int(time.time()) + 6 * 3600}:{sha(fid)[:12]}"
+    cred = base64.b64encode(hmac.new(TURN_SECRET.encode(), user.encode(), hashlib.sha1).digest()).decode()
+    return {"urls": TURN_URLS, "username": user, "credential": cred}
 
 
 def rtc_ticket(fid, role):
@@ -813,6 +827,8 @@ class Handler(BaseHTTPRequestHandler):
             if body.get("role") not in RTC_ROLES:
                 return self.reply(400, {"error": "bad request"})
             return self.reply(200, {"ticket": rtc_ticket(fid, body["role"])})
+        if path == "/api/rtc/turn":
+            return self.reply(200, {"turn": turn_login(fid)})
         if path == "/api/rtc":
             to, msg = body.get("to"), body.get("msg")
             if to not in RTC_ROLES or not isinstance(msg, dict) or len(json.dumps(msg)) > MAX_RTC_MSG:

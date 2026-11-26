@@ -132,6 +132,29 @@ function kinds(sdp) {
   const out = Object.entries(c).filter(([, n]) => n).map(([k, n]) => `${k}: ${n}`).join("، ");
   return out || "هیچ";
 }
+// Network help: Google's STUN finds the home's internet address; our relay
+// (TURN, short-lived password from our server) carries the picture when the
+// two can't reach each other directly.
+async function iceServers() {
+  const list = [{ urls: "stun:stun.l.google.com:19302" }];
+  const r = await NT.call("/rtc/turn");
+  if (r.ok && r.body && r.body.turn) list.push(r.body.turn);
+  return list;
+}
+// Which way the picture goes: straight inside the home, or through our relay.
+async function pathNow(pc) {
+  const st = await pc.getStats();
+  let pairId = null;
+  st.forEach((r) => { if (r.type === "transport" && r.selectedCandidatePairId) pairId = r.selectedCandidatePairId; });
+  let pair = pairId ? st.get(pairId) : null;
+  if (!pair) st.forEach((r) => { if (r.type === "candidate-pair" && r.state === "succeeded" && r.nominated) pair = r; });
+  if (!pair) return "";
+  const l = st.get(pair.localCandidateId), rm = st.get(pair.remoteCandidateId);
+  const types = [l && l.candidateType, rm && rm.candidateType];
+  if (types.includes("relay")) return "از راه سرور ما (فرانکفورت)";
+  if (types.includes("srflx") || types.includes("prflx")) return "از راه اینترنت خانه";
+  return "مستقیم داخل خانه";
+}
 let tvSdp = "";
 async function showDiag() {
   let pairs = 0, tried = 0;
@@ -157,13 +180,13 @@ async function connect() {
   };
   await new Promise((ok) => { es.onopen = ok; setTimeout(ok, 3000); });
   if (pc) pc.close();
-  pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+  pc = new RTCPeerConnection({ iceServers: await iceServers() });
   const video = cv.captureStream(30);
   for (const t of video.getVideoTracks()) pc.addTrack(t, video);
   for (const t of adest.stream.getAudioTracks()) pc.addTrack(t, video);
   pc.onconnectionstatechange = () => {
     const s = pc.connectionState;
-    if (s === "connected") say("✔ وصل است. حالا به تلویزیون نگاه کنید و بازی کنید.");
+    if (s === "connected") { say("✔ وصل است. حالا به تلویزیون نگاه کنید و بازی کنید."); setTimeout(async () => { const way = await pathNow(pc); if (way) say("✔ وصل است، " + way + ". حالا به تلویزیون نگاه کنید و بازی کنید."); }, 1500); }
     if (s === "failed") { say("وصل نشد. گوشی و تلویزیون روی یک وای‌فای هستند؟ (گوشی روی اینترنت سیم‌کارت نباشد.) اگر بودند، «راه دوم» را بزنید."); $("go").disabled = false; $("go2").hidden = false; showDiag(); }
     if (s === "connected") $("diag").hidden = true;
     if (s === "disconnected") { say("قطع شد."); $("go").disabled = false; }
