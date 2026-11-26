@@ -58,7 +58,7 @@ async function onMsg(m) {
       clearInterval(statTimer); statTimer = setInterval(showStats, 1000);
     };
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "failed") say("وصل نشد.", "تلویزیون و گوشی نتوانستند مستقیم به هم برسند. هر دو روی یک وای‌فای هستند؟");
+      if (pc.connectionState === "failed") say("وصل نشد.", "تلویزیون و گوشی نتوانستند مستقیم به هم برسند. هر دو روی یک وای‌فای هستند؟", `آدرس‌های تلویزیون: ${kinds(pc.localDescription && pc.localDescription.sdp)}، آدرس‌های گوشی: ${kinds(m.sdp)}، مرورگر: ${navigator.userAgent.slice(0, 90)}`);
       if (pc.connectionState === "disconnected" || pc.connectionState === "closed") say("گوشی قطع شد.", "روی گوشی دوباره «وصل شو» را بزنید.");
     };
     say("دارم وصل می‌شوم…");
@@ -72,6 +72,17 @@ async function onMsg(m) {
   }
 }
 
+function kinds(sdp) { // which kinds of network address a side offered
+  const c = { "خانه (اسم پنهان)": 0, "خانه (آدرس واقعی)": 0, "اینترنت": 0, "رله": 0 };
+  for (const line of (sdp || "").split("\n")) {
+    const m = line.match(/^a=candidate:\S+ \d+ (\S+) \d+ (\S+) \d+ typ (\S+)/i);
+    if (!m) continue;
+    if (m[3] === "host") c[m[2].endsWith(".local") ? "خانه (اسم پنهان)" : "خانه (آدرس واقعی)"]++;
+    else if (m[3] === "srflx" || m[3] === "prflx") c["اینترنت"]++;
+    else if (m[3] === "relay") c["رله"]++;
+  }
+  return Object.entries(c).filter(([, n]) => n).map(([k, n]) => `${k}: ${n}`).join("، ") || "هیچ";
+}
 function gathered(pc) {
   return new Promise((done) => {
     if (pc.iceGatheringState === "complete") return done();
