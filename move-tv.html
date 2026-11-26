@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>تلویزیون: حرکت کن!</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+/* Test: the TV asks for a move (a big picture of it: hands up, arms out, sit
+   down); the phone's camera (move-phone.html) says which move it sees; when it
+   matches, the TV cheers and asks for the next one. Only move names come here. */
+[hidden] { display: none !important; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; font: 26px/1.5 system-ui, sans-serif; color: #1d2b4f; }
+body { background: linear-gradient(#bfe3ff, #eaf7ff 70%, #a8dc8c 70%); display: grid; place-items: center; }
+.box { display: grid; justify-items: center; gap: 18px; text-align: center; padding: 24px; }
+.fig { width: min(46vh, 70vw); height: auto; transition: transform .3s; }
+.fig.yay { animation: yay .5s ease-in-out 3; }
+@keyframes yay { 50% { transform: translateY(-30px) rotate(-6deg); } }
+h1 { margin: 0; font-size: 56px; }
+.msg { margin: 0; font-size: 26px; opacity: .85; }
+.stars { position: fixed; top: 18px; right: 24px; font-size: 40px; font-weight: 700; }
+.sees { position: fixed; bottom: 14px; left: 18px; font-size: 18px; background: rgba(255, 255, 255, .7); border-radius: 12px; padding: 4px 12px; }
+button.go { font: 700 30px/1 system-ui, sans-serif; border: 0; border-radius: 22px; padding: 22px 40px; background: #f6c90e; color: #1d2b4f; box-shadow: 0 8px 0 rgba(0, 0, 0, .2); }
+.check { font-size: 120px; line-height: 1; }
+</style>
+</head>
+<body>
+<div class="stars" id="stars" hidden>⭐ ۰</div>
+<div class="box">
+  <svg class="fig" id="fig" viewBox="0 0 200 240"></svg>
+  <h1 id="title">حرکت کن!</h1>
+  <p class="msg" id="msg">در حال آماده شدن…</p>
+  <button class="go" id="go" type="button" hidden>شروع</button>
+</div>
+<div class="sees" id="sees" hidden></div>
+<script src="auth.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const fa = (n) => n.toLocaleString("fa-IR");
+const MOVES = {
+  up: { title: "دست‌ها بالا! 🙌", arms: "M100 92 L70 30 M100 92 L130 30", legs: "M100 150 L80 225 M100 150 L120 225", body: "M100 80 L100 150" },
+  out: { title: "دست‌ها باز! 🤸", arms: "M100 95 L35 95 M100 95 L165 95", legs: "M100 150 L80 225 M100 150 L120 225", body: "M100 80 L100 150" },
+  sit: { title: "بنشین! 🧎", arms: "M100 125 L70 160 M100 125 L130 160", legs: "M100 180 L65 185 L65 230 M100 180 L135 185 L135 230", body: "M100 115 L100 180" },
+};
+const SEES = { up: "دست‌ها بالا", out: "دست‌ها باز", sit: "نشسته", stand: "ایستاده", none: "کسی دیده نمی‌شود" };
+function drawFig(m, color = "#2f7fe0") {
+  const k = MOVES[m], headY = m === "sit" ? 90 : 55;
+  $("fig").innerHTML = `<g fill="none" stroke="${color}" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+    <path d="${k.body}"/><path d="${k.arms}"/><path d="${k.legs}"/></g><circle cx="100" cy="${headY}" r="24" fill="${color}"/>`;
+}
+let audio = null;
+function tune(notes, gap = 0.12) {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    notes.forEach((f, i) => {
+      const o = audio.createOscillator(), v = audio.createGain(), t = audio.currentTime + i * gap;
+      o.frequency.value = f; v.gain.setValueAtTime(0.0001, t); v.gain.exponentialRampToValueAtTime(0.25, t + 0.02); v.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+      o.connect(v); v.connect(audio.destination); o.start(t); o.stop(t + 0.45);
+    });
+  } catch (e) {}
+}
+
+let target = null, askedAt = 0, stars = 0, busy = false, now = "none", started = false;
+if (!NT.base) { $("msg").textContent = "این صفحه به سرور وصل نیست. روی noyantv.com باز کنید."; }
+else if (!NT.token()) { $("msg").textContent = "این تلویزیون هنوز وصل نشده. اول برنامهٔ نویان تی‌وی را روی همین تلویزیون باز کنید."; }
+else listen();
+drawFig("up", "#9db4d8");
+
+async function listen() {
+  const r = await NT.call("/rtc/ticket", { role: "tv" });
+  if (!r.ok) { $("msg").textContent = "به سرور وصل نشد…"; return setTimeout(listen, 3000); }
+  const es = new EventSource(NT.base + "/rtc/listen?t=" + encodeURIComponent(r.body.ticket));
+  es.onopen = () => { if (!started) $("msg").textContent = "روی گوشی noyantv.com/move-phone.html را باز کنید و دوربین را روشن کنید."; };
+  es.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch (err) { return; } if (m.type === "move") onMove(m.move); };
+  es.onerror = () => { es.close(); setTimeout(listen, 3000); };
+}
+
+function onMove(move) {
+  now = move;
+  $("sees").hidden = false; $("sees").textContent = "گوشی می‌بیند: " + (SEES[move] || move);
+  if (!started) { // the phone is there: one press of OK starts (and lets the TV play sounds)
+    $("msg").textContent = "گوشی وصل است ✔ دکمهٔ OK را بزنید.";
+    $("go").hidden = false; $("go").focus();
+    return;
+  }
+  // Done: the asked move, at least a second after asking (not a pose held from before).
+  if (target && !busy && move === target && performance.now() - askedAt > 1000) win();
+}
+$("go").onclick = () => { started = true; $("go").hidden = true; $("stars").hidden = false; tune([523, 659, 784]); next(); };
+
+function next() {
+  const keys = Object.keys(MOVES).filter((k) => k !== target);
+  target = keys[Math.floor(Math.random() * keys.length)];
+  busy = false; askedAt = performance.now();
+  drawFig(target); $("fig").classList.remove("yay");
+  $("title").textContent = MOVES[target].title;
+  $("msg").textContent = "";
+  tune([392, 523], 0.15);
+}
+function win() {
+  busy = true; stars++;
+  $("stars").textContent = "⭐ " + fa(stars);
+  drawFig(target, "#2a9d4b"); void $("fig").offsetWidth; $("fig").classList.add("yay");
+  $("title").textContent = "آفرین! ⭐";
+  tune([523, 659, 784, 1047]);
+  setTimeout(next, 2600);
+}
+</script>
+</body>
+</html>
