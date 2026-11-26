@@ -29,6 +29,8 @@ button.go:disabled { opacity: .6; }
 .pad { flex: 1; display: flex; gap: 14px; direction: ltr; }
 .diag { margin: 0; font-size: 13px; background: rgba(0, 0, 0, .35); border-radius: 10px; padding: 8px 10px; white-space: pre-line; }
 button.go2 { background: #fff; }
+.opts { display: flex; gap: 6px; }
+.opts select { flex: 1; min-width: 0; font: 14px system-ui, sans-serif; border-radius: 10px; border: 0; padding: 7px 4px; background: #fff; color: #1d2b4f; }
 .pad button { flex: 1; border: 0; border-radius: 30px; display: grid; place-items: center; box-shadow: 0 10px 0 rgba(0, 0, 0, .3); }
 .pad button svg { width: 50%; max-width: 140px; fill: #fff; }
 .pad .left { background: #e63946; } .pad .right { background: #2a9d4b; }
@@ -41,6 +43,10 @@ button.go2 { background: #fff; }
   <canvas id="c" width="1280" height="720"></canvas>
   <div class="side">
     <div class="clock" id="clock">0.000</div>
+    <div class="opts">
+      <select id="quality" aria-label="Quality"><option value="low">کیفیت کم (سریع‌تر)</option><option value="mid">کیفیت متوسط</option></select>
+      <select id="codec" aria-label="Format"><option value="h264">فرمت H.264</option><option value="vp8">فرمت VP8</option></select>
+    </div>
     <button class="go" id="go" type="button">وصل شو به تلویزیون</button>
     <button class="go go2" id="go2" type="button" hidden>راه دوم: با اجازهٔ میکروفون</button>
   </div>
@@ -158,17 +164,23 @@ async function pathNow(pc) {
 let tvSdp = "", videoSender = null;
 // A smaller picture (854×480) and a steady frame rate: less to squeeze, send and open.
 // Set once the TV has answered (before that the browser may not take it).
+// Low: 640×360, 20 frames a second, under 1 Mbit/s — less for a weak TV to open,
+// so frames don't pile up. Middle: 854×480, 30 a second. Changes at once while connected.
+const QUALITY = { low: { scale: 2, fps: 20, bps: 900000 }, mid: { scale: 1.5, fps: 30, bps: 2000000 } };
 async function tuneSender(sender) {
   try {
+    const q = QUALITY[$("quality").value] || QUALITY.low;
     const prm = sender.getParameters();
     if (!prm.encodings || !prm.encodings.length) return;
-    prm.degradationPreference = "maintain-framerate";
-    prm.encodings[0].scaleResolutionDownBy = 1.5;
-    prm.encodings[0].maxBitrate = 2500000;
-    prm.encodings[0].maxFramerate = 30;
+    prm.degradationPreference = "balanced";
+    prm.encodings[0].scaleResolutionDownBy = q.scale;
+    prm.encodings[0].maxBitrate = q.bps;
+    prm.encodings[0].maxFramerate = q.fps;
     await sender.setParameters(prm);
   } catch (e) {}
 }
+$("quality").onchange = () => { if (videoSender) tuneSender(videoSender); };
+$("codec").onchange = () => { if (pc && pc.connectionState === "connected") say("برای عوض شدن فرمت، دوباره «وصل شو» را بزنید."); $("go").disabled = false; };
 async function showDiag() {
   let pairs = 0, tried = 0;
   try { (await pc.getStats()).forEach((r) => { if (r.type === "candidate-pair") { pairs++; if (r.requestsSent) tried++; } }); } catch (e) {}
@@ -199,12 +211,13 @@ async function connect() {
   for (const t of video.getVideoTracks()) {
     t.contentHint = "motion"; // a game: keep it smooth rather than sharp
     const sender = pc.addTrack(t, video);
-    // H.264 first: TVs usually have a chip that opens it fast (VP8 is often opened by the slow main processor).
+    // The chosen format first (H.264: TVs often have a chip for it; VP8: sometimes faster when they don't).
     const tr = pc.getTransceivers().find((x) => x.sender === sender);
     try {
+      const want = $("codec").value === "vp8" ? /vp8/i : /h264/i;
       const codecs = RTCRtpSender.getCapabilities("video").codecs;
-      const h264 = codecs.filter((c) => /h264/i.test(c.mimeType));
-      if (h264.length && tr.setCodecPreferences) tr.setCodecPreferences([...h264, ...codecs.filter((c) => !/h264/i.test(c.mimeType))]);
+      const first = codecs.filter((c) => want.test(c.mimeType));
+      if (first.length && tr.setCodecPreferences) tr.setCodecPreferences([...first, ...codecs.filter((c) => !want.test(c.mimeType))]);
     } catch (e) {}
     videoSender = sender;
   }

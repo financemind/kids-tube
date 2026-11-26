@@ -136,10 +136,20 @@ async function showStats() {
   const dec = d("framesDecoded") ? 1000 * d("totalDecodeTime") / d("framesDecoded") : 0;
   const codec = video.codecId && st.get(video.codecId) ? st.get(video.codecId).mimeType.replace("video/", "") : "";
   const rtt = pair && pair.currentRoundTripTime ? pair.currentRoundTripTime * 1000 : 0;
+  // UDP or TCP to the relay: TCP can pile up delay when the line is busy.
+  let proto = "";
+  const lc = pair && st.get(pair.localCandidateId);
+  if (lc) proto = (lc.candidateType === "relay" ? (lc.relayProtocol || lc.protocol) : lc.protocol || "").toUpperCase();
+  const kbps = last ? Math.round(8 * d("bytesReceived") / ((video.timestamp - last.timestamp))) : 0;
   last = video;
   const way = await pathNow(pc);
   const fa = (n) => Math.round(n).toLocaleString("fa-IR");
-  $("stats").textContent = `تصویر: ${fa(video.frameWidth || 0)}×${fa(video.frameHeight || 0)}\nفریم در ثانیه: ${fa(fps)}\nتأخیر شبکه و بافر: حدود ${fa(rtt / 2 + buf)} میلی‌ثانیه\nباز کردن هر فریم: ${fa(dec)} میلی‌ثانیه (${codec}${video.decoderImplementation ? "، " + video.decoderImplementation : ""})\nفریم‌های گم‌شده: ${fa(video.framesDropped || 0)}${way ? "\nراه: " + way : ""}`;
+  $("stats").textContent = `تصویر: ${fa(video.frameWidth || 0)}×${fa(video.frameHeight || 0)}، ${fa(fps)} فریم در ثانیه، ${fa(kbps)} کیلوبیت\n`
+    + `شبکه: ${fa(rtt / 2)} میلی‌ثانیه${proto ? " (" + proto + ")" : ""}\n`
+    + `صف تلویزیون (بافر): ${fa(buf)} میلی‌ثانیه\n`
+    + `باز کردن هر فریم: ${fa(dec)} میلی‌ثانیه (${codec}${video.decoderImplementation ? "، " + video.decoderImplementation : ""})\n`
+    + `جمع تقریبی: ${fa(rtt / 2 + buf + dec)} میلی‌ثانیه\n`
+    + `فریم‌های گم‌شده: ${fa(video.framesDropped || 0)}${way ? "\nراه: " + way : ""}`;
 }
 </script>
 </body>
