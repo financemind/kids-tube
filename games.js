@@ -1813,70 +1813,150 @@ function musicKey(c) {
   if (game.notes >= 48) { game.busy = true; later(() => endGame(true), 1900); }
 }
 
-/* ---- Who says that? (animal sounds) ----
-   A sound plays (a cat's meow, a frog's ribbit, a chick's cheep, a little
-   dinosaur's roar), made in the browser. Press the animal that makes it. A
-   wrong one just makes its own sound, so he hears the difference. The
-   speaker button (or the same animal) plays it again. */
+/* ---- Who says that? (the farm) ----
+   Four animals stand on the grass of a farm. A real recording plays (a cat,
+   dog, cow, sheep, rooster, duck, horse or frog, from Wikimedia Commons; see
+   farm/CREDITS.md). Press the animal that makes it: it jumps, stars burst and a
+   star flies to the row at the top. A wrong one gently shakes its head and
+   makes its own sound, so he hears the difference; then the sound comes again.
+   The round badge at the top (or OK) plays it again. Only transforms and
+   opacity move, so a TV browser can keep up. */
 document.head.insertAdjacentHTML("beforeend", `<style>
-.game.sounds { background: #eaf6e4; }
-.sdroom { position: absolute; top: 0; right: 0; bottom: 120px; left: 0; display: grid; grid-template-rows: auto 1fr; justify-items: center; padding: 70px 20px 10px; direction: ltr; }
-.sdspeak { width: min(16vh, 13vw); aspect-ratio: 1; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 6px 0 rgba(29,43,79,.15); cursor: pointer; display: grid; place-items: center; }
-.sdspeak svg { width: 60%; height: 60%; }
-.sdspeak.on { animation: hop .4s ease-out 2; }
+.game.sounds { background: #8fd3ff url(farm/farm.jpg) center 30% / cover no-repeat; }
+.fm { position: absolute; inset: 0; direction: ltr; overflow: hidden; }
+.fm .badge { position: absolute; top: 4.5vh; left: 50%; width: min(19vh, 15vw); aspect-ratio: 1; margin-left: calc(min(19vh, 15vw) / -2); border: 0; border-radius: 50%; padding: 0; cursor: pointer;
+  background: radial-gradient(circle at 35% 30%, #fff8e1, #ffd36b 55%, #f2a93b); box-shadow: 0 1.2vh 0 #c97f22, 0 2vh 3vh rgba(60,40,0,.25); display: grid; place-items: center; }
+.fm .badge svg { width: 54%; height: 54%; position: relative; z-index: 1; }
+.fm .badge.on svg { animation: fmthump .35s ease-out 3; }
+@keyframes fmthump { 40% { transform: scale(1.18); } }
+.fm .ring { position: absolute; inset: 0; border-radius: 50%; border: .7vh solid #fff; opacity: 0; pointer-events: none; }
+.fm .badge.on .ring { animation: fmring 1.3s ease-out infinite; }
+.fm .badge.on .ring:nth-child(2) { animation-delay: .43s; } .fm .badge.on .ring:nth-child(3) { animation-delay: .86s; }
+@keyframes fmring { 0% { transform: scale(.9); opacity: .9; } 100% { transform: scale(1.9); opacity: 0; } }
+.fm .stars { position: absolute; top: 3.2vh; left: max(110px, 8vw); display: flex; gap: .6vw; padding: 1vh 1.2vw; border-radius: 99px; background: rgba(255,255,255,.55); }
+.fm .stars svg { width: min(4.4vh, 3.2vw); height: min(4.4vh, 3.2vw); transition: transform .4s cubic-bezier(.3,1.8,.5,1); }
+.fm .stars svg path { fill: rgba(29,43,79,.18); transition: fill .3s; }
+.fm .stars svg.got { transform: scale(1.15); } .fm .stars svg.got path { fill: #ffc531; stroke: #e08a00; stroke-width: 1.2; }
+.fm .row { position: absolute; left: 0; right: 0; bottom: 15vh; display: flex; justify-content: center; align-items: flex-end; gap: 2.5vw; }
+.fm .pet { position: relative; width: min(31vh, 21vw); height: min(36vh, 25vw); border: 0; padding: 0; background: none; cursor: pointer; display: flex; justify-content: center; align-items: flex-end; }
+.fm .mat { position: absolute; left: 6%; right: 6%; bottom: -3.2vh; height: 6.4vh; border-radius: 50%; background: var(--c);
+  box-shadow: inset 0 -.9vh 0 rgba(0,0,0,.18), inset 0 .6vh 0 rgba(255,255,255,.35), 0 1vh 1.6vh rgba(0,40,0,.25); }
+.fm .shade { position: absolute; left: 18%; right: 18%; bottom: -1.2vh; height: 2.6vh; border-radius: 50%; background: radial-gradient(rgba(0,0,0,.35), rgba(0,0,0,0) 70%); }
+.fm .body { position: relative; width: 100%; height: 100%; transform-origin: 50% 100%; will-change: transform; animation: fmin .7s cubic-bezier(.3,1.5,.55,1) both; animation-delay: var(--d); }
+.fm .body img { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; transform-origin: 50% 100%;
+  animation: fmbreathe 2.6s ease-in-out infinite; animation-delay: var(--b); }
+@keyframes fmin { from { transform: translateY(70vh) scale(.6); } }
+@keyframes fmbreathe { 50% { transform: scale(1.015, 1.035); } }
+.fm .pet.yes .body { animation: fmjump 1.1s cubic-bezier(.3,.7,.4,1) both; }
+@keyframes fmjump { 0% { transform: none; } 14% { transform: scale(1.18, .8); } 38% { transform: translateY(-26%) scale(.9, 1.12) rotate(-4deg); }
+  58% { transform: translateY(0) scale(1.14, .86); } 74% { transform: translateY(-6%) scale(.97, 1.04) rotate(2deg); } 100% { transform: none; } }
+.fm .pet.no .body { animation: fmno .8s ease-in-out both; }
+@keyframes fmno { 0%, 100% { transform: none; } 15% { transform: rotate(-7deg); } 35% { transform: rotate(6deg); } 55% { transform: rotate(-5deg); } 75% { transform: rotate(3deg); } }
+.fm .pet.talk .body img { animation: fmtalk .18s ease-in-out 4; }
+@keyframes fmtalk { 50% { transform: scale(1.04, .96); } }
+.fm .pet.away { transition: transform .6s ease-in, opacity .6s; transform: translateY(8vh) scale(.9); opacity: .35; }
+.fm .glow { position: absolute; left: 50%; top: 45%; width: 150%; aspect-ratio: 1; margin: -75% 0 0 -75%; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(rgba(255,255,255,1), rgba(255,250,200,.9) 25%, rgba(255,214,90,.55) 45%, rgba(255,214,90,0) 68%); animation: fmglow 1.3s ease-out both; }
+@keyframes fmglow { from { transform: scale(.3); opacity: 0; } 25% { transform: scale(1); opacity: 1; } 60% { opacity: .9; } to { transform: scale(1.5); opacity: 0; } }
+.fm .spark { position: absolute; left: 50%; top: 40%; width: 8vh; height: 8vh; margin: -4vh; pointer-events: none; animation: fmspark .9s cubic-bezier(.2,.8,.4,1) both; }
+@keyframes fmspark { from { transform: translate(0, 0) scale(.3) rotate(0); opacity: 1; } 70% { opacity: 1; } to { transform: translate(var(--x), var(--y)) scale(1) rotate(200deg); opacity: 0; } }
+.fm .fly { position: fixed; z-index: 9; width: 7vh; height: 7vh; margin: -3.5vh; pointer-events: none; transition: transform .9s cubic-bezier(.5,-0.3,.6,1); }
 </style>`);
-const SD_WHO = ["cat", "frog", "chick", "dino"];
-function sdNoise(a, len) { const b = a.createBuffer(1, a.sampleRate * len, a.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; const s = a.createBufferSource(); s.buffer = b; return s; }
-function sdSay(who) {
+const FARM = ["cat", "dog", "cow", "sheep", "rooster", "duck", "horse", "frog"];
+const FM_STAR = `<path d="${starPath(20, 21, 18)}"/>`;
+const FM_EAR = `<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z" fill="#7a4a12"/></svg>`;
+const fmSounds = {}; // name -> decoded sound, loaded once
+function fmLoad() {
   const a = audioCtx(); if (!a) return;
-  const t = a.currentTime + 0.02, out = a.createGain(); out.gain.value = 0.9; out.connect(a.destination);
-  const voice = (type, f0, f1, at, len, vol, filt) => { // one sliding tone
-    const o = a.createOscillator(), g = a.createGain(); o.type = type;
-    o.frequency.setValueAtTime(f0, at); o.frequency.exponentialRampToValueAtTime(f1, at + len);
-    g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(vol, at + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, at + len);
-    let node = o; if (filt) { const f = a.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = filt; o.connect(f); node = f; }
-    node.connect(g); g.connect(out); o.start(at); o.stop(at + len + 0.05);
-  };
-  if (who === "cat") { voice("sawtooth", 520, 900, t, 0.25, 0.12, 2200); voice("sawtooth", 900, 480, t + 0.25, 0.45, 0.12, 1800); }
-  else if (who === "frog") { for (const d of [0, 0.32]) for (let k = 0; k < 4; k++) voice("square", 180, 140, t + d + k * 0.045, 0.04, 0.12, 900); }
-  else if (who === "chick") { for (let k = 0; k < 3; k++) voice("sine", 2400, 3400, t + k * 0.2, 0.12, 0.14); }
-  else { // a small, friendly roar
-    voice("sawtooth", 110, 70, t, 0.9, 0.18, 500);
-    const n = sdNoise(a, 0.9), f = a.createBiquadFilter(), g = a.createGain();
-    f.type = "lowpass"; f.frequency.value = 600; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.15, t + 0.1); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
-    n.connect(f); f.connect(g); g.connect(out); n.start(t); n.stop(t + 0.95);
+  for (const n of FARM) if (!fmSounds[n]) {
+    fmSounds[n] = "loading";
+    fetch(`farm/${n}.mp3`).then((r) => r.arrayBuffer()).then((b) => new Promise((ok, no) => a.decodeAudioData(b, ok, no)))
+      .then((buf) => { fmSounds[n] = buf; }).catch(() => { delete fmSounds[n]; });
   }
 }
-const sdArt = (w, open) => w === "dino" ? `<svg viewBox="28 46 130 104">${dinoSvg({ stage: 0, mouth: open ? "open" : "smile" })}</svg>` : `<svg viewBox="0 0 100 100">${animal(w, open)}</svg>`;
-const SD_SPEAKER = `<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z" fill="#1d2b4f"/></svg>`;
+function fmPlay(n) { // the real recording; a plain audio element if the sound isn't decoded yet
+  const a = audioCtx(), buf = fmSounds[n];
+  if (a && buf && buf !== "loading") { const s = a.createBufferSource(), g = a.createGain(); g.gain.value = 0.95; s.buffer = buf; s.connect(g); g.connect(a.destination); s.start(); return buf.duration; }
+  try { new Audio(`farm/${n}.mp3`).play().catch(() => {}); } catch (e) {}
+  return 1.5;
+}
 function soundsPickArt() {
-  return `<svg viewBox="0 0 200 150"><g transform="translate(10 40) scale(.8)">${animal("cat", true)}</g><g transform="translate(110 40) scale(.8)">${animal("chick", false)}</g>
-    <g transform="translate(80 4) scale(1.6)"><path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z" fill="#1d2b4f"/></g></svg>`;
+  return `<svg viewBox="0 0 200 150"><defs><clipPath id="fmClip"><rect width="200" height="150" rx="14"/></clipPath></defs><g clip-path="url(#fmClip)"><image href="farm/farm.jpg" x="-20" y="0" width="267" height="150" preserveAspectRatio="xMidYMid slice"/></g>
+    <image href="farm/cow.png" x="18" y="40" width="88" height="96"/><image href="farm/duck.png" x="104" y="56" width="70" height="82"/></svg>`;
 }
-function soundsStart() { game.who = -1; soundsRound(); }
+function soundsStart() { // the pictures first (at most 2 s), so the animals never pop in half drawn
+  game.want = null; game.last = null; fmLoad();
+  const g = game, go = () => { if (game === g && !g.started) { g.started = true; soundsRound(); } };
+  Promise.all(FARM.map((n) => new Promise((ok) => { const im = new Image(); im.onload = im.onerror = ok; im.src = `farm/${n}.png`; }))).then(go);
+  later(go, 2000);
+}
 function soundsRound() {
-  game.order = SD_WHO.slice().sort(() => Math.random() - .5);
-  game.who = pickOther(4, game.who); game.want = game.order[game.who];
-  $("sky").innerHTML = `<div class="sdroom"><button class="sdspeak" id="sdSpeak" type="button">${SD_SPEAKER}</button>
-    <div class="feedrow">${game.order.map((w, i) => `<div class="pet" data-c="${KEY_COLORS[i]}">${sdArt(w, false)}<i class="mat" style="background:${BALLOON[KEY_COLORS[i]]}"></i></div>`).join("")}</div></div>`;
-  document.querySelectorAll(".sdroom .pet").forEach((d) => d.onclick = () => gameColor(d.dataset.c));
-  $("sdSpeak").onclick = soundsPlay;
-  later(soundsPlay, 700);
-}
-function soundsPlay() { const s = $("sdSpeak"); if (s) { s.classList.remove("on"); void s.offsetWidth; s.classList.add("on"); } sdSay(game.want); }
-function soundsKey(c) {
-  const i = KEY_COLORS.indexOf(c), pets = document.querySelectorAll(".sdroom .pet");
-  if (i < 0 || !pets.length) return;
-  const p = pets[i], who = game.order[i];
-  p.innerHTML = sdArt(who, true) + p.innerHTML.slice(p.innerHTML.indexOf("<i class"));
-  sdSay(who);
-  later(() => { if (p.isConnected) p.innerHTML = sdArt(who, false) + p.innerHTML.slice(p.innerHTML.indexOf("<i class")); }, 900);
-  if (who !== game.want) { game.wrong = (game.wrong || 0) + 1; p.classList.remove("nope"); void p.offsetWidth; p.classList.add("nope"); game.busy = true; later(() => { game.busy = false; soundsPlay(); }, 1300); return; }
+  const others = FARM.filter((n) => n !== game.last).sort(() => Math.random() - 0.5);
+  game.want = others[0]; game.last = game.want;
+  game.order = [game.want, ...others.slice(1, 4)].sort(() => Math.random() - 0.5);
   game.busy = true;
-  later(() => { p.classList.add("dance"); happy(); }, 900);
-  later(() => { game.busy = false; }, 2300);
-  if (++game.rounds >= 8) later(() => endGame(true), 2400); else later(soundsRound, 2400);
+  const stars = Array.from({ length: 8 }, (_, i) => `<svg viewBox="0 0 40 42" class="${i < game.rounds ? "got" : ""}">${FM_STAR}</svg>`).join("");
+  $("sky").innerHTML = `<div class="fm">
+    <button class="badge" id="fmBadge" type="button" aria-label="Play the sound again"><i class="ring"></i><i class="ring"></i><i class="ring"></i>${FM_EAR}</button>
+    <div class="stars" id="fmStars">${stars}</div>
+    <div class="row">${game.order.map((n, i) => `<button class="pet" type="button" data-c="${KEY_COLORS[i]}" style="--c:${BALLOON[KEY_COLORS[i]]};--d:${i * 0.09}s;--b:${-i * 0.7}s">
+      <i class="mat"></i><i class="shade"></i><div class="body"><img alt="" src="farm/${n}.png"></div></button>`).join("")}</div></div>`;
+  document.querySelectorAll(".fm .pet").forEach((p) => { p.onclick = () => gameColor(p.dataset.c); });
+  $("fmBadge").onclick = () => { if (!game.busy) soundsPlay(); };
+  const url = (n) => new URL(`farm/${n}.png`, location.href).href; // the phone's buttons show the same animals
+  keyIcons(game.order.map((n) => `<image href="${url(n)}" x="1" y="1" width="38" height="38"/>`));
+  later(() => { game.busy = false; soundsPlay(); }, 1000);
 }
+function soundsPlay() {
+  const b = $("fmBadge"); if (!b) return;
+  b.classList.remove("on"); void b.offsetWidth; b.classList.add("on");
+  const len = fmPlay(game.want);
+  clearTimeout(game.badgeOff); game.badgeOff = setTimeout(() => b.classList.remove("on"), Math.max(900, len * 1000));
+}
+function fmTalk(p, n) { p.classList.remove("talk"); void p.offsetWidth; p.classList.add("talk"); return fmPlay(n); }
+function fmBurst(p) {
+  const body = p.querySelector(".body");
+  body.insertAdjacentHTML("beforebegin", `<i class="glow"></i>`);
+  for (let k = 0; k < 10; k++) {
+    const a = (k / 10) * Math.PI * 2 + Math.random() * 0.4, r = 22 + Math.random() * 12;
+    const s = document.createElement("i"); s.className = "spark";
+    s.style.cssText = `--x:${(Math.cos(a) * r).toFixed(1)}vh;--y:${(Math.sin(a) * r - 6).toFixed(1)}vh;animation-delay:${(Math.random() * 0.12).toFixed(2)}s`;
+    s.innerHTML = `<svg viewBox="0 0 40 42"><path d="${starPath(20, 21, 18)}" fill="${["#ffc531", "#ff8fb1", "#7fd3ff", "#9be37a"][k % 4]}"/></svg>`;
+    p.appendChild(s);
+  }
+}
+function fmFly(p) { // a star from the animal to its place in the row at the top
+  const slot = document.querySelectorAll("#fmStars svg")[game.rounds - 1]; if (!slot) return;
+  const from = p.getBoundingClientRect(), to = slot.getBoundingClientRect();
+  const f = document.createElement("div"); f.className = "fly";
+  f.innerHTML = `<svg viewBox="0 0 40 42"><path d="${starPath(20, 21, 18)}" fill="#ffc531" stroke="#e08a00" stroke-width="1.2"/></svg>`;
+  f.style.left = from.left + from.width / 2 + "px"; f.style.top = from.top + from.height * 0.35 + "px";
+  document.body.appendChild(f);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    f.style.transform = `translate(${to.left + to.width / 2 - (from.left + from.width / 2)}px, ${to.top + to.height / 2 - (from.top + from.height * 0.35)}px) scale(.6)`;
+  }));
+  setTimeout(() => { f.remove(); slot.classList.add("got"); tune([1319, 1760], 0.08, 0.1); }, 950);
+}
+function soundsKey(c) {
+  const i = KEY_COLORS.indexOf(c), pets = document.querySelectorAll(".fm .pet");
+  if (i < 0 || !pets.length || game.busy) return;
+  const p = pets[i], who = game.order[i];
+  if (who !== game.want) { // its own sound, a gentle "not me", then the sound again
+    game.wrong = (game.wrong || 0) + 1; game.busy = true;
+    p.classList.remove("no"); void p.offsetWidth; p.classList.add("no");
+    const len = fmTalk(p, who);
+    later(() => { p.classList.remove("no"); game.busy = false; soundsPlay(); }, Math.max(1300, len * 1000 + 500));
+    return;
+  }
+  game.busy = true; game.rounds++;
+  pets.forEach((q) => { if (q !== p) q.classList.add("away"); });
+  p.classList.add("yes"); fmBurst(p);
+  tune([784, 988, 1175], 0.09, 0.12);
+  later(() => fmTalk(p, who), 450);
+  later(() => fmFly(p), 700);
+  if (game.rounds >= 8) later(() => endGame(true), 2800); else later(soundsRound, 2700);
+}
+function sdNoise(a, len) { const b = a.createBuffer(1, a.sampleRate * len, a.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; const s = a.createBufferSource(); s.buffer = b; return s; }
 
 /* ---- Bubbles ----
    Soft bubbles drift slowly up in the four colours. A colour key pops the
