@@ -841,6 +841,7 @@ function renderStories() {
   $("restText").textContent = "یک قصه انتخاب کن، چشم‌هایت را ببند و گوش کن.";
   $("todayTopic").hidden = true;
   const box = $("storyList");
+  if (window.myStoryButtons) myStoryButtons(box, MOON_BADGE); // his own stories first
   for (const st of nightStories()) {
     const b = document.createElement("button");
     b.style.backgroundImage = `url(${thumb(st.id)})`;
@@ -910,6 +911,8 @@ function renderGrid() {
     h.onclick = () => playGame("hunt");
     $("grid").appendChild(h);
   }
+  // Noyan's own stories, made by a parent from a real day (mystory.js).
+  if (window.myStoryCard) myStoryCard($("grid"));
   for (const v of currentList()) {
     const b = document.createElement("button");
     b.className = "video";
@@ -1468,6 +1471,7 @@ function leaveGame() {
 $("gameHome").onclick = leaveGame;
 document.querySelectorAll(".keys .k").forEach((k) => k.onclick = () => gameColor(k.classList[1]));
 function onColor(c) {
+  if (window.bookColor && window.bookColor(c)) return;
   if (!$("game").hidden) return gameColor(c);
   const press = (b) => { if (b && focusables().includes(b)) b.click(); };
   if ($("stage").hidden && $("storyList").children.length) { // bedtime: red/green move between the stories, yellow plays
@@ -1497,6 +1501,7 @@ function onColor(c) {
   else if (c === "blue") press($("rotateBtn"));
 }
 document.addEventListener("keydown", (e) => {
+  if (window.bookKey && window.bookKey(e.key)) { e.preventDefault(); return; } // Noyan's own stories (mystory.js)
   const color = COLOR_KEYS[e.keyCode] || COLOR_KEYS[e.key];
   if (color) { e.preventDefault(); onColor(color); return; }
   if (e.key.startsWith("Arrow")) { e.preventDefault(); if (!$("game").hidden && window.gameArrow && window.gameArrow(e.key)) return; moveFocus(e.key); return; }
@@ -1584,6 +1589,7 @@ else Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r) => r.json
 });
 </script>
 <script src="games.js?v=25"></script><!-- raise v whenever games.js changes, so TVs never keep an old copy -->
+<script src="mystory.js?v=1"></script><!-- the same for mystory.js -->
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

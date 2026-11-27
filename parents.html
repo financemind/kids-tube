@@ -93,6 +93,20 @@ details.card > :not(summary) + :not(summary) { margin-top: 10px; }
 .day.today .col i { background: var(--bar); }
 .day span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .day.today span { color: var(--ink); font-weight: 700; }
+/* Noyan's own stories */
+.stform { display: grid; gap: 10px; }
+.stform input[type=text], .stform textarea, .stedit textarea, .stedit input[type=text] { font: inherit; font-size: 15px; width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 10px; background: var(--soft); color: var(--ink); }
+.stform textarea { min-height: 110px; resize: vertical; }
+.stcard { border: 1px solid var(--line); border-radius: 16px; padding: 12px; display: grid; gap: 10px; background: var(--card); }
+.sthead { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.sthead b { font-size: 17px; }
+.stpage { display: grid; grid-template-columns: 96px 1fr; gap: 10px; align-items: start; }
+.stpage .ph { width: 96px; aspect-ratio: 4 / 3; border-radius: 10px; background: var(--soft); object-fit: cover; display: grid; place-items: center; font-size: 26px; }
+.stpage textarea { min-height: 70px; resize: vertical; }
+.stpage .rec { font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; background: var(--soft); color: var(--ink); cursor: pointer; }
+.stpage .rec.on { background: var(--stop); color: #fff; border-color: var(--stop); }
+.stedit { display: grid; gap: 10px; }
+.stbtns { display: flex; gap: 8px; flex-wrap: wrap; }
 /* The 7-day look */
 .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .tile { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; box-shadow: var(--shadow); display: grid; gap: 2px; align-content: start; min-width: 0; }
@@ -245,7 +259,7 @@ input.sw:disabled { opacity: .45; cursor: default; }
   </header>
 
   <nav class="jump" aria-label="بخش‌ها">
-    <a href="#gNow">الان</a><a href="#gToday">امروز</a><a href="#gSettings">ساعت و بازی</a><a href="#gInsight">تحلیل</a><a href="#gReport">گزارش</a><a href="#gFamily">دستگاه‌ها</a>
+    <a href="#gNow">الان</a><a href="#gToday">امروز</a><a href="#gSettings">ساعت و بازی</a><a href="#gStories">قصه‌ها</a><a href="#gInsight">تحلیل</a><a href="#gReport">گزارش</a><a href="#gFamily">دستگاه‌ها</a>
   </nav>
 
   <div class="stats">
@@ -330,6 +344,23 @@ input.sw:disabled { opacity: .45; cursor: default; }
       <div class="gamelist" id="gameList"></div>
       <p class="note msg" id="gamesMsg"></p>
     </section>
+  </div>
+
+  <div class="group" id="gStories">
+    <h3>قصه‌های نویان</h3>
+    <section>
+      <div class="head"><span class="ic">📖</span><h2>یک قصه از خاطرهٔ نویان</h2></div>
+      <p class="note">چند جمله از یک روز واقعی بنویسید (کجا رفتید، چه دید، یک لحظهٔ خنده‌دار یا سخت) و تا ۶ عکس بگذارید. از روی آن یک قصهٔ کوتاه شب ساخته می‌شود که نویان خودش قهرمانش است. بعد می‌توانید متن را عوض کنید و صدای خودتان را برای هر صفحه ضبط کنید. قصه روی تلویزیون، در کارت «قصه‌های نویان» و در قصه‌های شب، می‌آید.</p>
+      <div class="stform">
+        <input type="text" id="stTitle" maxlength="80" placeholder="اسم قصه (اختیاری)، مثلاً: نویان و اردک‌ها">
+        <textarea id="stMemory" maxlength="3000" placeholder="مثلاً: امروز با بابا رفتیم پارک. نویان اردک‌ها را دید و بهشان نان داد. بعد زمین خورد و گریه کرد، ولی زود پا شد و خندید."></textarea>
+        <label class="note">عکس‌ها (تا ۶ تا، هر عکس یک صفحه): <input type="file" id="stPhotos" accept="image/*" multiple></label>
+        <div class="stbtns"><button class="go" type="button" id="stMake">ساختن قصه</button></div>
+        <p class="note msg" id="stMsg"></p>
+        <p class="note">فقط جمله‌های شما برای نوشتن قصه به هوش مصنوعی (Claude) فرستاده می‌شود؛ عکس‌ها و صدای شما فقط روی سرور خانوادهٔ خودتان می‌ماند.</p>
+      </div>
+    </section>
+    <div id="stList" style="display:grid;gap:12px"></div>
   </div>
 
   <div class="group" id="gInsight">
@@ -952,6 +983,107 @@ gate.then(() => Promise.all([fetch("videos.json", { cache: "no-cache" }).then((r
   }
   insight(data, all, info);
 }));
+
+/* ---- Noyan's own stories ---- */
+async function stCall(path, body) {
+  const r = await NT.call(path, body);
+  if (r.status === 403) throw new Error("parents");
+  if (!r.ok) throw new Error("server");
+  return r.body;
+}
+const stErr = (e) => (e.message === "parents" ? "این دستگاه به‌عنوان تلویزیون وصل است. قصه را فقط با ورود پدر یا مادر می‌شود ساخت یا عوض کرد." : "به سرور وصل نشد. دوباره امتحان کنید.");
+function photoData(file) { // a photo made smaller (1280 px at most) as a JPEG
+  return new Promise((ok, bad) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, 1280 / Math.max(img.width, img.height)), c = document.createElement("canvas");
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      ok(c.toDataURL("image/jpeg", 0.82));
+    };
+    img.onerror = bad; img.src = url;
+  });
+}
+$("stMake").onclick = async () => {
+  const memory = $("stMemory").value.trim(), files = [...$("stPhotos").files].slice(0, 6);
+  if (!memory) { $("stMsg").textContent = "اول چند جمله از خاطره بنویسید."; return; }
+  $("stMake").disabled = true; $("stMsg").textContent = "دارم قصه را می‌نویسم… (تا یک دقیقه)";
+  try {
+    const { story } = await stCall("/story/new", { memory, title: $("stTitle").value.trim(), photos: files.length });
+    for (let i = 0; i < files.length && i < story.pages.length; i++) {
+      $("stMsg").textContent = `عکس ${fa(i + 1)} از ${fa(files.length)}…`;
+      await stCall("/story/upload", { id: story.id, what: "img", n: i, data: await photoData(files[i]) });
+    }
+    $("stMsg").textContent = story.by === "claude" ? "✔ قصه ساخته شد. پایین می‌توانید متنش را عوض کنید و صدایتان را ضبط کنید." : "✔ ذخیره شد. (نوشتن با هوش مصنوعی روی سرور روشن نیست، پس جمله‌های خودتان صفحه‌به‌صفحه آمد. می‌توانید پایین عوضشان کنید.)";
+    $("stMemory").value = ""; $("stTitle").value = ""; $("stPhotos").value = "";
+    stShow();
+  } catch (e) { $("stMsg").textContent = stErr(e); }
+  $("stMake").disabled = false;
+};
+async function stShow() {
+  const box = $("stList");
+  let stories = [];
+  try { stories = (await stCall("/stories", {})).stories || []; } catch (e) { return; }
+  box.innerHTML = "";
+  for (const st of stories) box.appendChild(stCard(st));
+}
+function stCard(st) {
+  const card = document.createElement("div"); card.className = "stcard";
+  card.innerHTML = `<div class="sthead"><b></b><span class="note"></span></div>
+    <div class="stedit"><input type="text" class="t" maxlength="80"><div class="pages"></div>
+    <label class="note">سؤال‌ها برای بعد از قصه (هر خط یکی):</label><textarea class="q" rows="3"></textarea>
+    <div class="stbtns"><button class="go save" type="button">ذخیرهٔ متن</button><button class="danger del" type="button">حذف قصه</button></div><p class="note msg"></p></div>`;
+  card.querySelector("b").textContent = "📖 " + st.title;
+  card.querySelector(".sthead .note").textContent = `${fa(st.pages.length)} صفحه · ${st.by === "claude" ? "نوشتهٔ هوش مصنوعی" : "جمله‌های خودتان"}`;
+  card.querySelector(".t").value = st.title;
+  card.querySelector(".q").value = (st.questions || []).join("\n");
+  const msg = card.querySelector(".msg");
+  st.pages.forEach((pg, i) => {
+    const row = document.createElement("div"); row.className = "stpage";
+    row.innerHTML = `<div><div class="ph">${pg.img ? "⏳" : "📄"}</div></div><div style="display:grid;gap:6px"><textarea></textarea>
+      <div class="stbtns"><button class="rec" type="button">🎙️ ضبط صدای من</button><span class="note">${pg.audio ? "✔ صدا ضبط شده" : ""}</span></div></div>`;
+    row.querySelector("textarea").value = pg.text;
+    if (pg.img) NT.call("/story/media", { id: st.id, what: "img", n: i }).then((r) => {
+      if (r.ok && r.body.data) { const im = document.createElement("img"); im.className = "ph"; im.src = r.body.data; row.querySelector(".ph").replaceWith(im); }
+    });
+    const rec = row.querySelector(".rec"), said = row.querySelector(".stbtns .note");
+    let mr = null, chunks = [];
+    rec.onclick = async () => { // press to record this page in your own voice, press again to stop
+      if (mr && mr.state === "recording") { mr.stop(); return; }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        chunks = []; mr = new MediaRecorder(stream);
+        mr.ondataavailable = (e) => chunks.push(e.data);
+        mr.onstop = async () => {
+          stream.getTracks().forEach((t) => t.stop()); rec.classList.remove("on"); rec.textContent = "🎙️ ضبط دوباره";
+          const blob = new Blob(chunks, { type: mr.mimeType || "audio/webm" });
+          const data = await new Promise((ok) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(blob); });
+          said.textContent = "در حال فرستادن…";
+          try { await stCall("/story/upload", { id: st.id, what: "audio", n: i, data }); said.textContent = "✔ صدا ضبط شد"; }
+          catch (e) { said.textContent = stErr(e); }
+        };
+        mr.start(); rec.classList.add("on"); rec.textContent = "⏹️ تمام (دوباره بزنید)";
+      } catch (e) { said.textContent = "اجازهٔ میکروفون داده نشد."; }
+    };
+    card.querySelector(".pages").appendChild(row);
+  });
+  const save = card.querySelector("button.save"), del = card.querySelector("button.del");
+  save.onclick = async () => {
+    msg.textContent = "صبر کنید…";
+    try {
+      await stCall("/story/edit", { id: st.id, title: card.querySelector(".t").value,
+        pages: [...card.querySelectorAll(".stpage textarea")].map((t) => ({ text: t.value })),
+        questions: card.querySelector(".q").value.split("\n") });
+      msg.textContent = "✔ ذخیره شد.";
+    } catch (e) { msg.textContent = stErr(e); }
+  };
+  del.onclick = async () => {
+    if (!confirm("این قصه و عکس‌ها و صدایش برای همیشه پاک شود؟")) return;
+    try { await stCall("/story/delete", { id: st.id }); card.remove(); } catch (e) { msg.textContent = stErr(e); }
+  };
+  return card;
+}
+gate.then(stShow);
 
 /* The 7-day analysis: only counting, no judging. */
 function insight(data, all, info) {

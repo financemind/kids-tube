@@ -59,6 +59,7 @@ ORIGINS = {"https://noyantv.com", "https://ntv.financemind.com", "https://financ
 if os.environ.get("STATS_DEV"):
     ORIGINS.add("http://localhost:8765")  # local testing only
 MAX_BODY = 200_000
+MAX_UPLOAD = 5_000_000  # a story's photo or voice (base64), only on /api/story/upload
 MAX_DEVICES = 100  # per family; old devices that stopped syncing stay in the history
 PAIR_SECONDS = 600
 DAY = re.compile(r"^\d{4}-\d{1,2}-\d{1,2}$")
@@ -527,6 +528,118 @@ def rtc_send(fid, to, msg):
     return len(lst)
 
 
+# ---------- Noyan's own stories ----------
+# A parent gives a memory (a few sentences) and up to 6 photos; Claude writes a
+# short bedtime story from it (only the parent's words go to Claude, never the
+# photos), the parent can change the words and record their own voice for each
+# page, and the TV shows it as a picture book. Kept only in the family's folder.
+STORY_ID = re.compile(r"^[a-z0-9]{8,24}$")
+MAX_STORIES = 60
+STORY_PAGES = 8
+STORY_SYSTEM = (
+    "You write very short bedtime stories in Persian (Farsi) for Noyan, a boy of three and a half. "
+    "A parent gives you a real memory. Tell that memory back as a gentle story with Noyan as the hero. "
+    "Use only the people, places and events in the parent's note; do not invent new people, dangers or lessons. "
+    "Very simple spoken Persian words, very short sentences, two or three sentences per page, "
+    "sounds a child can repeat (like vroom or splash, written in Persian), one line that repeats on several pages, "
+    "and a calm, sleepy last page. Nothing scary, no morals, no questions inside the story. "
+    "Then write three short, open questions the parent can ask Noyan afterwards about the real memory "
+    "(what he saw, did, or felt), in simple Persian."
+)
+
+
+def story_dir(fid):
+    return fam_path(fid, "stories")
+
+
+def story_read(fid, sid):
+    return read_json(os.path.join(story_dir(fid), sid + ".json"), None) if STORY_ID.match(sid or "") else None
+
+
+def story_write(fid, st):
+    os.makedirs(story_dir(fid), exist_ok=True)
+    write_json(os.path.join(story_dir(fid), st["id"] + ".json"), st)
+
+
+def story_list(fid):
+    out = []
+    try:
+        names = sorted(os.listdir(story_dir(fid)))
+    except OSError:
+        return out
+    for n in names:
+        if n.endswith(".json"):
+            st = read_json(os.path.join(story_dir(fid), n), None)
+            if st:
+                out.append(st)
+    return sorted(out, key=lambda x: x.get("made", 0), reverse=True)
+
+
+def story_media_path(fid, sid, what, n):
+    return os.path.join(story_dir(fid), f"{sid}-{what}{n}.b64")
+
+
+def clean_lines(x, most, length):
+    return [str(t).strip()[:length] for t in (x if isinstance(x, list) else []) if str(t).strip()][:most]
+
+
+def story_by_claude(memory, title, pages):
+    """The story from Claude (pages and questions), or None when there is no key,
+    no SDK, or Claude declined; then the parent's own words are used."""
+    if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
+        return None
+    try:
+        import anthropic
+    except ImportError:
+        return None
+    try:
+        client = anthropic.Anthropic(timeout=120.0)
+        response = client.beta.messages.create(
+            model="claude-opus-5-5",
+            max_tokens=16000,
+            betas=["server-side-fallback-2026-07-01"],
+            fallbacks="default",
+            output_config={
+                "effort": "medium",
+                "format": {"type": "json_schema", "schema": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string"},
+                        "pages": {"type": "array", "items": {"type": "string"}},
+                        "questions": {"type": "array", "items": {"type": "string"}},
+                    },
+                    "required": ["title", "pages", "questions"],
+                    "additionalProperties": False,
+                }},
+            },
+            system=STORY_SYSTEM,
+            messages=[{"role": "user", "content":
+                       f"Pages: exactly {pages}.\nTitle idea from the parent (may be empty): {title}\n"
+                       f"The parent's memory:\n{memory}"}],
+        )
+    except anthropic.APIError:
+        return None
+    if response.stop_reason == "refusal":
+        return None
+    text = next((b.text for b in response.content if b.type == "text"), "")
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return None
+    pages_out = clean_lines(data.get("pages"), STORY_PAGES, 600)
+    if not pages_out:
+        return None
+    return {"title": str(data.get("title", ""))[:80], "pages": pages_out, "questions": clean_lines(data.get("questions"), 5, 200)}
+
+
+def story_from_parent(memory, pages):
+    """Without Claude: the parent's own sentences, shared out over the pages."""
+    parts = [x.strip() for x in re.split(r"(?<=[.!؟?…])\s+|\n+", memory) if x.strip()] or [memory.strip()]
+    n = max(1, min(pages, len(parts)))
+    per = -(-len(parts) // n)
+    return [" ".join(parts[i:i + per]) for i in range(0, len(parts), per)][:STORY_PAGES]
+
+
 def clean_event(ev, device, label):
     if not isinstance(ev, dict) or ev.get("a") not in ACTIONS or not isinstance(ev.get("at"), (int, float)):
         return None
@@ -764,7 +877,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         size = int(self.headers.get("Content-Length") or 0)
-        if size < 0 or size > MAX_BODY:
+        if size < 0 or size > (MAX_UPLOAD if self.path == "/api/story/upload" else MAX_BODY):
             return self.reply(413, {"error": "bad size"})
         try:
             body = json.loads(self.rfile.read(size) or b"{}")
@@ -842,6 +955,63 @@ class Handler(BaseHTTPRequestHandler):
             if body.get("role") not in RTC_ROLES:
                 return self.reply(400, {"error": "bad request"})
             return self.reply(200, {"ticket": rtc_ticket(fid, body["role"])})
+        if path == "/api/stories":
+            return self.reply(200, {"stories": story_list(fid)})
+        if path == "/api/story/media":
+            st = story_read(fid, body.get("id"))
+            what, n = body.get("what"), body.get("n")
+            if not st or what not in ("img", "audio") or not isinstance(n, int) or not 0 <= n < STORY_PAGES:
+                return self.reply(400, {"error": "bad request"})
+            try:
+                with open(story_media_path(fid, st["id"], what, n)) as f:
+                    return self.reply(200, {"data": f.read()})
+            except OSError:
+                return self.reply(404, {"error": "none"})
+        if path.startswith("/api/story/"):
+            if s["kind"] != "parent":
+                return self.reply(403, {"error": "parents only"})
+            if path == "/api/story/new":
+                memory, title, photos = str(body.get("memory", "")).strip()[:3000], str(body.get("title", "")).strip()[:80], body.get("photos", 0)
+                if not memory or not isinstance(photos, int) or not 0 <= photos <= 6 or len(story_list(fid)) >= MAX_STORIES:
+                    return self.reply(400, {"error": "bad request"})
+                pages = photos or 4
+                made = story_by_claude(memory, title, pages)
+                st = {"id": secrets.token_hex(8), "made": now_ms(), "memory": memory, "photos": photos,
+                      "by": "claude" if made else "parent",
+                      "title": (made and made["title"]) or title or "قصهٔ نویان",
+                      "pages": [{"text": t} for t in (made["pages"] if made else story_from_parent(memory, pages))],
+                      "questions": made["questions"] if made else []}
+                story_write(fid, st)
+                return self.reply(200, {"story": st})
+            st = story_read(fid, body.get("id"))
+            if not st:
+                return self.reply(404, {"error": "none"})
+            if path == "/api/story/edit":
+                pages = clean_lines([p.get("text") if isinstance(p, dict) else p for p in body.get("pages", [])], STORY_PAGES, 600)
+                if not pages:
+                    return self.reply(400, {"error": "bad request"})
+                old = st.get("pages", [])
+                st["pages"] = [{**(old[i] if i < len(old) else {}), "text": t} for i, t in enumerate(pages)]
+                st["title"] = str(body.get("title", st["title"])).strip()[:80] or st["title"]
+                st["questions"] = clean_lines(body.get("questions", st.get("questions", [])), 5, 200)
+                story_write(fid, st)
+                return self.reply(200, {"story": st})
+            if path == "/api/story/upload":
+                what, n, data = body.get("what"), body.get("n"), body.get("data")
+                if what not in ("img", "audio") or not isinstance(n, int) or not 0 <= n < len(st["pages"]) \
+                        or not isinstance(data, str) or not data.startswith(("data:image/", "data:audio/")):
+                    return self.reply(400, {"error": "bad request"})
+                with open(story_media_path(fid, st["id"], what, n), "w") as f:
+                    f.write(data)
+                st["pages"][n][what] = True
+                story_write(fid, st)
+                return self.reply(200, {"story": st})
+            if path == "/api/story/delete":
+                for name in os.listdir(story_dir(fid)):
+                    if name.startswith(st["id"]):
+                        os.remove(os.path.join(story_dir(fid), name))
+                return self.reply(200, {"ok": True})
+            return self.reply(404, {"error": "not found"})
         if path == "/api/rtc/diag":
             data = body.get("data")
             if body.get("role") not in RTC_ROLES or not isinstance(data, dict) or len(json.dumps(data)) > 8000:

@@ -247,6 +247,63 @@ class ServerTest(unittest.TestCase):
                 found += [json.loads(l) for l in open(p)]
         self.assertEqual([(x["role"], x["ev"]) for x in found], [("tv", "turn")])
 
+    def test_noyans_stories(self):
+        os.environ.pop("ANTHROPIC_API_KEY", None)  # no Claude here: the parent's own words are used
+        parent = self.signup()
+        _, p = self.post("/api/pair/new")
+        self.post("/api/pair/approve", {"code": p["code"]}, parent)
+        tv = self.post("/api/pair/wait", {"pair": p["pair"]})[1]["token"]
+        memory = "رفتیم پارک. نویان اردک‌ها را دید. به آن‌ها نان داد. بعد زمین خورد و زود پا شد."
+        self.assertEqual(self.post("/api/story/new", {"memory": memory, "photos": 2}, tv)[0], 403)  # the TV can't make one
+        self.assertEqual(self.post("/api/story/new", {"memory": "", "photos": 2}, parent)[0], 400)
+        code, r = self.post("/api/story/new", {"memory": memory, "title": "پارک", "photos": 2}, parent)
+        self.assertEqual(code, 200)
+        st = r["story"]
+        self.assertEqual((st["by"], st["title"], len(st["pages"])), ("parent", "پارک", 2))
+        self.assertIn("اردک", " ".join(x["text"] for x in st["pages"]))
+        img = "data:image/jpeg;base64," + "A" * 1000
+        self.assertEqual(self.post("/api/story/upload", {"id": st["id"], "what": "img", "n": 0, "data": img}, parent)[0], 200)
+        self.assertEqual(self.post("/api/story/upload", {"id": st["id"], "what": "img", "n": 5, "data": img}, parent)[0], 400)
+        self.assertEqual(self.post("/api/story/upload", {"id": st["id"], "what": "img", "n": 1, "data": "<script>"}, parent)[0], 400)
+        listed = self.post("/api/stories", {}, tv)[1]["stories"]  # the TV can read them
+        self.assertEqual([x["id"] for x in listed], [st["id"]])
+        self.assertTrue(listed[0]["pages"][0]["img"])
+        self.assertEqual(self.post("/api/story/media", {"id": st["id"], "what": "img", "n": 0}, tv)[1]["data"], img)
+        self.assertEqual(self.post("/api/story/media", {"id": st["id"], "what": "audio", "n": 0}, tv)[0], 404)
+        _, e = self.post("/api/story/edit", {"id": st["id"], "title": "اردک‌ها", "pages": [{"text": "یک"}, {"text": "دو"}], "questions": ["چه دیدی؟"]}, parent)
+        self.assertEqual((e["story"]["title"], e["story"]["pages"][0], e["story"]["questions"]), ("اردک‌ها", {"text": "یک", "img": True}, ["چه دیدی؟"]))
+        other = self.signup("dad@example.org")
+        self.assertEqual(self.post("/api/stories", {}, other)[1]["stories"], [])  # another family sees none
+        self.assertEqual(self.post("/api/story/delete", {"id": st["id"]}, parent)[0], 200)
+        self.assertEqual(self.post("/api/stories", {}, parent)[1]["stories"], [])
+
+    def test_story_written_by_claude(self):
+        import sys, types
+        sent = {}
+
+        class FakeMessages:
+            def create(self, **kw):
+                sent.update(kw)
+                text = json.dumps({"title": "نویان و اردک‌ها", "pages": ["صفحهٔ یک", "صفحهٔ دو"], "questions": ["اردک‌ها چه رنگی بودند؟"]})
+                return types.SimpleNamespace(stop_reason="end_turn", content=[types.SimpleNamespace(type="text", text=text)])
+
+        fake = types.ModuleType("anthropic")
+        fake.APIError = Exception
+        fake.Anthropic = lambda **kw: types.SimpleNamespace(beta=types.SimpleNamespace(messages=FakeMessages()))
+        sys.modules["anthropic"] = fake
+        os.environ["ANTHROPIC_API_KEY"] = "test"
+        try:
+            parent = self.signup()
+            st = self.post("/api/story/new", {"memory": "رفتیم پارک و اردک دیدیم.", "photos": 2}, parent)[1]["story"]
+        finally:
+            del sys.modules["anthropic"]; os.environ.pop("ANTHROPIC_API_KEY", None)
+        self.assertEqual((st["by"], st["title"], [p["text"] for p in st["pages"]], st["questions"]),
+                         ("claude", "نویان و اردک‌ها", ["صفحهٔ یک", "صفحهٔ دو"], ["اردک‌ها چه رنگی بودند؟"]))
+        self.assertEqual(sent["model"], "claude-opus-5-5")
+        self.assertEqual(sent["output_config"]["format"]["type"], "json_schema")
+        self.assertIn("Pages: exactly 2", sent["messages"][0]["content"])
+        self.assertNotIn("image", json.dumps(sent))  # only the parent's words go to Claude
+
     def test_late_night_and_game_switches(self):
         parent = self.signup()
         _, p = self.post("/api/pair/new")
