@@ -1,6 +1,7 @@
 /* Shared by the app, the report and the account page: where the server is,
    the family login token, and one helper to call the server with it.
-   - On noyantv.com / ntv.financemind.com the server is on the same site.
+   - On noyantv.com / ntv.financemind.com the server is on the same site
+     (and on test.noyantv.com, the test site, its own test server).
    - The GitHub copy reaches ntv.financemind.com.
    - On this computer (localhost) there is no server, unless the page was
      opened once with ?dev (then a local test server on port 8099 is used).
@@ -13,7 +14,7 @@
     set(k, v) { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (e) {} },
   };
   if (LOCAL && params.has("dev")) store.set("devApi", "1");
-  const OWN = ["noyantv.com", "ntv.financemind.com"];
+  const OWN = ["noyantv.com", "ntv.financemind.com", "test.noyantv.com"]; // test.noyantv.com: the test site, with its own test server and data
   const base = params.has("preview") ? null
     : LOCAL ? (store.get("devApi") ? "http://localhost:8099/api" : null)
     : OWN.includes(location.hostname) ? location.origin + "/api" : "https://ntv.financemind.com/api";

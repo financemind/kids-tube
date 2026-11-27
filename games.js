@@ -140,7 +140,8 @@ const softNo = () => { if (game) game.wrong = (game.wrong || 0) + 1; tune([247],
 /* Games with a right answer: at the end, how many he got right (rounds) and
    wrong (softNo) go to the parents' report. Pairs, maze and the dinosaur are
    left out: a wrong turn there is part of playing, not a mistake. */
-window.SCORED = { colors: 1, count: 1, feed: 1, simon: 1, puzzle: 1, sizes: 1, story: 1, climb: 1, sounds: 1, hide: 1, train: 1 };
+window.SCORED = { colors: 1, count: 1, feed: 1, simon: 1, puzzle: 1, sizes: 1, story: 1, climb: 1, sounds: 1, hide: 1, train: 1,
+  freeze: 1, tempo: 1, loudsoft: 1, drum: 1, clap: 1, pose: 1 };
 
 /* ---- Picker ---- */
 const PICK = [
@@ -164,38 +165,87 @@ const PICK = [
   ["cook", cookPickArt], ["photo", photoPickArt], ["climb", climbPickArt],
   ["simon", `<svg viewBox="0 0 200 100">${["#e63946", "#2a9d4b", "#f6c90e", "#2f7fe0"].map((c, i) => `<circle cx="${30 + i * 47}" cy="50" r="20" fill="${c}" opacity="${i === 1 ? 1 : .4}"/>`).join("")}</svg>`],
   ["music", musicPickArt], ["sounds", soundsPickArt], ["bubbles", bubblesPickArt], ["hide", hidePickArt],
-  ["tower", towerPickArt], ["train", trainPickArt], ["candles", candlesPickArt], ["tree", treePickArt],
+  ["tower", towerPickArt], ["train", trainPickArt], ["candles", candlesPickArt], ["tree", treePickArt], ["mpath", mpathPickArt], ["pose", posePickArt],
   ["album", albumPickArt],
 ];
 window.PICK_KINDS = PICK.map(([kind]) => kind);
 const PICK_VID = { balloons: "game", colors: "game-colors", count: "game-count", feed: "game-feed", simon: "game-simon", pet: "game-pet", car: "game-car", maze: "game-maze", puzzle: "game-puzzle", pairs: "game-pairs", sizes: "game-sizes",
   catch: "game-catch", paint: "game-paint", story: "game-story", dress: "game-dress", cook: "game-cook", photo: "game-photo", climb: "game-climb",
-  music: "game-music", sounds: "game-sounds", bubbles: "game-bubbles", hide: "game-hide", tower: "game-tower", train: "game-train", album: "game-album", hunt: "game-hunt", candles: "game-candles", tree: "game-tree" };
-function showPicker() {
-  if (!canWatch()) return renderGrid();
+  music: "game-music", sounds: "game-sounds", bubbles: "game-bubbles", hide: "game-hide", tower: "game-tower", train: "game-train", album: "game-album", hunt: "game-hunt", candles: "game-candles", tree: "game-tree",
+  pose: "game-pose", freeze: "game-freeze", tempo: "game-tempo", loudsoft: "game-loudsoft", drum: "game-drum", clap: "game-clap" };
+/* The games come in groups: music on its own, counting and thinking, moving,
+   animals and stories, making things. The games card opens the groups; a group
+   opens its games; after a game it comes back to the same group. */
+const GAME_GROUPS = [
+  ["music", "🎵", "موسیقی", ["music", "simon", "sounds", "freeze", "tempo", "loudsoft", "drum", "clap"]],
+  ["think", "🔢", "شمردن و فکر", ["colors", "count", "sizes", "puzzle", "pairs", "climb", "maze"]],
+  ["move", "🏃", "حرکت", ["pose", "balloons", "car", "catch", "bubbles", "candles", "tree"]],
+  ["world", "🐾", "حیوان‌ها و قصه", ["feed", "photo", "hide", "story", "train"]],
+  ["make", "🎨", "ساختن", ["paint", "dress", "cook", "tower", "album"]],
+];
+let lastGroup = null;
+const groupOn = (kind) => (MUSIC_GAMES.some(([k]) => k === kind) ? gameOn("mpath") : gameOn(kind)); // the music path games share one switch
+function pickerBox(cls = "picker") {
   playingId = null; playingCat = null;
   $("home").hidden = true; $("game").hidden = false; $("game").className = "game pick";
-  const box = document.createElement("div");
-  box.className = "picker";
-  for (const [kind, art] of PICK.filter(([k]) => gameOn(k))) { // only the games the parents left on
+  const box = document.createElement("div"); box.className = cls;
+  $("sky").innerHTML = ""; $("sky").appendChild(box);
+  return box;
+}
+function showPicker(group) {
+  if (!canWatch()) return renderGrid();
+  if (typeof group !== "string") group = (group === undefined && lastGroup) || null; // after a game: back to its group; from home: the groups
+  if (group) return showGroup(group);
+  lastGroup = null;
+  const box = pickerBox("picker groups");
+  for (const [key, icon, name, kinds] of GAME_GROUPS) {
+    if (!kinds.some(groupOn)) continue; // no game of this group is switched on
     const b = document.createElement("button");
-    b.setAttribute("aria-label", kind);
-    b.innerHTML = typeof art === "function" ? art() : art; // a function: drawn when the picker opens (it may use pictures defined further down)
-    b.onclick = () => playGame(kind);
+    b.setAttribute("aria-label", name);
+    b.innerHTML = `<div class="gpic">${icon}</div><div class="gname"></div>`;
+    b.querySelector(".gname").textContent = name;
+    b.onclick = () => showGroup(key);
     box.appendChild(b);
   }
-  $("sky").innerHTML = "";
-  $("sky").appendChild(box);
+  if (box.firstChild) box.firstChild.focus({ preventScroll: true });
+}
+function showGroup(key) {
+  const grp = GAME_GROUPS.find((g) => g[0] === key);
+  if (!grp) return showPicker(null);
+  lastGroup = key;
+  const box = pickerBox(key === "music" ? "picker mumap" : "picker");
+  const arts = Object.fromEntries(PICK), open2 = stageOneStars() >= 6, st = musicStars();
+  for (const kind of grp[3].filter(groupOn)) {
+    const b = document.createElement("button"), mus = MUSIC_GAMES.find(([k]) => k === kind), locked = mus && mus[1] === 2 && !open2;
+    b.setAttribute("aria-label", kind);
+    if (mus) { // a music path game: its emoji and stars; the beat games open after six stars in the first ones
+      b.innerHTML = `<div style="display:grid;place-items:center;align-content:center;height:100%"><div class="mic">${locked ? "🔒" : mus[2]}</div>
+        <div class="mstars">${"⭐".repeat(Math.min(5, st[kind] || 0)) || "☆"}</div></div>`;
+      if (locked) b.className = "locked";
+    } else {
+      const art = arts[kind];
+      b.innerHTML = typeof art === "function" ? art() : art; // a function: drawn when the picker opens (it may use pictures defined further down)
+    }
+    b.onclick = () => (locked ? tune([330, 262], 0.12, 0.1) : playGame(kind));
+    box.appendChild(b);
+  }
+  const back = document.createElement("button"); // back to the groups
+  back.className = "back"; back.setAttribute("aria-label", "Back");
+  back.innerHTML = `<div class="gpic">↩️</div>`;
+  back.onclick = () => showPicker(null);
+  box.appendChild(back);
   box.firstChild.focus({ preventScroll: true });
 }
 function playGame(kind) {
   document.querySelectorAll(".keys .k").forEach((k) => { k.innerHTML = ""; }); // the dots belong to the counting game only
   if (kind === "balloons") { startGame(); return phoneHook("balloons"); }
+  if (kind === "mpath") return showGroup("music");
   if (!beginGame(kind, PICK_VID[kind])) return;
   later(() => phoneHook(kind), 0); // after the game has drawn itself
   ({ colors: colorsRound, count: countRound, feed: feedRound, simon: simonStart, pet: petStart, car: carStart, maze: mazeStart, puzzle: puzzleStart, pairs: pairsStart, sizes: sizesStart,
     catch: catchStart, paint: paintStart, story: storyStart, dress: dressStart, cook: cookStart, photo: photoStart, climb: climbStart,
-    music: musicStart, sounds: soundsStart, bubbles: bubblesStart, hide: hideStart, tower: towerStart, train: trainStart, album: albumStart, hunt: huntStart, candles: candlesStart, tree: treeStart })[kind]();
+    music: musicStart, sounds: soundsStart, bubbles: bubblesStart, hide: hideStart, tower: towerStart, train: trainStart, album: albumStart, hunt: huntStart, candles: candlesStart, tree: treeStart,
+    pose: poseStart, freeze: freezeStart, tempo: tempoStart, loudsoft: loudStart, drum: drumStart, clap: drumStart })[kind]();
 }
 const later = (fn, ms) => { if (game) game.timers.push(setTimeout(() => { if (game) fn(); }, ms)); };
 const pickOther = (n, last) => { let x; do x = Math.floor(Math.random() * n); while (x === last && n > 1); return x; };
@@ -216,7 +266,8 @@ function gameColor(c) {
   if (game.busy) return;
   ({ colors: colorsKey, count: countKey, feed: feedKey, simon: simonKey, pet: petKey, car: carKey, maze: mazeKey, puzzle: puzzleKey, pairs: pairsKey, sizes: sizesKey,
     catch: catchKey, paint: paintKey, story: storyKey, dress: dressKey, cook: cookKey, photo: photoKey, climb: climbKey,
-    music: musicKey, sounds: soundsKey, bubbles: bubblesKey, hide: hideKey, tower: towerKey, train: trainKey, album: albumKey, hunt: huntKey, candles: candlesKey, tree: treeKey })[game.kind](c);
+    music: musicKey, sounds: soundsKey, bubbles: bubblesKey, hide: hideKey, tower: towerKey, train: trainKey, album: albumKey, hunt: huntKey, candles: candlesKey, tree: treeKey,
+    pose: poseKey, freeze: freezeKey, tempo: tempoKey, loudsoft: loudKey, drum: drumKey, clap: drumKey })[game.kind](c);
 }
 
 /* ---- Find the colour ---- */
@@ -857,6 +908,7 @@ function phoneBtn(btn) { // one signal from the phone, played like the remote
   if (btn === "blow") { if (k === "candles") candlesBlow(); else if (k === "bubbles") phonePopBubble(); return; }
   if (btn === "pop" && k === "bubbles") return phonePopBubble();
   if (btn === "shake") {
+    if (k === "freeze") return freezeMoved();
     if (k === "tree") treeShake();
     else if (k === "dress" || k === "tower") gameColor(KEY_COLORS[Math.floor(Math.random() * 4)]);
     else if (k === "album") albumKey();
@@ -878,6 +930,7 @@ async function phoneHook(kind) {
   const mo = new MutationObserver(() => { clearTimeout(game.mirrorT); game.mirrorT = setTimeout(() => { if (game && game.kind === kind) phoneMirror(); }, 250); });
   mo.observe($("sky"), { childList: true, subtree: true });
   phoneMirror();
+  if (!game.phoneView) phoneView([null, null, null, null]); // no pictures for this game: the phone still learns which game it is
   const resend = setInterval(phoneSendView, 5000); // a phone that opens later still gets the pictures
   const stop = () => { qr.remove(); mo.disconnect(); clearInterval(resend); if (game && game.es) game.es.close(); };
   const old = game.stop; game.stop = () => { stop(); if (old) old(); };
@@ -2124,6 +2177,234 @@ function treeShake() {
   if (++game.round >= 2) later(() => endGame(true), 2600); else later(treeRound, 2800);
 }
 function treeKey() { treeShake(); }
+
+/* ---- Move like this (the phone's camera checks) ----
+   The TV shows a big stick figure: hands up, arms out, or sit down. The phone,
+   standing across the room, watches him with its camera; a body-tracking model
+   runs on the phone itself and only the move's name comes here (yellow: hands
+   up, green: arms out, blue: sitting, red: standing). When it is the move asked
+   for, the figure turns green and jumps, and the next move comes. Without a
+   phone, a parent presses the colour shown on the key. The camera picture
+   never leaves the phone. */
+const POSE_MOVES = {
+  up: { c: "yellow", say: "دست‌ها بالا! 🙌", arms: "M100 92 L70 30 M100 92 L130 30", legs: "M100 150 L80 225 M100 150 L120 225", body: "M100 80 L100 150", head: 55 },
+  out: { c: "green", say: "دست‌ها باز! 🤸", arms: "M100 95 L35 95 M100 95 L165 95", legs: "M100 150 L80 225 M100 150 L120 225", body: "M100 80 L100 150", head: 55 },
+  sit: { c: "blue", say: "بنشین! 🧎", arms: "M100 125 L70 160 M100 125 L130 160", legs: "M100 180 L65 185 L65 230 M100 180 L135 185 L135 230", body: "M100 115 L100 180", head: 90 },
+};
+const poseFig = (m, color = "#2f7fe0") => { const k = POSE_MOVES[m];
+  return `<svg viewBox="0 0 200 240"><g fill="none" stroke="${color}" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"><path d="${k.body}"/><path d="${k.arms}"/><path d="${k.legs}"/></g><circle cx="100" cy="${k.head}" r="24" fill="${color}"/></svg>`; };
+function posePickArt() { return `<svg viewBox="0 0 200 150"><g transform="translate(40 8) scale(.55)">${poseFig("up").replace(/<\/?svg[^>]*>/g, "")}</g><g transform="translate(100 8) scale(.55)">${poseFig("sit", "#2a9d4b").replace(/<\/?svg[^>]*>/g, "")}</g></svg>`; }
+function poseStart() {
+  muRoom(`<div class="dino" id="psFig" style="width:min(44vh,40vw)"></div><div class="say" id="muSay"></div>`);
+  later(poseRound, 500);
+}
+function poseRound() {
+  const keys = Object.keys(POSE_MOVES).filter((k) => k !== game.want);
+  game.want = keys[Math.floor(Math.random() * keys.length)]; game.busy = false; game.askedAt = performance.now();
+  $("psFig").innerHTML = poseFig(game.want); $("psFig").classList.remove("dance");
+  $("muSay").textContent = POSE_MOVES[game.want].say;
+  tune([392, 523], 0.15, 0.12);
+  keyIcons(["", "", "", ""].map((x, i) => { const m = Object.keys(POSE_MOVES).find((k) => POSE_MOVES[k].c === KEY_COLORS[i]); return m ? `<g transform="translate(4 2) scale(.16)">${poseFig(m, "#fff").replace(/<\/?svg[^>]*>/g, "")}</g>` : ""; }));
+}
+function poseKey(c) {
+  if (game.busy || !game.want) return;
+  const seen = Object.keys(POSE_MOVES).find((k) => POSE_MOVES[k].c === c);
+  if (!seen || seen !== game.want) { if (!game.padSeen && seen) softNo(); return; } // with the phone, other moves are just what he is doing now
+  if (performance.now() - game.askedAt < 900) return; // a move already held from before doesn't count yet
+  game.busy = true;
+  $("psFig").innerHTML = poseFig(game.want, "#2a9d4b"); $("psFig").classList.add("dance");
+  $("muSay").textContent = "آفرین! ⭐";
+  muWin();
+  if (game.rounds >= 6) later(() => endGame(true), 1800); else later(poseRound, 2200);
+}
+
+/* ---- The music path ----
+   Music step by step, from the very start. Stage 1, listening and moving:
+   freeze dance (the music stops: stand still), slow or fast (bear or rabbit),
+   loud or soft (a sleepy dinosaur). Stage 2, the beat: tap the drum with the
+   heart, clap with the beat. A map shows the stars; stage 2 opens after six
+   stars in stage 1. Every game also works with the remote. With the phone
+   (control.html): it feels his dancing (moving or still), hears loud and soft,
+   and keeps the beat itself (it plays the drum and judges each tap right there,
+   so the network's delay can't spoil the timing); only the result comes here. */
+document.head.insertAdjacentHTML("beforeend", `<style>
+.game.freeze, .game.tempo, .game.loudsoft, .game.drum, .game.clap { background: linear-gradient(#ffe6f0, #fff6e0 64%, #f4d6a8 64%); }
+.muroom { position: absolute; inset: 0 0 120px 0; display: grid; place-items: center; align-content: center; gap: 2vh; text-align: center; }
+.muroom .dino { width: min(50vh, 56vw); }
+.muroom .dino svg { width: 100%; height: auto; overflow: visible; }
+.muroom .dino.dance svg { animation: mudance .5s ease-in-out infinite alternate; transform-origin: 50% 100%; }
+@keyframes mudance { from { transform: rotate(-8deg) translateY(0); } to { transform: rotate(8deg) translateY(-14px); } }
+.muroom .say { font: 700 50px/1.3 Vazirmatn, sans-serif; color: #24324f; min-height: 1.4em; padding: 0 4vw; }
+.muroom .hud { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,.85); border-radius: 22px; padding: 6px 18px; font: 700 34px/1 Fredoka, sans-serif; color: #24324f; }
+.muroom .heart { width: min(38vh, 44vw); }
+.muroom .heart path { transform-origin: 50% 55%; transform-box: fill-box; transition: transform .08s; }
+.muroom .heart.beat path { transform: scale(1.18); }
+.muroom .heart.hit path { fill: #2a9d4b; }
+.muroom .pick2 { display: flex; gap: 8vw; direction: ltr; }
+.muroom .pick2 div { font-size: 20vh; line-height: 1; transition: transform .6s; }
+.muroom .pick2 div.go { transform: translateX(6vw) scale(1.1); }
+.muroom .notes { font-size: 54px; }
+.picker.groups { gap: 3vw; }
+.picker.groups button { width: min(17vw, 32vh); height: min(17vw, 32vh); aspect-ratio: auto; display: grid; place-items: center; align-content: center; gap: 6px; }
+.picker .gpic { font-size: min(7.5vw, 14vh); line-height: 1; }
+.picker .gname { font: 700 min(1.9vw, 24px)/1.2 Vazirmatn, sans-serif; color: #24324f; }
+.picker button.back { background: #eef3ff; display: grid; place-items: center; }
+.picker.mumap { gap: 3vw; }
+.picker.mumap button { width: min(17vw, 34vh); height: min(17vw, 34vh); }
+.picker.mumap button .mic { font-size: min(7vw, 13vh); line-height: 1; }
+.picker button.locked { opacity: .45; filter: grayscale(1); }
+.picker .mstars { font: 700 22px/1 Fredoka, sans-serif; color: #24324f; margin-top: 6px; }
+</style>`);
+const MUSIC_GAMES = [["freeze", 1, "💃"], ["tempo", 1, "🐻🐰"], ["loudsoft", 1, "🔊🤫"], ["drum", 2, "🥁"], ["clap", 2, "👏"]];
+const musicStars = () => { try { return JSON.parse(load("musicStars") || "{}"); } catch (e) { return {}; } };
+function musicStar(kind) { const st = musicStars(); st[kind] = (st[kind] || 0) + 1; save("musicStars", JSON.stringify(st)); }
+const stageOneStars = () => MUSIC_GAMES.filter(([, s]) => s === 1).reduce((a, [k]) => a + (musicStars()[k] || 0), 0);
+function mpathPickArt() {
+  return `<svg viewBox="0 0 200 150"><path d="M20 120 Q60 60 100 100 T180 40" stroke="#c9a0e8" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="2 18"/>
+    <text x="22" y="70" font-size="44">🎵</text><text x="122" y="64" font-size="40">🥁</text><text x="74" y="142" font-size="34">⭐</text></svg>`;
+}
+function musicMap() { // like the game picker, with stars; stage 2 is locked until six stars in stage 1
+  playingId = null; playingCat = null;
+  $("home").hidden = true; $("game").hidden = false; $("game").className = "game pick";
+  const box = document.createElement("div"); box.className = "picker mumap";
+  const open2 = stageOneStars() >= 6, st = musicStars();
+  for (const [kind, stage, icon] of MUSIC_GAMES) {
+    const b = document.createElement("button"), locked = stage === 2 && !open2;
+    b.setAttribute("aria-label", kind);
+    b.innerHTML = `<div style="display:grid;place-items:center;align-content:center;height:100%"><div class="mic">${locked ? "🔒" : icon}</div>
+      <div class="mstars">${"⭐".repeat(Math.min(5, st[kind] || 0)) || "☆"}</div></div>`;
+    if (locked) b.className = "locked";
+    b.onclick = () => (locked ? tune([330, 262], 0.12, 0.1) : playGame(kind));
+    box.appendChild(b);
+  }
+  $("sky").innerHTML = ""; $("sky").appendChild(box);
+  box.firstChild.focus({ preventScroll: true });
+}
+// A little dance tune that loops until stopped, played on the TV.
+const TUNE = [523, 659, 784, 659, 587, 698, 880, 698, 523, 659, 784, 1047, 988, 784, 659, 587];
+function musicLoop(bpm) {
+  let i = 0;
+  const step = () => { const a = audioCtx(); if (a) bell(a, TUNE[i++ % TUNE.length], a.currentTime + 0.01, 0.35, 0.12); };
+  step();
+  const t = setInterval(step, 60000 / bpm / 2);
+  return () => clearInterval(t);
+}
+function muRoom(inner) { $("sky").innerHTML = `<div class="muroom"><div class="hud" id="muHud">⭐ ۰</div>${inner}</div>`; }
+function muWin() { game.rounds++; musicStar(game.kind); const h = $("muHud"); if (h) h.textContent = "⭐ " + game.rounds.toLocaleString("fa-IR"); happy(); }
+function muStopLoop() { if (game && game.loopStop) { game.loopStop(); game.loopStop = null; } }
+const emojiIcon = (e) => `<text x="20" y="29" font-size="22" text-anchor="middle">${e}</text>`;
+
+/* Freeze dance: dance while the music plays; when it stops, stand still. */
+function freezeStart() {
+  muRoom(`<div class="dino dance" id="muDino"><svg viewBox="0 0 200 150">${dinoSvg({ stage: 2 })}</svg></div><div class="say" id="muSay"></div>`);
+  game.stop = () => muStopLoop();
+  later(freezeDance, 600);
+}
+function freezeDance() {
+  game.frozen = false; game.moved = false;
+  $("muDino").classList.add("dance"); $("muSay").textContent = "برقص! 💃";
+  game.loopStop = musicLoop(110);
+  later(() => { // the music stops: "Freeze!"
+    muStopLoop(); game.frozen = true; game.freezeAt = performance.now();
+    $("muDino").classList.remove("dance"); $("muSay").textContent = "ایست! ✋";
+    tune([784, 392], 0.15, 0.1);
+    later(() => {
+      game.frozen = false;
+      if (game.moved) { $("muSay").textContent = "تکان خوردی! دوباره 😄"; game.wrong = (game.wrong || 0) + 1; }
+      else { $("muSay").textContent = "آفرین! مثل مجسمه! ⭐"; muWin(); }
+      if (game.rounds >= 4) later(() => endGame(true), 1800); else later(freezeDance, 2200);
+    }, 3000);
+  }, 4000 + Math.random() * 4000);
+}
+function freezeMoved() { // the phone felt him move while frozen (the first part of a second doesn't count)
+  if (game && game.kind === "freeze" && game.frozen && performance.now() - game.freezeAt > 700) game.moved = true;
+}
+function freezeKey() {} // with the remote, the parent just watches: standing still wins
+
+/* Slow or fast: bear walks slowly, rabbit runs. Red: bear, green: rabbit. */
+function tempoStart() {
+  muRoom(`<div class="notes">🎵</div><div class="pick2"><div id="muBear">🐻</div><div id="muRabbit">🐰</div></div><div class="say" id="muSay"></div>`);
+  game.stop = () => muStopLoop();
+  later(tempoRound, 500);
+}
+function tempoRound() {
+  game.fast = Math.random() < 0.5; game.busy = false;
+  $("muSay").textContent = "آهسته است یا تند؟";
+  ["muBear", "muRabbit"].forEach((id) => $(id).classList.remove("go"));
+  muStopLoop(); game.loopStop = musicLoop(game.fast ? 170 : 55);
+  keyIcons([emojiIcon("🐻"), emojiIcon("🐰"), "", ""]);
+}
+function tempoKey(c) {
+  if (c !== "red" && c !== "green") return;
+  if ((c === "green") !== game.fast) { softNo(); return; }
+  game.busy = true; muStopLoop();
+  $(game.fast ? "muRabbit" : "muBear").classList.add("go");
+  $("muSay").textContent = game.fast ? "تند! خرگوش دوید 🐰" : "آهسته! خرس آرام رفت 🐻";
+  muWin();
+  if (game.rounds >= 6) later(() => endGame(true), 1800); else later(tempoRound, 2200);
+}
+
+/* Loud or soft: "say it softly, shhh" or "loud, wake up!". Red: loud, green: soft. */
+function loudStart() {
+  muRoom(`<div class="dino" id="muDino"></div><div class="say" id="muSay"></div>`);
+  later(loudRound, 400);
+}
+function loudRound() {
+  game.loud = Math.random() < 0.5; game.busy = false;
+  $("muDino").innerHTML = `<svg viewBox="0 0 200 150">${dinoSvg({ stage: 2, eyes: game.loud ? "closed" : "open" })}</svg>`;
+  $("muSay").textContent = game.loud ? "خوابیده! بلند بگو: بیدار شو! 🔊" : "خوابش می‌آید… آرام بگو: لالا 🤫";
+  keyIcons([emojiIcon("🔊"), emojiIcon("🤫"), "", ""]);
+}
+function loudKey(c) {
+  if (c !== "red" && c !== "green") return;
+  if ((c === "red") !== game.loud) { softNo(); return; }
+  game.busy = true;
+  $("muDino").innerHTML = `<svg viewBox="0 0 200 150">${dinoSvg({ stage: 2, eyes: game.loud ? "open" : "closed" })}</svg>`;
+  $("muSay").textContent = game.loud ? "بیدار شد! 😃" : "خوابید… 😴";
+  muWin();
+  if (game.rounds >= 6) later(() => endGame(true), 1800); else later(loudRound, 2200);
+}
+
+/* The beat: tap the drum (or clap) with the dinosaur's heart. Eight good beats
+   fill the heart; three hearts and it's done, a little faster each time. With
+   the phone, the phone keeps the beat and judges each tap (green: on the beat,
+   red: off). With the remote, the TV plays the beat and judges OK/yellow. */
+function drumStart() {
+  muRoom(`<svg class="heart" id="muHeart" viewBox="0 0 100 90"><path d="M50 84 C10 56 4 34 18 18 C30 6 46 10 50 24 C54 10 70 6 82 18 C96 34 90 56 50 84 Z" fill="#e63946"/></svg>
+    <div class="say" id="muSay"></div>`);
+  game.good = 0; game.bpm = 92;
+  $("muSay").textContent = game.kind === "clap" ? "با قلب دایناسور دست بزن 👏" : "با قلب دایناسور طبل بزن 🥁";
+  game.stop = () => clearInterval(game.beatT);
+  drumBeat();
+}
+function drumBeat() { // the TV's own beat, for playing with the remote (with a phone, the phone keeps its own and sounds it)
+  clearInterval(game.beatT);
+  const tick = () => {
+    if (!game) return;
+    game.beatAt = performance.now();
+    const h = $("muHeart"); if (h) { h.classList.add("beat"); setTimeout(() => h && h.classList.remove("beat"), 120); }
+    if (!game.padSeen) { const a = audioCtx(); if (a) bell(a, 196, a.currentTime + 0.01, 0.15, 0.14); }
+  };
+  tick(); game.beatT = setInterval(tick, 60000 / game.bpm);
+}
+function drumHit(ok) {
+  const h = $("muHeart"); if (!h) return;
+  if (!ok) { game.wrong = (game.wrong || 0) + 1; return; }
+  game.good++; h.classList.add("hit"); setTimeout(() => h && h.classList.remove("hit"), 150);
+  if (game.good < 8) return;
+  game.good = 0; muWin(); $("muSay").textContent = "آفرین! قلب پر شد ❤️";
+  if (game.rounds >= 3) { clearInterval(game.beatT); later(() => endGame(true), 1600); return; }
+  game.bpm += 10; later(drumBeat, 400);
+}
+function drumKey(c) {
+  if (game.padSeen) return drumHit(c === "green"); // the phone already judged it
+  if (c !== "yellow" && c !== "green") return;
+  const period = 60000 / game.bpm, off = (performance.now() - game.beatAt) % period;
+  drumHit(Math.min(off, period - off) < 200); // close enough to a beat
+}
+window.addEventListener("keydown", (e) => { // OK on the remote is the drum, too
+  if (game && (game.kind === "drum" || game.kind === "clap") && e.key === "Enter") { e.preventDefault(); e.stopPropagation(); drumKey("yellow"); }
+}, true);
 
 /* ---- Colour treasure hunt (out in the real room) ----
    The TV shows a colour, with a few things of that colour as a hint, and the
